@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-pensieve-dedicated
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" . | nindent 4 }}
+    firebolt/component: pensieve-dedicated
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "fbinstance.selectorLabels" . | nindent 4 }}
+    firebolt/component: pensieve-dedicated
+  ports:
+    - name: grpc
+      port: {{ .Values.metadata.server.port }}
+      targetPort: grpc
+      protocol: TCP

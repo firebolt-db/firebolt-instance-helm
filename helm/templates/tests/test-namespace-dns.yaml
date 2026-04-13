@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-test-namespace-dns
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: check
+      image: busybox:stable
+      command:
+        - sh
+        - -c
+        - |
+          SVC="{{ include "fbinstance.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local"
+          echo "Resolving $SVC ..."
+          nslookup "$SVC" \
+            && echo "PASS: namespace DNS resolves" \
+            || { echo "FAIL: DNS resolution failed — namespace may not exist or DNS is broken"; exit 1; }

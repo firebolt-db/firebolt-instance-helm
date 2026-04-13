@@ -1,0 +1,24 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-test-postgres
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: check
+      image: postgres:16
+      command:
+        - sh
+        - -c
+        - |
+          HOST="{{ printf "%s-postgresql" .Release.Name }}.{{ .Release.Namespace }}.svc.cluster.local"
+          echo "Running pg_isready against $HOST:5432 ..."
+          pg_isready -h "$HOST" -p 5432 -U {{ .Values.postgresql.auth.username }} \
+            && echo "PASS: PostgreSQL is accepting connections" \
+            || { echo "FAIL: PostgreSQL not ready"; exit 1; }
+{{- end }}

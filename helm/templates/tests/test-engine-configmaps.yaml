@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-test-engine-configmaps
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  volumes:
+    {{- range .Values.engines }}
+    - name: config-{{ .name }}
+      configMap:
+        name: {{ include "fbinstance.fullname" $ }}-{{ .name }}-config
+    {{- end }}
+  containers:
+    - name: check
+      image: busybox:stable
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+          {{- range .Values.engines }}
+          FILE="/configs/{{ .name }}/config.json"
+          echo "Validating $FILE ..."
+          [ -s "$FILE" ] || { echo "FAIL: $FILE is missing or empty"; exit 1; }
+          grep -q '"nodes"' "$FILE"             || { echo "FAIL: missing nodes key"; exit 1; }
+          grep -q '"pensieve_endpoint"' "$FILE" || { echo "FAIL: missing pensieve_endpoint key"; exit 1; }
+          echo "PASS: {{ .name }} config.json is valid"
+          {{- end }}
+      volumeMounts:
+        {{- range .Values.engines }}
+        - name: config-{{ .name }}
+          mountPath: /configs/{{ .name }}
+        {{- end }}

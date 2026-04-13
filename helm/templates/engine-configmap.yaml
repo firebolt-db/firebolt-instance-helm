@@ -1,0 +1,16 @@
+{{- range .Values.engines }}
+{{- $engine := . }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-config
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" $ | nindent 4 }}
+    firebolt/component: engine
+    firebolt/engine: {{ $engine.name }}
+data:
+  config.json: |
+    {{- include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) | trim | nindent 4 }}
+{{- end }}

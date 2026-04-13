@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-test-auth-configmap
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  volumes:
+    - name: auth-config
+      configMap:
+        name: {{ include "fbinstance.fullname" . }}-auth
+  containers:
+    - name: check
+      image: busybox:stable
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+          FILE="/auth/auth.json"
+          [ -s "$FILE" ] || { echo "FAIL: auth.json missing or empty"; exit 1; }
+          grep -q '"mode"' "$FILE" || { echo "FAIL: missing mode key"; exit 1; }
+          grep -q '"mode": "{{ .Values.auth.mode }}"' "$FILE" \
+            || { echo "FAIL: mode mismatch, expected {{ .Values.auth.mode }}"; exit 1; }
+          echo "PASS: auth.json mode={{ .Values.auth.mode }}"
+      volumeMounts:
+        - name: auth-config
+          mountPath: /auth

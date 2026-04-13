@@ -1,0 +1,21 @@
+{{- range .Values.engines }}
+{{- $engine := . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-hl
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" $ | nindent 4 }}
+    firebolt/component: engine
+    firebolt/engine: {{ $engine.name }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "fbinstance.selectorLabels" $ | nindent 4 }}
+    firebolt/engine: {{ $engine.name }}
+  ports:
+    {{- include "fbinstance.enginePorts" $ | nindent 4 }}
+{{- end }}

@@ -1,0 +1,261 @@
+{{- range .Values.engines }}
+{{- $engine := . }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}
+  labels:
+    {{- include "fbinstance.labels" $ | nindent 4 }}
+    firebolt/component: engine
+    firebolt/engine: {{ $engine.name }}
+spec:
+  serviceName: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-hl
+  replicas: {{ $engine.replicas }}
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "fbinstance.selectorLabels" $ | nindent 6 }}
+      firebolt/engine: {{ $engine.name }}
+  template:
+    metadata:
+      {{- with $engine.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "fbinstance.podLabels" $ | nindent 8 }}
+        firebolt/component: engine
+        firebolt/engine: {{ $engine.name }}
+    spec:
+      {{- if $engine.priorityClassName }}
+      priorityClassName: {{ $engine.priorityClassName }}
+      {{- end }}
+      serviceAccount: {{ $.Values.serviceAccount }}
+      serviceAccountName: {{ $.Values.serviceAccount }}
+      terminationGracePeriodSeconds: {{ $.Values.terminationGracePeriodSeconds }}
+      {{- if $.Values.nonRoot }}
+      securityContext:
+        fsGroup: 1111
+        {{- if $.Values.fsGroupChangePolicy }}
+        fsGroupChangePolicy: {{ $.Values.fsGroupChangePolicy }}
+        {{- end }}
+      {{- end }}
+      {{- if and $.Values.memlockSetup $.Values.nonRoot }}
+      shareProcessNamespace: true
+      {{- end }}
+      {{- with ($engine.tolerations | default $.Values.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($engine.affinity | default $.Values.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($engine.nodeSelector | default $.Values.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: core
+          image: "{{ $.Values.image.repository }}:{{ $.Values.version }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: NODES_COUNT
+              value: {{ $engine.replicas | quote }}
+          command: ["/bin/bash", "-c"]
+          tty: true
+          stdin: true
+          args:
+            - |
+              REQUIRED_MEMLOCK_BYTES=8589934592 # 8GB
+              function get_memlock_limit() {
+                cat /proc/self/limits | grep -F 'Max locked memory' | awk '{print $4}'
+              }
+
+              function needs_memlock_setup() {
+                # Expected: 'unlimited' or a number in bytes.
+                local CURRENT_MEMLOCK_VALUE=$(get_memlock_limit)
+
+                if [ "$CURRENT_MEMLOCK_VALUE" = "unlimited" ]; then
+                  return 1
+                fi
+                if [ "$CURRENT_MEMLOCK_VALUE" -ge "$REQUIRED_MEMLOCK_BYTES" ]; then
+                  return 1
+                fi
+
+                # memlock setup is necessary
+                return 0
+              }
+
+              echo -n "[Setup] Firebolt Core version "
+              /firebolt-core/firebolt-core --version
+
+              {{- if $.Values.nonRoot }}
+              if [[ $(id -u) -eq 0 ]]; then
+                echo "[Setup] Core container is running as root, however deployment used nonRoot=false" 1>&2
+                exit 4
+              fi
+
+              {{- if $.Values.memlockSetup }}
+              echo "[Setup] Core entrypoint PID: $BASHPID"
+              rm -f /firebolt-core/volume/entrypoint-*.pid
+              PID_FILE="/firebolt-core/volume/entrypoint-$POD_UID.pid"
+              echo "$BASHPID" > "$PID_FILE"
+              trap "rm -f $PID_FILE" EXIT
+
+              ## wait until memlock limits are changed by the helper container
+              CURRENT_MEMLOCK_VALUE=$(get_memlock_limit)
+              echo "[Setup] current soft memlock limit: $CURRENT_MEMLOCK_VALUE (will wait for limits to be upgraded if below 8GB)" 1>&2
+              while needs_memlock_setup; do
+                sleep 0.2
+              done
+              {{- end }}
+              {{- else }}
+              if [[ $(id -u) -ne 0 ]]; then
+                echo "[Setup] Core container is not running as root, however deployment used nonRoot=true" 1>&2
+                exit 4
+              fi
+
+              {{- if $.Values.memlockSetup }}
+              ## NOTE: no 'ulimit' call happens here because root images support is soon to be deprecated
+              echo "WARNING: memlockSetup=true is unnecessary with nonRoot=false" 1>&2
+              {{- end }}
+
+              {{- end }}
+              echo "[Setup] current memlock limit:" 1>&2
+              cat /proc/self/limits | grep -F 'Max locked memory' 1>&2
+
+              rm -f "$PID_FILE"
+
+              export POD_INDEX="$(echo $POD_NAME | awk -F'-' '{print $NF}')"
+              exec /firebolt-core/firebolt-core --node $POD_INDEX
+          ports:
+            - name: http-query
+              containerPort: 3473
+              protocol: TCP
+            - name: health
+              containerPort: 8122
+              protocol: TCP
+            - name: execp
+              containerPort: 5678
+              protocol: TCP
+            - name: datacp
+              containerPort: 16000
+              protocol: TCP
+            - name: storage-manager
+              containerPort: 1717
+              protocol: TCP
+            - name: storage-agent
+              containerPort: 3434
+              protocol: TCP
+            - name: metadata
+              containerPort: 6500
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          livenessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+            httpGet:
+              path: /health/live
+              port: 8122
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+            httpGet:
+              path: /health/ready
+              port: 8122
+          resources:
+            {{- toYaml $engine.resources | nindent 12 }}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - name: data
+              mountPath: /firebolt-core/volume
+            - name: engine-config
+              mountPath: /firebolt-core/config.json
+              subPath: config.json
+              readOnly: true
+            - name: auth-config
+              mountPath: /firebolt-core/auth.json
+              subPath: auth.json
+              readOnly: true
+          securityContext:
+            readOnlyRootFilesystem: false
+            {{- if $.Values.nonRoot }}
+            runAsNonRoot: true
+            runAsUser: 1111
+            runAsGroup: 1111
+            {{- end }}
+            allowPrivilegeEscalation: false
+            capabilities:
+              {{- toYaml $.Values.securityContextCapabilities | nindent 14 }}
+        {{- if and $.Values.memlockSetup $.Values.nonRoot }}
+        - name: memlock-setup
+          image: {{ $.Values.utilitiesImage }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            runAsUser: 0
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - SYS_RESOURCE
+          env:
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              {{- include "fbinstance.memlockSetupScript" $ | nindent 14 }}
+          volumeMounts:
+            - name: data
+              mountPath: /firebolt-core/volume
+        {{- end }}
+      volumes:
+        - name: engine-config
+          configMap:
+            name: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-config
+        - name: auth-config
+          configMap:
+            name: {{ include "fbinstance.fullname" $ }}-auth
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        {{- $storage := $engine.storage | default $.Values.defaultStorage }}
+        accessModes: {{ toYaml $storage.accessModes | nindent 10 }}
+        resources:
+          requests:
+            storage: {{ $storage.resources.requests.storage }}
+{{- end }}

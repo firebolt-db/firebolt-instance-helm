@@ -1,0 +1,20 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" . | nindent 4 }}
+    firebolt/component: gateway
+spec:
+  type: {{ .Values.gateway.service.type }}
+  selector:
+    {{- include "fbinstance.selectorLabels" . | nindent 4 }}
+    firebolt/component: gateway
+  ports:
+    - name: http-query
+      port: {{ .Values.gateway.service.port }}
+      targetPort: http-query
+      protocol: TCP
+{{- end }}

@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-test-gateway-health
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: test
+      image: curlimages/curl:latest
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+          BASE="{{ include "fbinstance.fullname" . }}"
+          NS="{{ .Release.Namespace }}"
+
+          echo "=== Gateway health ==="
+          curl --fail --retry 5 --retry-delay 3 --retry-connrefused \
+            "http://${BASE}-gateway.${NS}.svc.cluster.local:{{ .Values.gateway.service.port }}/health/ready"
+          echo "PASS: gateway ready"
+
+          echo "=== PensieveDedicated reachable ==="
+          (echo > /dev/tcp/${BASE}-pensieve-dedicated.${NS}.svc.cluster.local/{{ .Values.metadata.server.port }}) 2>/dev/null \
+            && echo "PASS: PensieveDedicated port {{ .Values.metadata.server.port }} open" \
+            || { echo "FAIL: PensieveDedicated unreachable"; exit 1; }
+
+          {{- range .Values.engines }}
+          echo "=== Engine {{ .name }} pod-0 health ==="
+          (echo > /dev/tcp/${BASE}-{{ .name }}-0.${BASE}-{{ .name }}-hl.${NS}.svc.cluster.local/8122) 2>/dev/null \
+            && echo "PASS: {{ .name }} pod-0 health port open" \
+            || { echo "FAIL: {{ .name }} pod-0 unreachable"; exit 1; }
+          {{- end }}
+
+          echo "=== All checks passed ==="
