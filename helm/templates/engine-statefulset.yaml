@@ -66,8 +66,8 @@ spec:
       {{- end }}
       containers:
         - name: core
-          image: "{{ $.Values.image.repository }}:{{ $.Values.version }}"
-          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          image: "{{ $.Values.engineSpec.image.repository }}:{{ $.Values.engineSpec.image.tag }}"
+          imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
           env:
             - name: POD_NAME
               valueFrom:
@@ -215,7 +215,7 @@ spec:
         {{- if and $.Values.engineSpec.memlockSetup $.Values.engineSpec.nonRoot }}
         - name: memlock-setup
           image: {{ $.Values.utilitiesImage }}
-          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
           resources:
             requests:
               cpu: 50m

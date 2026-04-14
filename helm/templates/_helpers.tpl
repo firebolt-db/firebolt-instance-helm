@@ -36,8 +36,8 @@ Common labels
 {{- define "fbinstance.labels" -}}
 {{ include "fbinstance.selectorLabels" . }}
 helm.sh/chart: {{ include "fbinstance.chart" . }}
-{{- if .Values.version }}
-app.kubernetes.io/version: {{ .Values.version | quote }}
+{{- if .Values.engineSpec.image.tag }}
+app.kubernetes.io/version: {{ .Values.engineSpec.image.tag | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}

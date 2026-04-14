@@ -33,8 +33,8 @@ spec:
       {{- end }}
       containers:
         - name: gateway
-          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag | default .Values.version }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.engineSpec.image.pullPolicy }}
           args:
             - serve
             - --config=/etc/core-gateway.yaml

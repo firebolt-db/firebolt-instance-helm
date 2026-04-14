@@ -69,8 +69,8 @@ spec:
       {{- end }}
       containers:
         - name: pensieve-dedicated
-          image: "{{ .Values.metadata.image.repository }}:{{ .Values.metadata.image.tag | default .Values.version }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.metadata.image.repository }}:{{ .Values.metadata.image.tag }}"
+          imagePullPolicy: {{ .Values.engineSpec.image.pullPolicy }}
           command: ["/dedicated-pensieve", "--config", "/configs/config.xml"]
           ports:
             - name: grpc

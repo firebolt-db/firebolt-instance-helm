@@ -1,27 +1,47 @@
 ---
 
-# Engine image (shared across all engines)
-image:
-  # ECR repository for the firebolt-core engine image.
-  repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/firebolt-core
-  # imagePullPolicy applied to all containers in every pod.
-  pullPolicy: Always
-
 # Registry credentials — must be a pre-created docker-registry Secret in the
 # deployment namespace. The Makefile `create` target handles this for ECR.
 # Leave empty if your nodes have ambient registry access (e.g. node IAM role).
 imagePullSecrets: []
 # - name: regcred
 
-# Engine version (required). Used as the firebolt-core image tag and as the
-# fallback tag for pensieve-dedicated and gateway when their individual tag is
-# left empty. Set this in your values override.
-version: ""
-
 # When true, a Namespace resource is included in the chart output.
 # Pair with: helm install --create-namespace --set createNamespace=false
 # (the Makefile create target handles this automatically).
 createNamespace: false
+
+# ---------------------------------------------------------------------------
+# Shared engine pod defaults (apply to all engines unless overridden per-engine)
+# ---------------------------------------------------------------------------
+engineSpec:
+  image:
+    # ECR repository for the firebolt-core engine image.
+    repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/firebolt-core
+    # Image tag (required). Set in your values override.
+    tag: "release-4.32.0-pre.0.20260414104905.92750f097354"
+    pullPolicy: Always
+
+  nonRoot: true
+  memlockSetup: true
+  fsGroupChangePolicy: "OnRootMismatch"
+  terminationGracePeriodSeconds: 5
+  serviceAccount: default
+  tolerations: []
+  affinity: {}
+  nodeSelector: {}
+
+  # ---------------------------------------------------------------------------
+  # Default PVC storage spec for engines
+  # ---------------------------------------------------------------------------
+  # storageClassName is intentionally absent — the cluster default storage class
+  # is used. Override here or per-engine if your cluster requires a specific class
+  # (e.g. storageClassName: gp3).
+  defaultStorage:
+    accessModes: [ReadWriteOnce]
+    resources:
+      requests:
+        storage: 100Gi
 
 # ---------------------------------------------------------------------------
 # Metadata service — pensieve-dedicated
@@ -31,7 +51,7 @@ metadata:
     # ECR repository for the pensieve-dedicated metadata service.
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/dedicated-pensieve
     # Pensieve is versioned independently from firebolt-core.
-    # Set explicitly in your values override. Defaults to .Values.version if empty.
+    # Set explicitly in your values override.
     tag: ""
 
   resources:
@@ -113,7 +133,7 @@ gateway:
     # ECR repository for the core-gateway image.
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/core-gateway
     # Gateway follows its own semver release cadence (v-prefixed, e.g. "v1.54.0").
-    # Set explicitly in your values override. Defaults to .Values.version if empty.
+    # Set explicitly in your values override.
     tag: ""
   resources:
     # Gateway is stateless and CPU-light; it proxies HTTP queries to engines.
@@ -156,31 +176,6 @@ auth:
     clientID: ""
     claimMappings:
       username: "email"
-
-# ---------------------------------------------------------------------------
-# Shared engine pod defaults (apply to all engines unless overridden per-engine)
-# ---------------------------------------------------------------------------
-engineSpec:
-  nonRoot: true
-  memlockSetup: true
-  fsGroupChangePolicy: "OnRootMismatch"
-  terminationGracePeriodSeconds: 5
-  serviceAccount: default
-  tolerations: []
-  affinity: {}
-  nodeSelector: {}
-
-  # ---------------------------------------------------------------------------
-  # Default PVC storage spec for engines
-  # ---------------------------------------------------------------------------
-  # storageClassName is intentionally absent — the cluster default storage class
-  # is used. Override here or per-engine if your cluster requires a specific class
-  # (e.g. storageClassName: gp3).
-  defaultStorage:
-    accessModes: [ReadWriteOnce]
-    resources:
-      requests:
-        storage: 100Gi
 
 # ---------------------------------------------------------------------------
 # Engines
