@@ -21,7 +21,7 @@ version: ""
 # When true, a Namespace resource is included in the chart output.
 # Pair with: helm install --create-namespace --set createNamespace=false
 # (the Makefile create target handles this automatically).
-createNamespace: true
+createNamespace: false
 
 # ---------------------------------------------------------------------------
 # Metadata service — pensieve-dedicated
