@@ -92,7 +92,7 @@ Common engine ports
 
 {{/*
 Engine config JSON helper.
-Produces a JSON object with nodes (Pod FQDNs) and pensieve_endpoint.
+Produces a JSON object with nodes (Pod FQDNs) and the metadata endpoint.
 Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 */}}
 {{- define "fbinstance.engineConfig" -}}
@@ -107,7 +107,7 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{-   $fqdn := printf "%s-%d.%s.%s.svc.cluster.local" $stsName $i $svcName $ns -}}
 {{-   $nodes = append $nodes (dict "host" $fqdn) -}}
 {{- end -}}
-{{- $config := dict "nodes" $nodes "pensieve_endpoint" (printf "%s.%s.svc.cluster.local:%d" $pensieveSvc $ns (int $root.Values.metadata.server.port)) -}}
+{{- $config := dict "nodes" $nodes "multi_engine_endpoint" (printf "%s.%s.svc.cluster.local:%d" $pensieveSvc $ns (int $root.Values.metadata.server.port)) -}}
 {{- if $root.Values.customNodeConfig -}}
 {{-   $config = merge $config $root.Values.customNodeConfig -}}
 {{- end -}}
