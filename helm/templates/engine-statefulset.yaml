@@ -34,28 +34,28 @@ spec:
       {{- if $engine.priorityClassName }}
       priorityClassName: {{ $engine.priorityClassName }}
       {{- end }}
-      serviceAccount: {{ $.Values.serviceAccount }}
-      serviceAccountName: {{ $.Values.serviceAccount }}
-      terminationGracePeriodSeconds: {{ $.Values.terminationGracePeriodSeconds }}
-      {{- if $.Values.nonRoot }}
+      serviceAccount: {{ $.Values.engineSpec.serviceAccount }}
+      serviceAccountName: {{ $.Values.engineSpec.serviceAccount }}
+      terminationGracePeriodSeconds: {{ $.Values.engineSpec.terminationGracePeriodSeconds }}
+      {{- if $.Values.engineSpec.nonRoot }}
       securityContext:
         fsGroup: 1111
-        {{- if $.Values.fsGroupChangePolicy }}
-        fsGroupChangePolicy: {{ $.Values.fsGroupChangePolicy }}
+        {{- if $.Values.engineSpec.fsGroupChangePolicy }}
+        fsGroupChangePolicy: {{ $.Values.engineSpec.fsGroupChangePolicy }}
         {{- end }}
       {{- end }}
-      {{- if and $.Values.memlockSetup $.Values.nonRoot }}
+      {{- if and $.Values.engineSpec.memlockSetup $.Values.engineSpec.nonRoot }}
       shareProcessNamespace: true
       {{- end }}
-      {{- with ($engine.tolerations | default $.Values.tolerations) }}
+      {{- with ($engine.tolerations | default $.Values.engineSpec.tolerations) }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with ($engine.affinity | default $.Values.affinity) }}
+      {{- with ($engine.affinity | default $.Values.engineSpec.affinity) }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with ($engine.nodeSelector | default $.Values.nodeSelector) }}
+      {{- with ($engine.nodeSelector | default $.Values.engineSpec.nodeSelector) }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -107,13 +107,13 @@ spec:
               echo -n "[Setup] Firebolt Core version "
               /firebolt-core/firebolt-core --version
 
-              {{- if $.Values.nonRoot }}
+              {{- if $.Values.engineSpec.nonRoot }}
               if [[ $(id -u) -eq 0 ]]; then
                 echo "[Setup] Core container is running as root, however deployment used nonRoot=false" 1>&2
                 exit 4
               fi
 
-              {{- if $.Values.memlockSetup }}
+              {{- if $.Values.engineSpec.memlockSetup }}
               echo "[Setup] Core entrypoint PID: $BASHPID"
               rm -f /firebolt-core/volume/entrypoint-*.pid
               PID_FILE="/firebolt-core/volume/entrypoint-$POD_UID.pid"
@@ -133,7 +133,7 @@ spec:
                 exit 4
               fi
 
-              {{- if $.Values.memlockSetup }}
+              {{- if $.Values.engineSpec.memlockSetup }}
               ## NOTE: no 'ulimit' call happens here because root images support is soon to be deprecated
               echo "WARNING: memlockSetup=true is unnecessary with nonRoot=false" 1>&2
               {{- end }}
@@ -204,7 +204,7 @@ spec:
               readOnly: true
           securityContext:
             readOnlyRootFilesystem: false
-            {{- if $.Values.nonRoot }}
+            {{- if $.Values.engineSpec.nonRoot }}
             runAsNonRoot: true
             runAsUser: 1111
             runAsGroup: 1111
@@ -212,7 +212,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               {{- toYaml $.Values.securityContextCapabilities | nindent 14 }}
-        {{- if and $.Values.memlockSetup $.Values.nonRoot }}
+        {{- if and $.Values.engineSpec.memlockSetup $.Values.engineSpec.nonRoot }}
         - name: memlock-setup
           image: {{ $.Values.utilitiesImage }}
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
@@ -253,7 +253,7 @@ spec:
     - metadata:
         name: data
       spec:
-        {{- $storage := $engine.storage | default $.Values.defaultStorage }}
+        {{- $storage := $engine.storage | default $.Values.engineSpec.defaultStorage }}
         accessModes: {{ toYaml $storage.accessModes | nindent 10 }}
         resources:
           requests:

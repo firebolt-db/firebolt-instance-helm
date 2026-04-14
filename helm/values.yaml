@@ -160,26 +160,27 @@ auth:
 # ---------------------------------------------------------------------------
 # Shared engine pod defaults (apply to all engines unless overridden per-engine)
 # ---------------------------------------------------------------------------
-nonRoot: true
-memlockSetup: true
-fsGroupChangePolicy: "OnRootMismatch"
-terminationGracePeriodSeconds: 5
-serviceAccount: default
-tolerations: []
-affinity: {}
-nodeSelector: {}
+engineSpec:
+  nonRoot: true
+  memlockSetup: true
+  fsGroupChangePolicy: "OnRootMismatch"
+  terminationGracePeriodSeconds: 5
+  serviceAccount: default
+  tolerations: []
+  affinity: {}
+  nodeSelector: {}
 
-# ---------------------------------------------------------------------------
-# Default PVC storage spec for engines
-# ---------------------------------------------------------------------------
-# storageClassName is intentionally absent — the cluster default storage class
-# is used. Override here or per-engine if your cluster requires a specific class
-# (e.g. storageClassName: gp3).
-defaultStorage:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: 100Gi
+  # ---------------------------------------------------------------------------
+  # Default PVC storage spec for engines
+  # ---------------------------------------------------------------------------
+  # storageClassName is intentionally absent — the cluster default storage class
+  # is used. Override here or per-engine if your cluster requires a specific class
+  # (e.g. storageClassName: gp3).
+  defaultStorage:
+    accessModes: [ReadWriteOnce]
+    resources:
+      requests:
+        storage: 100Gi
 
 # ---------------------------------------------------------------------------
 # Engines
