@@ -106,13 +106,13 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{- define "fbinstance.engineConfig" -}}
 {{- $root := .root -}}
 {{- $engine := .engine -}}
-{{- $stsName := printf "%s-%s" (include "fbinstance.fullname" $root) $engine.name -}}
-{{- $svcName := printf "%s-%s-hl" (include "fbinstance.fullname" $root) $engine.name -}}
+{{- $baseName := printf "%s-%s" (include "fbinstance.fullname" $root) $engine.name -}}
+{{- $svcName := printf "%s-hl" $baseName -}}
 {{- $ns := $root.Release.Namespace -}}
 {{- $pensieveSvc := printf "%s-pensieve-dedicated" (include "fbinstance.fullname" $root) -}}
 {{- $nodes := list -}}
 {{- range $i := until (int $engine.replicas) -}}
-{{-   $fqdn := printf "%s-%d.%s.%s.svc%s" $stsName $i $svcName $ns $root.Values.engineSpec.nodeHostSuffix -}}
+{{-   $fqdn := printf "%s-node-%d-0.%s.%s.svc%s" $baseName $i $svcName $ns $root.Values.engineSpec.nodeHostSuffix -}}
 {{-   $nodes = append $nodes (dict "host" $fqdn) -}}
 {{- end -}}
 {{- $config := dict "nodes" $nodes "multi_engine_endpoint" (printf "%s.%s.svc.cluster.local:%d" $pensieveSvc $ns (int $root.Values.metadata.server.port)) -}}

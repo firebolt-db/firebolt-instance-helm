@@ -1,18 +1,20 @@
 {{- range .Values.engines }}
 {{- $engine := . }}
+{{- range $i := until (int $engine.replicas) }}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   namespace: {{ $.Release.Namespace }}
-  name: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}
+  name: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-node-{{ $i }}
   labels:
     {{- include "fbinstance.labels" $ | nindent 4 }}
     firebolt/component: engine
     firebolt/engine: {{ $engine.name }}
+    firebolt/node: {{ $i | quote }}
 spec:
   serviceName: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-hl
-  replicas: {{ $engine.replicas }}
+  replicas: 1
   podManagementPolicy: Parallel
   updateStrategy:
     type: RollingUpdate
@@ -22,6 +24,7 @@ spec:
     matchLabels:
       {{- include "fbinstance.selectorLabels" $ | nindent 6 }}
       firebolt/engine: {{ $engine.name }}
+      firebolt/node: {{ $i | quote }}
   template:
     metadata:
       {{- with $engine.podAnnotations }}
@@ -32,6 +35,7 @@ spec:
         {{- include "fbinstance.podLabels" $ | nindent 8 }}
         firebolt/component: engine
         firebolt/engine: {{ $engine.name }}
+        firebolt/node: {{ $i | quote }}
     spec:
       {{- if $engine.priorityClassName }}
       priorityClassName: {{ $engine.priorityClassName }}
@@ -71,10 +75,8 @@ spec:
           image: "{{ $.Values.engineSpec.image.repository }}:{{ $.Values.engineSpec.image.tag }}"
           imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
           env:
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
+            - name: FIREBOLT_CORE_NODE
+              value: {{ $i | quote }}
             - name: POD_UID
               valueFrom:
                 fieldRef:
@@ -146,8 +148,7 @@ spec:
 
               rm -f "$PID_FILE"
 
-              export POD_INDEX="$(echo $POD_NAME | awk -F'-' '{print $NF}')"
-              exec /firebolt-core/firebolt-core --node $POD_INDEX
+              exec /firebolt-core/firebolt-core --node $FIREBOLT_CORE_NODE
           ports:
             - name: http-query
               containerPort: 3473
@@ -343,5 +344,6 @@ spec:
         resources:
           requests:
             storage: {{ $storage.resources.requests.storage }}
+{{- end }}
 {{- end }}
 {{- end }}

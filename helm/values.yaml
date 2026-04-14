@@ -217,8 +217,9 @@ auth:
 # ---------------------------------------------------------------------------
 # Engines
 # ---------------------------------------------------------------------------
-# Each entry produces one StatefulSet + headless Service + ClusterIP Service +
-# ConfigMap. Per-engine values override the shared pod defaults above.
+# Each entry produces one StatefulSet per node (replicas controls the count),
+# plus a shared headless Service, ClusterIP Service and ConfigMap.
+# Per-engine values override the shared engineSpec defaults above.
 engines:
   - name: default
     replicas: 1
