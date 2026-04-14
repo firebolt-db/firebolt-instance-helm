@@ -40,6 +40,9 @@ helm.sh/chart: {{ include "fbinstance.chart" . }}
 app.kubernetes.io/version: {{ .Values.engineSpec.image.tag | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- if .Values.extraLabels }}
+{{ toYaml .Values.extraLabels }}
+{{- end }}
 {{- end }}
 
 {{/*
@@ -88,6 +91,11 @@ Common engine ports
 - name: metrics
   port: 9090
   protocol: TCP
+{{- if .Values.engineSpec.uiSidecar }}
+- name: web-ui
+  port: 9100
+  protocol: TCP
+{{- end }}
 {{- end }}
 
 {{/*
@@ -104,7 +112,7 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{- $pensieveSvc := printf "%s-pensieve-dedicated" (include "fbinstance.fullname" $root) -}}
 {{- $nodes := list -}}
 {{- range $i := until (int $engine.replicas) -}}
-{{-   $fqdn := printf "%s-%d.%s.%s.svc.cluster.local" $stsName $i $svcName $ns -}}
+{{-   $fqdn := printf "%s-%d.%s.%s.svc%s" $stsName $i $svcName $ns $root.Values.engineSpec.nodeHostSuffix -}}
 {{-   $nodes = append $nodes (dict "host" $fqdn) -}}
 {{- end -}}
 {{- $config := dict "nodes" $nodes "multi_engine_endpoint" (printf "%s.%s.svc.cluster.local:%d" $pensieveSvc $ns (int $root.Values.metadata.server.port)) -}}

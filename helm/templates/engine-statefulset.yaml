@@ -14,8 +14,10 @@ spec:
   serviceName: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-hl
   replicas: {{ $engine.replicas }}
   podManagementPolicy: Parallel
+  {{- if hasKey $.Values.engineSpec "updateStrategy" }}
   updateStrategy:
-    type: RollingUpdate
+    type: {{ $.Values.engineSpec.updateStrategy }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "fbinstance.selectorLabels" $ | nindent 6 }}
@@ -179,6 +181,7 @@ spec:
             httpGet:
               path: /health/live
               port: 8122
+          {{- if $.Values.engineSpec.readiness }}
           readinessProbe:
             initialDelaySeconds: 5
             periodSeconds: 5
@@ -187,6 +190,7 @@ spec:
             httpGet:
               path: /health/ready
               port: 8122
+          {{- end }}
           resources:
             {{- toYaml $engine.resources | nindent 12 }}
           terminationMessagePath: /dev/termination-log
@@ -212,6 +216,40 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               {{- toYaml $.Values.securityContextCapabilities | nindent 14 }}
+        {{- if $.Values.engineSpec.uiSidecar }}
+        - name: core-ui
+          image: ghcr.io/firebolt-db/firebolt-core-ui:latest
+          imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
+          env:
+            - name: FIREBOLT_CORE_URL
+              value: http://localhost:3473
+          ports:
+            - containerPort: 9100
+              name: web-ui
+              protocol: TCP
+          resources:
+            limits:
+              memory: 128Mi
+            requests:
+              cpu: 25m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1111
+            runAsGroup: 1111
+          volumeMounts:
+            - name: nginx-writable-dir
+              mountPath: /var/tmp
+            - name: nginx-writable-dir
+              mountPath: /var/cache/nginx
+            - name: nginx-writable-dir
+              mountPath: /var/run/nginx
+        {{- end }}
         {{- if and $.Values.engineSpec.memlockSetup $.Values.engineSpec.nonRoot }}
         - name: memlock-setup
           image: {{ $.Values.utilitiesImage }}
@@ -242,13 +280,60 @@ spec:
             - name: data
               mountPath: /firebolt-core/volume
         {{- end }}
+{{- $hpEnabled := $.Values.engineSpec.hostPathStorageEnabled }}
+{{- if or $hpEnabled $.Values.engineSpec.customInitContainersTemplate }}
+      initContainers:
+        {{- if $.Values.engineSpec.customInitContainersTemplate }}
+        {{- tpl (toYaml $.Values.engineSpec.customInitContainersTemplate) $ | nindent 8 }}
+        {{- end }}
+        {{- if $hpEnabled }}
+        - name: host-path-setup
+          image: {{ $.Values.utilitiesImage }}
+          imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "[Setup] changing ownership of /firebolt-core/volume to UID 1111"
+              chown -R 1111:1111 /firebolt-core/volume
+          resources:
+            limits:
+              memory: 24Mi
+            requests:
+              cpu: 25m
+              memory: 24Mi
+          securityContext:
+            runAsUser: 0
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - CHOWN
+          volumeMounts:
+            - name: data
+              mountPath: /firebolt-core/volume
+        {{- end }}
+{{- end }}
       volumes:
+        {{- if $.Values.engineSpec.uiSidecar }}
+        - name: nginx-writable-dir
+          emptyDir: {}
+        {{- end }}
         - name: engine-config
           configMap:
             name: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-config
         - name: auth-config
           configMap:
             name: {{ include "fbinstance.fullname" $ }}-auth
+        {{- with $.Values.engineSpec.customVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if $hpEnabled }}
+        - name: data
+          hostPath:
+            path: {{ $.Values.engineSpec.storageHostPath.path }}
+            type: {{ default "DirectoryOrCreate" $.Values.engineSpec.storageHostPath.type }}
+        {{- end }}
+{{- if not $hpEnabled }}
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -258,4 +343,5 @@ spec:
         resources:
           requests:
             storage: {{ $storage.resources.requests.storage }}
+{{- end }}
 {{- end }}

@@ -6,6 +6,10 @@
 imagePullSecrets: []
 # - name: regcred
 
+# Extra labels applied to all resources and pods.
+extraLabels:
+  firebolt/product: core
+
 # When true, a Namespace resource is included in the chart output.
 # Pair with: helm install --create-namespace --set createNamespace=false
 # (the Makefile create target handles this automatically).
@@ -22,6 +26,14 @@ engineSpec:
     tag: "release-4.32.0-pre.0.20260414104905.92750f097354"
     pullPolicy: Always
 
+  # StatefulSet update strategy. OnDelete is recommended so that version bumps
+  # don't trigger automatic rolling restarts — pods are replaced only when
+  # manually deleted.
+  updateStrategy: OnDelete
+
+  # When true, a readiness probe is added to the core container.
+  readiness: true
+
   nonRoot: true
   memlockSetup: true
   fsGroupChangePolicy: "OnRootMismatch"
@@ -30,6 +42,34 @@ engineSpec:
   tolerations: []
   affinity: {}
   nodeSelector: {}
+
+  # Deploy a Core UI sidecar for each engine pod.
+  uiSidecar: false
+
+  # Custom init containers injected into engine pods (supports templating).
+  customInitContainersTemplate: []
+  # Example:
+  # customInitContainersTemplate:
+  #   - name: custom-init
+  #     image: busybox:latest
+  #     command: ['sh', '-c', 'echo "Custom init container"']
+
+  # Custom volumes injected into engine pods.
+  customVolumes: []
+  # Example:
+  # customVolumes:
+  #   - name: custom-config
+  #     configMap:
+  #       name: my-config
+
+  # When true, uses hostPath instead of PVC for engine data.
+  hostPathStorageEnabled: false
+  storageHostPath:
+    path: /var/lib/firebolt-core
+    type: DirectoryOrCreate
+
+  # Suffix appended after .svc in node FQDNs in config.json.
+  nodeHostSuffix: ".cluster.local"
 
   # ---------------------------------------------------------------------------
   # Default PVC storage spec for engines
