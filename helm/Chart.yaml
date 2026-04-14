@@ -7,6 +7,7 @@ icon: https://raw.githubusercontent.com/firebolt-db/firebolt-instance-helm/refs/
 home: "https://github.com/firebolt-db/firebolt-instance-helm"
 sources: ["https://github.com/firebolt-db/firebolt-instance-helm"]
 version: 0.1.0
+appVersion: "release-4.32.0-pre.0.20260414104905.92750f097354-amd64"
 dependencies:
   - name: postgresql
     version: "~18.0.0"

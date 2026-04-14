@@ -72,7 +72,7 @@ spec:
       {{- end }}
       containers:
         - name: core
-          image: "{{ $.Values.engineSpec.image.repository }}:{{ $.Values.engineSpec.image.tag }}"
+          image: "{{ $.Values.engineSpec.image.repository }}:{{ default $.Chart.AppVersion $.Values.engineSpec.image.tag }}"
           imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
           env:
             - name: FIREBOLT_CORE_NODE

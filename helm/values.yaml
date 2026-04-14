@@ -22,8 +22,8 @@ engineSpec:
   image:
     # ECR repository for the firebolt-core engine image.
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/firebolt-core
-    # Image tag (required). Set in your values override.
-    tag: "release-4.32.0-pre.0.20260414104905.92750f097354-amd64"
+    # Image tag. Defaults to Chart.appVersion when empty.
+    tag: ""
     pullPolicy: IfNotPresent
 
   # When true, a readiness probe is added to the core container.
