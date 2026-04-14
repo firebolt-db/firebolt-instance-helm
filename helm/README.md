@@ -1,5 +1,7 @@
 # firebolt-instance
 
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)
+
 Firebolt Instance on Kubernetes — gateway, metadata, auth, and engines
 
 **Homepage:** <https://github.com/firebolt-db/firebolt-instance-helm>
@@ -8,43 +10,37 @@ Firebolt Instance on Kubernetes — gateway, metadata, auth, and engines
 
 * <https://github.com/firebolt-db/firebolt-instance-helm>
 
+## Requirements
+
+| Repository | Name | Version |
+|------------|------|---------|
+| https://charts.bitnami.com/bitnami | postgresql | ~18.0.0 |
+
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| affinity | object | `{}` | affinity allows you to configure pod affinity and anti-affinity. See: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/ |
-| customInitContainersTemplate | list | `[]` | custom init containers to be injected into the pod (supports templating) |
-| customNodeConfig | object | `{}` | custom configuration for nodes |
-| customVolumes | list | `[]` | custom volumes to be injected into the pod |
-| deployment.hostPathStorageEnabled | bool | `false` | `deployment.storageHostPath` is used instead. Only one mode is active at a time. |
-| deployment.storageHostPath | object | `{"path":"/var/lib/firebolt-core","type":"DirectoryOrCreate"}` | hostPath settings used when hostPathStorageEnabled=true |
-| deployment.storageHostPath.path | string | `"/var/lib/firebolt-core"` | path on the node's filesystem to store data |
-| deployment.storageHostPath.type | string | `"DirectoryOrCreate"` | hostPath type, e.g. DirectoryOrCreate, Directory, File, etc. |
-| deployment.storageSpec.accessModes | list | `["ReadWriteOnce"]` | PersistentVolumeClaim spec used when hostPathStorageEnabled=false. Ignored when hostPathStorageEnabled=true. |
-| deployment.storageSpec.resources.limits.storage | string | `"1Gi"` |  |
-| deployment.storageSpec.resources.requests.storage | string | `"1Gi"` |  |
-| deployment.terminationGracePeriodSeconds | int | `5` | give a few seconds of grace time on shutdown to allow queries to finish |
-| extraLabels | object | `{"firebolt/product":"core"}` | extra labels to assign to each pod |
-| fsGroupChangePolicy | string | `"OnRootMismatch"` | fsGroupChangePolicy defines how volume ownership is applied to pods. "OnRootMismatch" only changes permissions if the root of the volume doesn't match fsGroup, which significantly speeds up pod startup for large volumes. See: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#configure-volume-permission-and-ownership-change-policy-for-pods |
-| image.pullPolicy | string | `"Always"` | imagePullPolicy for all containers in the pod |
-| image.repository | string | `"ghcr.io/firebolt-db/firebolt-core"` | use a custom ECR repository to pull the Docker image used by the pods |
-| image.tag | string | `""` | use a custom Docker image tag; when unspecified the app version from chart will be used instead |
-| memlockSetup | bool | `true` | automatically attempt to set memlock limits on container startup; not necessary if your nodes already have a large enough memlock limit. |
-| nodeHostSuffix | string | `""` | use a specific suffix for the node hostnames e.g. ".cluster.local." |
-| nodeSelector | object | `{}` | nodeSelector allows you to configure a node selection constraint. See: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector |
-| nodesCount | int | `1` | number of nodes to deploy |
-| nonRoot | bool | `true` | enable non-root mode; set to false for Firebolt Core <= 4.29 |
-| podAnnotations | object | `{}` | extra annotations to assign to each pod |
-| podMonitor | bool | `false` | deploy a PodMonitor for Prometheus metrics scraping |
-| priorityClassNode0 | string | `""` | priority class for node-0 (Deployment mode) or all pods (StatefulSet mode). When using Deployments, nodes after node 0 will use priorityClassNodeN instead. Requires setting priorityClassNodeN as well when useStatefulSet=false. |
-| priorityClassNodeN | string | `""` | priority class for all nodes after node-0; only used when useStatefulSet=false. Unused unless priorityClassNode0 is set. |
-| readiness | bool | `true` | readiness check on each pod |
-| resources | object | `{"limits":{"memory":"4Gi"},"requests":{"cpu":"1","memory":"4Gi"}}` | resources for each pod; at least 1 core is advised |
-| securityContextCapabilities | object | `{"drop":["ALL"]}` | specify custom security context capabilities for the Firebolt Core container |
-| serviceAccount | string | `"default"` | service account which pods will use for their identity |
-| tolerations | list | `[]` | tolerations allows you to configure pod tolerations. See: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/ |
-| uiSidecar | bool | `false` | deploy 1 Core UI sidecar for each node |
-| updateStrategy | string | `"OnDelete"` | sets the update strategy for the statefulset; using a statefulset requires manually deleting pods in most cases. See: https://docs.firebolt.io/firebolt-core/firebolt-core-operation/firebolt-core-deployment-k8s#updating-firebolt-core-version |
-| useStatefulSet | bool | `false` | when true, uses a StatefulSet; when false, uses multiple Deployments (one per node) |
+| affinity | object | `{}` |  |
+| auth | object | `{"local":{"credentialsSecretRef":""},"mode":"none","oidc":{"claimMappings":{"username":"email"},"clientID":"","issuerURL":""}}` | ------------------------------------------------------------------------- |
+| createNamespace | bool | `true` |  |
+| customNodeConfig | object | `{}` |  |
+| defaultStorage | object | `{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"100Gi"}}}` | ------------------------------------------------------------------------- storageClassName is intentionally absent — the cluster default storage class is used. Override here or per-engine if your cluster requires a specific class (e.g. storageClassName: gp3). |
+| engines | list | `[{"affinity":{},"name":"default","nodeSelector":{},"podAnnotations":{},"priorityClassName":"","replicas":1,"resources":{"limits":{"cpu":"8","memory":"64Gi"},"requests":{"cpu":"4","memory":"32Gi"}},"storage":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"100Gi"}}},"tolerations":[]}]` | ------------------------------------------------------------------------- Each entry produces one StatefulSet + headless Service + ClusterIP Service + ConfigMap. Per-engine values override the shared pod defaults above. |
+| fsGroupChangePolicy | string | `"OnRootMismatch"` |  |
+| gateway | object | `{"auth":{"directAccessSecret":""},"enabled":false,"image":{"repository":"000000000000.dkr.ecr.us-east-1.amazonaws.com/core-gateway","tag":""},"organization":{"accountId":"","name":""},"podTemplate":{},"replicas":1,"resources":{"limits":{"memory":"1Gi"},"requests":{"cpu":"500m","memory":"512Mi"}},"service":{"port":3473,"type":"ClusterIP"}}` | ------------------------------------------------------------------------- |
+| image.pullPolicy | string | `"Always"` |  |
+| image.repository | string | `"000000000000.dkr.ecr.us-east-1.amazonaws.com/firebolt-core"` |  |
+| imagePullSecrets | list | `[]` |  |
+| memlockSetup | bool | `true` |  |
+| metadata | object | `{"deployment":{"securityContext":{},"terminationGracePeriodSeconds":30},"image":{"repository":"000000000000.dkr.ecr.us-east-1.amazonaws.com/dedicated-pensieve","tag":""},"podTemplate":{},"postgresql":{"connect_timeout_sec":5,"credentials":{"existingSecret":"","mountPath":"/secrets/postgres","password":"","username":""},"database":"","host":"","keepalive":{"count":5,"enabled":1,"idle_sec":120,"interval_sec":30},"port":5432,"schema":"public"},"resources":{"limits":{"memory":"1Gi"},"requests":{"cpu":"100m","memory":"512Mi"}},"server":{"host":"0.0.0.0","log_level":"information","port":7000,"threads":0}}` | ------------------------------------------------------------------------- |
+| nodeSelector | object | `{}` |  |
+| nonRoot | bool | `true` | ------------------------------------------------------------------------- |
+| podMonitor | bool | `false` |  |
+| postgresql | object | `{"auth":{"database":"firebolt_metadata","password":"","username":"firebolt"},"enabled":true,"primary":{"persistence":{"size":"10Gi"}}}` | ------------------------------------------------------------------------- Set enabled: false and configure metadata.postgresql for an external database. |
+| securityContextCapabilities.drop[0] | string | `"ALL"` |  |
+| serviceAccount | string | `"default"` |  |
+| terminationGracePeriodSeconds | int | `5` |  |
+| tolerations | list | `[]` |  |
 | utilitiesImage | string | `"debian:stable-slim"` |  |
+| version | string | `""` |  |
 
