@@ -23,13 +23,8 @@ engineSpec:
     # ECR repository for the firebolt-core engine image.
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/firebolt-core
     # Image tag (required). Set in your values override.
-    tag: "release-4.32.0-pre.0.20260414104905.92750f097354"
-    pullPolicy: Always
-
-  # StatefulSet update strategy. OnDelete is recommended so that version bumps
-  # don't trigger automatic rolling restarts — pods are replaced only when
-  # manually deleted.
-  updateStrategy: OnDelete
+    tag: "release-4.32.0-pre.0.20260414104905.92750f097354-amd64"
+    pullPolicy: IfNotPresent
 
   # When true, a readiness probe is added to the core container.
   readiness: true
@@ -84,7 +79,7 @@ engineSpec:
         storage: 100Gi
 
 # ---------------------------------------------------------------------------
-# Metadata service — pensieve-dedicated
+# Metadata service
 # ---------------------------------------------------------------------------
 metadata:
   image:
@@ -92,7 +87,8 @@ metadata:
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/dedicated-pensieve
     # Pensieve is versioned independently from firebolt-core.
     # Set explicitly in your values override.
-    tag: ""
+    tag: "4.32.0-pre.0.20260414104905.92750f097354-amd64"
+    pullPolicy: IfNotPresent
 
   resources:
     # Pensieve is a lightweight gRPC metadata service. These defaults are
@@ -174,7 +170,8 @@ gateway:
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/core-gateway
     # Gateway follows its own semver release cadence (v-prefixed, e.g. "v1.54.0").
     # Set explicitly in your values override.
-    tag: ""
+    tag: "v1.54.0"
+    pullPolicy: IfNotPresent
   resources:
     # Gateway is stateless and CPU-light; it proxies HTTP queries to engines.
     requests:
@@ -238,11 +235,10 @@ engines:
       # Storage I/O is also significant — use an SSD-backed StorageClass and
       # size the PVC to hold your working dataset plus ~30 % headroom.
       requests:
-        cpu: "4"
-        memory: "32Gi"
+        cpu: "1"
+        memory: "4Gi"
       limits:
-        cpu: "8"
-        memory: "64Gi"
+        memory: "4Gi"
     # Storage for this engine's PVC (falls back to defaultStorage if omitted).
     storage:
       accessModes: [ReadWriteOnce]

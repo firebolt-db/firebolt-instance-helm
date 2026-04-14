@@ -14,10 +14,10 @@ spec:
   serviceName: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-hl
   replicas: {{ $engine.replicas }}
   podManagementPolicy: Parallel
-  {{- if hasKey $.Values.engineSpec "updateStrategy" }}
   updateStrategy:
-    type: {{ $.Values.engineSpec.updateStrategy }}
-  {{- end }}
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
   selector:
     matchLabels:
       {{- include "fbinstance.selectorLabels" $ | nindent 6 }}
