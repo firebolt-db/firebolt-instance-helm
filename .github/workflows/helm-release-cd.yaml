@@ -1,0 +1,116 @@
+---
+name: Helm - Release Chart
+
+env:
+  HELM_CHARTS_NAMESPACE: helm-charts
+  GHCR_REGISTRY: ghcr.io
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "helm/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  release-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          show-progress: "false"
+          fetch-depth: 2
+
+      - name: Determine chart version
+        id: chart
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CURR_VERSION=$(yq '.version' helm/Chart.yaml)
+          APP_VERSION=$(yq '.appVersion' helm/Chart.yaml)
+
+          # workflow_dispatch: publish the version already in Chart.yaml.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "chart_version=$CURR_VERSION" >> "$GITHUB_OUTPUT"
+            echo "Releasing existing chart version $CURR_VERSION (appVersion: $APP_VERSION)"
+            exit 0
+          fi
+
+          # If the developer already bumped Chart.version in their commit, honour it.
+          PREV_VERSION=$(git show HEAD~1:helm/Chart.yaml | yq '.version')
+          if [ "$PREV_VERSION" != "$CURR_VERSION" ]; then
+            echo "chart_version=$CURR_VERSION" >> "$GITHUB_OUTPUT"
+            echo "Chart.version already bumped ($PREV_VERSION -> $CURR_VERSION); using as-is."
+            exit 0
+          fi
+
+          # ── Auto-bump based on conventional-commit message ────────────────
+          COMMIT_MSG=$(git log --format='%s' -1)
+          COMMIT_BODY=$(git log --format='%b' -1)
+
+          MAJOR=$(echo "$CURR_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$CURR_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$CURR_VERSION" | cut -d. -f3)
+
+          if echo "$COMMIT_BODY" | grep -qi 'BREAKING CHANGE'; then
+            NEW_VERSION="$((MAJOR + 1)).0.0"
+            BUMP_TYPE="major"
+          elif echo "$COMMIT_MSG" | grep -qE '^feat(\(|:)'; then
+            NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+            BUMP_TYPE="minor"
+          else
+            NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+            BUMP_TYPE="patch"
+          fi
+
+          echo "Auto $BUMP_TYPE bump: $CURR_VERSION -> $NEW_VERSION (commit: $COMMIT_MSG)"
+
+          yq -i ".version = \"$NEW_VERSION\"" helm/Chart.yaml
+
+          printf "# %s\n\n%s\n\n" "$NEW_VERSION" "$COMMIT_MSG" \
+            | cat - helm/CHANGELOG.md > /tmp/CHANGELOG.md
+          mv /tmp/CHANGELOG.md helm/CHANGELOG.md
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add helm/Chart.yaml helm/CHANGELOG.md
+          git commit -m "chore(helm): bump chart to $NEW_VERSION"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+
+          echo "chart_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
+        with:
+          version: "latest"
+
+      - name: Build chart dependencies
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm dependency build helm/
+
+      - name: Login to GitHub Container Registry (Helm)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | helm registry login ${{ env.GHCR_REGISTRY }} --username ${{ github.actor }} --password-stdin
+
+      - name: Package Helm chart
+        run: |
+          mkdir -p /tmp/helm-packages
+          helm package helm/ --destination /tmp/helm-packages
+          echo "Packaged: $(ls /tmp/helm-packages)"
+
+      - name: Push chart to GitHub Container Registry
+        run: |
+          helm push \
+            /tmp/helm-packages/firebolt-instance-${{ steps.chart.outputs.chart_version }}.tgz \
+            oci://${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.HELM_CHARTS_NAMESPACE }}
+          echo "Pushed firebolt-instance:${{ steps.chart.outputs.chart_version }} to GHCR"
