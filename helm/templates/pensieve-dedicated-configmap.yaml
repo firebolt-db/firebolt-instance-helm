@@ -17,28 +17,22 @@ data:
         <log_level>{{ .Values.metadata.server.log_level }}</log_level>
         <metadata_storage>
           <postgresql>
-            <!-- Connection settings (non-sensitive) -->
             {{- if .Values.postgresql.enabled }}
-            <host>{{ printf "%s-postgresql" .Release.Name }}</host>
-            <database>{{ .Values.postgresql.auth.database }}</database>
+            <host>{{ include "fbinstance.fullname" . }}-metadata-pg</host>
             {{- else }}
-            <host>{{ .Values.metadata.postgresql.host }}</host>
-            <database>{{ .Values.metadata.postgresql.database }}</database>
+            <host>{{ .Values.postgresql.host }}</host>
             {{- end }}
-            <port>{{ .Values.metadata.postgresql.port }}</port>
-            <schema>{{ .Values.metadata.postgresql.schema }}</schema>
+            <port>{{ .Values.postgresql.port }}</port>
+            <database>{{ .Values.postgresql.database }}</database>
+            <schema>{{ .Values.postgresql.schema }}</schema>
 
-            <!-- Credentials are provided via POSTGRES_USERNAME_FILE / POSTGRES_PASSWORD_FILE -->
-            <!-- pointing to files mounted from a Secret -->
-
-            <!-- Connection tuning -->
             <keepalive>
-              <enabled>{{ .Values.metadata.postgresql.keepalive.enabled }}</enabled>
-              <idle_sec>{{ .Values.metadata.postgresql.keepalive.idle_sec }}</idle_sec>
-              <interval_sec>{{ .Values.metadata.postgresql.keepalive.interval_sec }}</interval_sec>
-              <count>{{ .Values.metadata.postgresql.keepalive.count }}</count>
+              <enabled>{{ .Values.postgresql.keepalive.enabled }}</enabled>
+              <idle_sec>{{ .Values.postgresql.keepalive.idle_sec }}</idle_sec>
+              <interval_sec>{{ .Values.postgresql.keepalive.interval_sec }}</interval_sec>
+              <count>{{ .Values.postgresql.keepalive.count }}</count>
             </keepalive>
-            <connect_timeout_sec>{{ .Values.metadata.postgresql.connect_timeout_sec }}</connect_timeout_sec>
+            <connect_timeout_sec>{{ .Values.postgresql.connect_timeout_sec }}</connect_timeout_sec>
           </postgresql>
           <garbage_collection>
             <enabled>true</enabled>

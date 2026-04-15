@@ -16,9 +16,9 @@ spec:
         - sh
         - -c
         - |
-          HOST="{{ printf "%s-postgresql" .Release.Name }}.{{ .Release.Namespace }}.svc.cluster.local"
+          HOST="{{ include "fbinstance.fullname" . }}-metadata-pg.{{ .Release.Namespace }}.svc.cluster.local"
           echo "Running pg_isready against $HOST:5432 ..."
-          pg_isready -h "$HOST" -p 5432 -U {{ .Values.postgresql.auth.username }} \
+          pg_isready -h "$HOST" -p 5432 -U {{ .Values.postgresql.username }} \
             && echo "PASS: PostgreSQL is accepting connections" \
             || { echo "FAIL: PostgreSQL not ready"; exit 1; }
 {{- end }}

@@ -1,9 +1,4 @@
-{{- $pgSecretName := "" }}
-{{- if .Values.postgresql.enabled }}
-{{-   $pgSecretName = printf "%s-pensieve-postgres-creds" (include "fbinstance.fullname" .) }}
-{{- else }}
-{{-   $pgSecretName = .Values.metadata.postgresql.credentials.existingSecret | default (printf "%s-pensieve-postgres-creds" (include "fbinstance.fullname" .)) }}
-{{- end }}
+{{- $pgSecretName := .Values.postgresql.credentials.existingSecret | default (printf "%s-pensieve-postgres-creds" (include "fbinstance.fullname" .)) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -27,7 +22,7 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ toYaml .Values.metadata.server | sha256sum }}
-        checksum/secret: {{ toYaml .Values.metadata.postgresql | sha256sum }}
+        checksum/secret: {{ toYaml .Values.postgresql | sha256sum }}
       labels:
         {{- include "fbinstance.podLabels" . | nindent 8 }}
         firebolt/component: pensieve-dedicated
@@ -60,8 +55,8 @@ spec:
             - sh
             - -c
             - |
-              echo "Waiting for PostgreSQL at {{ printf "%s-postgresql" .Release.Name }}:5432 ..."
-              until nc -z {{ printf "%s-postgresql" .Release.Name }} 5432; do
+              echo "Waiting for PostgreSQL at {{ include "fbinstance.fullname" . }}-metadata-pg:5432 ..."
+              until nc -z {{ include "fbinstance.fullname" . }}-metadata-pg 5432; do
                 echo "PostgreSQL not ready, retrying in 2s..."
                 sleep 2
               done
@@ -81,7 +76,7 @@ spec:
               mountPath: /configs
               readOnly: true
             - name: postgres-creds
-              mountPath: {{ .Values.metadata.postgresql.credentials.mountPath }}
+              mountPath: {{ .Values.postgresql.credentials.mountPath }}
               readOnly: true
           resources:
             {{- toYaml .Values.metadata.resources | nindent 12 }}
@@ -91,9 +86,9 @@ spec:
           {{- end }}
           env:
             - name: POSTGRES_USERNAME_FILE
-              value: {{ .Values.metadata.postgresql.credentials.mountPath }}/username
+              value: {{ .Values.postgresql.credentials.mountPath }}/username
             - name: POSTGRES_PASSWORD_FILE
-              value: {{ .Values.metadata.postgresql.credentials.mountPath }}/password
+              value: {{ .Values.postgresql.credentials.mountPath }}/password
           {{- with .Values.metadata.podTemplate.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}

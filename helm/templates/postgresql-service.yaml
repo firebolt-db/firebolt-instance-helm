@@ -1,0 +1,20 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-metadata-pg
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" . | nindent 4 }}
+    firebolt/component: metadata-pg
+spec:
+  clusterIP: None
+  selector:
+    {{- include "fbinstance.selectorLabels" . | nindent 4 }}
+    firebolt/component: metadata-pg
+  ports:
+    - name: tcp-postgresql
+      port: 5432
+      targetPort: tcp-postgresql
+      protocol: TCP
+{{- end }}

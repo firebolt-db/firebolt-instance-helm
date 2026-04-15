@@ -106,32 +106,6 @@ metadata:
     threads: 0          # 0 = use all available cores
     log_level: "information"
 
-  # PostgreSQL connection settings (non-sensitive).
-  # When postgresql.enabled=true (internal DB), host and database are derived
-  # from the postgresql subchart automatically — only override for external PG.
-  postgresql:
-    host: ""
-    port: 5432
-    database: ""
-    schema: "public"
-    keepalive:
-      enabled: 1
-      idle_sec: 120
-      interval_sec: 30
-      count: 5
-    connect_timeout_sec: 5
-    # Credentials are always mounted from a Secret, never injected as env vars.
-    credentials:
-      mountPath: /secrets/postgres
-      # existingSecret: reference an externally-managed Secret (e.g. via ESO).
-      # When set the chart will NOT create a Secret of its own.
-      # Ignored when postgresql.enabled=true.
-      existingSecret: ""
-      # username/password: only used when existingSecret is empty and
-      # postgresql.enabled=false (external database).
-      username: ""
-      password: ""
-
   deployment:
     terminationGracePeriodSeconds: 30
     securityContext: {}
@@ -139,22 +113,40 @@ metadata:
   podTemplate: {}   # nodeSelector / tolerations / affinity
 
 # ---------------------------------------------------------------------------
-# Internal PostgreSQL — bitnami/postgresql subchart
+# PostgreSQL — native deployment or external connection
 # ---------------------------------------------------------------------------
-# Set enabled: false and configure metadata.postgresql for an external database.
+# When enabled: true the chart deploys a single-replica postgres:16-alpine
+# Deployment (no Bitnami subchart). Host is derived automatically.
+# When enabled: false supply host/port/database and credentials for an
+# external database.
 postgresql:
   enabled: true
-  auth:
-    database: firebolt_metadata
-    username: firebolt
-    # Required — set a strong password in your values override.
-    # Never commit the real password to source control.
-    password: ""
-  primary:
-    persistence:
-      # Storage for PostgreSQL metadata. 10 Gi is sufficient for most
-      # deployments; increase if you expect heavy DDL or many databases.
-      size: 10Gi
+  image: "postgres:16-alpine"
+  # Connection settings — used by the Pensieve ConfigMap.
+  # When enabled: true, host is auto-derived and database comes from this block.
+  # When enabled: false, set host explicitly.
+  host: ""
+  port: 5432
+  database: firebolt_metadata
+  username: firebolt
+  # Required when enabled: true — set a strong password in your values override.
+  # For external PG, set here or use existingSecret.
+  password: ""
+  schema: "public"
+  keepalive:
+    enabled: 1
+    idle_sec: 120
+    interval_sec: 30
+    count: 5
+  connect_timeout_sec: 5
+  credentials:
+    mountPath: /secrets/postgres
+    # existingSecret: reference an externally-managed Secret (e.g. via ESO).
+    # When set, the chart will NOT create a Secret of its own.
+    # Ignored when postgresql.enabled=true.
+    existingSecret: ""
+  persistence:
+    size: 10Gi
 
 # ---------------------------------------------------------------------------
 # Gateway — core-gateway
