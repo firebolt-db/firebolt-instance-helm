@@ -8,18 +8,14 @@ Expand the name of the chart.
 {{/*
 Create a default fully-qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
+The release name is used as-is — the chart name is intentionally excluded to avoid
+prefix duplication when the release name already contains "firebolt".
 */}}
 {{- define "fbinstance.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
-{{- $name := default .Chart.Name .Values.nameOverride -}}
-{{- if contains $name .Release.Name -}}
 {{- .Release.Name | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
 {{- end -}}
 {{- end -}}
 
@@ -106,10 +102,10 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{- define "fbinstance.engineConfig" -}}
 {{- $root := .root -}}
 {{- $engine := .engine -}}
-{{- $baseName := printf "%s-%s" (include "fbinstance.fullname" $root) $engine.name -}}
+{{- $baseName := printf "%s-engine-%s" (include "fbinstance.fullname" $root) $engine.name -}}
 {{- $svcName := printf "%s-hl" $baseName -}}
 {{- $ns := $root.Release.Namespace -}}
-{{- $pensieveSvc := printf "%s-pensieve-dedicated" (include "fbinstance.fullname" $root) -}}
+{{- $pensieveSvc := printf "%s-metadata-service" (include "fbinstance.fullname" $root) -}}
 {{- $nodes := list -}}
 {{- range $i := until (int $engine.replicas) -}}
 {{-   $fqdn := printf "%s-node-%d-0.%s.%s.svc%s" $baseName $i $svcName $ns $root.Values.engineSpec.nodeHostSuffix -}}

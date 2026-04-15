@@ -17,9 +17,9 @@ spec:
         - |
           set -e
           {{- range .Values.engines }}
-          echo "Probing {{ include "fbinstance.fullname" $ }}-{{ .name }}-0 ..."
+          echo "Probing {{ include "fbinstance.fullname" $ }}-engine-{{ .name }}-0 ..."
           nc -z -w 5 \
-            {{ include "fbinstance.fullname" $ }}-{{ .name }}-0.{{ include "fbinstance.fullname" $ }}-{{ .name }}-hl.{{ $.Release.Namespace }}.svc.cluster.local \
+            {{ include "fbinstance.fullname" $ }}-engine-{{ .name }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ .name }}-hl.{{ $.Release.Namespace }}.svc.cluster.local \
             8122
           echo "PASS: {{ .name }} pod-0 health port reachable"
           {{- end }}

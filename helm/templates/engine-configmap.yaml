@@ -4,7 +4,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-config
+  name: {{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-config
   namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "fbinstance.labels" $ | nindent 4 }}

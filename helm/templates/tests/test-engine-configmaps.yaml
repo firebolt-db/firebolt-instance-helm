@@ -12,7 +12,7 @@ spec:
     {{- range .Values.engines }}
     - name: config-{{ .name }}
       configMap:
-        name: {{ include "fbinstance.fullname" $ }}-{{ .name }}-config
+        name: {{ include "fbinstance.fullname" $ }}-engine-{{ .name }}-config
     {{- end }}
   containers:
     - name: check

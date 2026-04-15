@@ -6,14 +6,14 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   namespace: {{ $.Release.Namespace }}
-  name: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-node-{{ $i }}
+  name: {{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}
   labels:
     {{- include "fbinstance.labels" $ | nindent 4 }}
     firebolt/component: engine
     firebolt/engine: {{ $engine.name }}
     firebolt/node: {{ $i | quote }}
 spec:
-  serviceName: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-hl
+  serviceName: {{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl
   replicas: 1
   podManagementPolicy: Parallel
   updateStrategy:
@@ -321,7 +321,7 @@ spec:
         {{- end }}
         - name: engine-config
           configMap:
-            name: {{ include "fbinstance.fullname" $ }}-{{ $engine.name }}-config
+            name: {{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-config
         - name: auth-config
           configMap:
             name: {{ include "fbinstance.fullname" $ }}-auth

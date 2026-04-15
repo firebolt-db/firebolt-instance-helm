@@ -26,10 +26,10 @@ spec:
             "http://${BASE}-gateway.${NS}.svc.cluster.local:{{ .Values.gateway.service.port }}/health/ready"
           echo "PASS: gateway ready"
 
-          echo "=== PensieveDedicated reachable ==="
-          (echo > /dev/tcp/${BASE}-pensieve-dedicated.${NS}.svc.cluster.local/{{ .Values.metadata.server.port }}) 2>/dev/null \
-            && echo "PASS: PensieveDedicated port {{ .Values.metadata.server.port }} open" \
-            || { echo "FAIL: PensieveDedicated unreachable"; exit 1; }
+          echo "=== MetadataService reachable ==="
+          (echo > /dev/tcp/${BASE}-metadata-service.${NS}.svc.cluster.local/{{ .Values.metadata.server.port }}) 2>/dev/null \
+            && echo "PASS: MetadataService port {{ .Values.metadata.server.port }} open" \
+            || { echo "FAIL: MetadataService unreachable"; exit 1; }
 
           {{- range .Values.engines }}
           echo "=== Engine {{ .name }} pod-0 health ==="

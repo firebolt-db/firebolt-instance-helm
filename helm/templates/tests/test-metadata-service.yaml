@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-test-metadata-service
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: check
+      image: busybox:stable
+      command:
+        - sh
+        - -c
+        - |
+          HOST="{{ include "fbinstance.fullname" . }}-metadata-service.{{ .Release.Namespace }}.svc.cluster.local"
+          echo "Probing MetadataService at $HOST:{{ .Values.metadata.server.port }} ..."
+          nc -z -w 10 "$HOST" {{ .Values.metadata.server.port }} \
+            && echo "PASS: MetadataService port {{ .Values.metadata.server.port }} reachable" \
+            || { echo "FAIL: could not reach MetadataService"; exit 1; }

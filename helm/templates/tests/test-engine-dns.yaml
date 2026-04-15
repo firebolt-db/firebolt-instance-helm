@@ -17,7 +17,7 @@ spec:
         - |
           set -e
           {{- range .Values.engines }}
-          FQDN="{{ include "fbinstance.fullname" $ }}-{{ .name }}-0.{{ include "fbinstance.fullname" $ }}-{{ .name }}-hl.{{ $.Release.Namespace }}.svc.cluster.local"
+          FQDN="{{ include "fbinstance.fullname" $ }}-engine-{{ .name }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ .name }}-hl.{{ $.Release.Namespace }}.svc.cluster.local"
           echo "Resolving $FQDN ..."
           nslookup "$FQDN"
           echo "PASS: {{ .name }} pod-0 DNS resolves"

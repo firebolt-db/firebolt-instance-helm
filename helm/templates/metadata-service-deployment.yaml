@@ -1,18 +1,18 @@
-{{- $pgSecretName := .Values.postgresql.credentials.existingSecret | default (printf "%s-pensieve-postgres-creds" (include "fbinstance.fullname" .)) }}
+{{- $pgSecretName := .Values.postgresql.credentials.existingSecret | default (printf "%s-metadata-postgres-creds" (include "fbinstance.fullname" .)) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "fbinstance.fullname" . }}-pensieve-dedicated
+  name: {{ include "fbinstance.fullname" . }}-metadata-service
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "fbinstance.labels" . | nindent 4 }}
-    firebolt/component: pensieve-dedicated
+    firebolt/component: metadata-service
 spec:
   replicas: 1
   selector:
     matchLabels:
       {{- include "fbinstance.selectorLabels" . | nindent 6 }}
-      firebolt/component: pensieve-dedicated
+      firebolt/component: metadata-service
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -25,7 +25,7 @@ spec:
         checksum/secret: {{ toYaml .Values.postgresql | sha256sum }}
       labels:
         {{- include "fbinstance.podLabels" . | nindent 8 }}
-        firebolt/component: pensieve-dedicated
+        firebolt/component: metadata-service
         {{- with .Values.metadata.podTemplate.extraPodLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -63,7 +63,7 @@ spec:
               echo "PostgreSQL is ready."
       {{- end }}
       containers:
-        - name: pensieve-dedicated
+        - name: metadata-service
           image: "{{ .Values.metadata.image.repository }}:{{ .Values.metadata.image.tag }}"
           imagePullPolicy: {{ .Values.engineSpec.image.pullPolicy }}
           command: ["/dedicated-pensieve", "--config", "/configs/config.xml"]
@@ -95,7 +95,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ include "fbinstance.fullname" . }}-pensieve-dedicated
+            name: {{ include "fbinstance.fullname" . }}-metadata-service
         - name: postgres-creds
           secret:
             secretName: {{ $pgSecretName }}
