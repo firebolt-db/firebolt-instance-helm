@@ -29,10 +29,16 @@ jobs:
           show-progress: "false"
           fetch-depth: 2
 
+      - uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        id: app-token
+        with:
+          client-id: ${{ secrets.GH_APP_FB_DB_CI_WRITER_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_FB_DB_CI_WRITER_APP_KEY_PEM }}
+
       - name: Determine chart version
         id: chart
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           CURR_VERSION=$(yq '.version' helm/Chart.yaml)
           APP_VERSION=$(yq '.appVersion' helm/Chart.yaml)
