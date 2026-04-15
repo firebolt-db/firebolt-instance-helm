@@ -62,7 +62,8 @@ TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
 echo "Generating template with default values..."
-if ! helm template firebolt-instance "$HELM_DIR/" > "$TEMP_DIR/helm-template-output.yaml"; then
+if ! helm template firebolt-instance "$HELM_DIR/" \
+    --set postgresql.password="validation-dummy" > "$TEMP_DIR/helm-template-output.yaml"; then
     echo "✗ Failed to generate template with default values"
     exit 1
 fi
