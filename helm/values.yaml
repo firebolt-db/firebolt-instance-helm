@@ -245,8 +245,13 @@ engines:
     nodeSelector: {}
     podAnnotations: {}
 
-# Custom configuration merged into each engine's config.json (top-level keys only).
-customNodeConfig: {}
+# Custom configuration merged into each engine's config.config object.
+customNodeConfig:
+  account_id: "default-account-id"
+  account_name: "default-account"
+  organization_id: "01KP98J0000000000000000000"
+  organization_name: "default-org"
+  cluster_id: "default-cluster"
 
 # Deploy a PodMonitor for Prometheus metrics scraping.
 podMonitor: false
