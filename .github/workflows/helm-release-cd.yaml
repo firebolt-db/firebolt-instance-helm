@@ -28,17 +28,19 @@ jobs:
         with:
           show-progress: "false"
           fetch-depth: 2
+          persist-credentials: false
 
       - uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
         id: app-token
         with:
           client-id: ${{ secrets.GH_APP_FB_DB_CI_WRITER_CLIENT_ID }}
           private-key: ${{ secrets.GH_APP_FB_DB_CI_WRITER_APP_KEY_PEM }}
+          permission-contents: write
 
       - name: Determine chart version
         id: chart
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_APP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           CURR_VERSION=$(yq '.version' helm/Chart.yaml)
           APP_VERSION=$(yq '.appVersion' helm/Chart.yaml)
@@ -89,7 +91,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add helm/Chart.yaml helm/CHANGELOG.md
           git commit -m "chore(helm): bump chart to $NEW_VERSION"
-          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          git push "https://x-access-token:${GH_APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
 
           echo "chart_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
 
@@ -106,7 +108,7 @@ jobs:
       - name: Login to GitHub Container Registry (Helm)
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" \
-            | helm registry login ${{ env.GHCR_REGISTRY }} --username ${{ github.actor }} --password-stdin
+            | helm registry login ${{ env.GHCR_REGISTRY }} --username ${GITHUB_ACTOR} --password-stdin
 
       - name: Package Helm chart
         run: |
@@ -117,6 +119,9 @@ jobs:
       - name: Push chart to GitHub Container Registry
         run: |
           helm push \
-            /tmp/helm-packages/firebolt-instance-${{ steps.chart.outputs.chart_version }}.tgz \
+            /tmp/helm-packages/firebolt-instance-${STEPS_CHART_OUTPUTS_CHART_VERSION}.tgz \
             oci://${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.HELM_CHARTS_NAMESPACE }}
-          echo "Pushed firebolt-instance:${{ steps.chart.outputs.chart_version }} to GHCR"
+          echo "Pushed firebolt-instance:${STEPS_CHART_OUTPUTS_CHART_VERSION} to GHCR"
+
+        env:
+          STEPS_CHART_OUTPUTS_CHART_VERSION: ${{ steps.chart.outputs.chart_version }}
