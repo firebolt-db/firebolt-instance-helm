@@ -13,8 +13,8 @@ spec:
     {{- include "fbinstance.selectorLabels" . | nindent 4 }}
     firebolt/component: gateway
   ports:
-    - name: http-query
+    - name: http
       port: {{ .Values.gateway.service.port }}
-      targetPort: http-query
+      targetPort: http
       protocol: TCP
 {{- end }}

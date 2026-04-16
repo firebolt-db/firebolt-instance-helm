@@ -34,7 +34,7 @@ spec:
       containers:
         - name: gateway
           image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
-          imagePullPolicy: {{ .Values.engineSpec.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
           args:
             - serve
             - --config=/etc/core-gateway.yaml
@@ -44,19 +44,33 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
           ports:
-            - name: http-query
-              containerPort: 3473
+            - name: http
+              containerPort: {{ .Values.gateway.containerPort }}
               protocol: TCP
           resources:
             {{- toYaml .Values.gateway.resources | nindent 12 }}
           livenessProbe:
             httpGet:
               path: /health/live
-              port: http-query
+              port: http
+            initialDelaySeconds: 1
+            periodSeconds: 15
+            timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /health/ready
-              port: http-query
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 3
+            timeoutSeconds: 5
+          securityContext:
+            runAsUser: 65534
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
             - name: gateway-config
               mountPath: /etc/core-gateway.yaml

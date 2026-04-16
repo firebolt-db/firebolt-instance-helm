@@ -1,7 +1,4 @@
-{{- if .Values.postgresql.enabled }}
-{{- if and (not .Values.postgresql.credentials.existingSecret) (not .Values.postgresql.password) }}
-{{- fail "postgresql.password must be set to a non-empty value when postgresql.enabled=true (or supply postgresql.credentials.existingSecret)" }}
-{{- end }}
+{{- if .Values.postgresql.local_enabled }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -47,7 +44,12 @@ spec:
                   name: {{ include "fbinstance.fullname" . }}-metadata-postgres-creds
                   key: password
             - name: POSTGRES_DB
-              value: {{ .Values.postgresql.database }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fbinstance.fullname" . }}-metadata-postgres-creds
+                  key: database
+          resources:
+            {{- toYaml .Values.postgresql.resources | nindent 12 }}
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data

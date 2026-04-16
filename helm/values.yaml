@@ -87,7 +87,7 @@ metadata:
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/dedicated-pensieve
     # Pensieve is versioned independently from firebolt-core.
     # Set explicitly in your values override.
-    tag: "4.32.0-pre.0.20260414104905.92750f097354-amd64"
+    tag: "4.32.0-pre.0.20260331033249.e67bde0be1cd"
     pullPolicy: IfNotPresent
 
   resources:
@@ -115,24 +115,31 @@ metadata:
 # ---------------------------------------------------------------------------
 # PostgreSQL — native deployment or external connection
 # ---------------------------------------------------------------------------
-# When enabled: true the chart deploys a single-replica postgres:16-alpine
-# Deployment (no Bitnami subchart). Host is derived automatically.
-# When enabled: false supply host/port/database and credentials for an
+# When local_enabled: true the chart deploys a single-replica postgres:16-alpine
+# StatefulSet. Host is derived automatically.
+# When local_enabled: false supply host/port/database and credentials for an
 # external database.
 postgresql:
-  enabled: true
+  local_enabled: true
   image: "postgres:16-alpine"
   # Connection settings — used by the Pensieve ConfigMap.
-  # When enabled: true, host is auto-derived and database comes from this block.
-  # When enabled: false, set host explicitly.
+  # When local_enabled: true, host is auto-derived and database comes from this block.
+  # When local_enabled: false, set host explicitly.
   host: ""
   port: 5432
   database: firebolt_metadata
   username: firebolt
-  # Required when enabled: true — set a strong password in your values override.
+  # Required when local_enabled: true — set a strong password in your values override.
   # For external PG, set here or use existingSecret.
   password: ""
   schema: "public"
+  resources:
+    requests:
+      cpu: "25m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
   keepalive:
     enabled: 1
     idle_sec: 120
@@ -143,7 +150,7 @@ postgresql:
     mountPath: /secrets/postgres
     # existingSecret: reference an externally-managed Secret (e.g. via ESO).
     # When set, the chart will NOT create a Secret of its own.
-    # Ignored when postgresql.enabled=true.
+    # Ignored when postgresql.local_enabled=true.
     existingSecret: ""
   persistence:
     size: 10Gi
@@ -156,14 +163,16 @@ gateway:
   # Requires either gateway.auth.directAccessSecret to be set, or
   # auth.mode: sso with OIDC fully configured.
   enabled: false
-  replicas: 1
+  replicas: 2
   image:
     # ECR repository for the core-gateway image.
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/core-gateway
-    # Gateway follows its own semver release cadence (v-prefixed, e.g. "v1.54.0").
+    # Gateway follows its own semver release cadence (v-prefixed, e.g. "v1.55.2").
     # Set explicitly in your values override.
-    tag: "v1.54.0"
+    tag: "v1.55.2"
     pullPolicy: IfNotPresent
+  # Container port the gateway process listens on. The operator uses 5050.
+  containerPort: 5050
   resources:
     # Gateway is stateless and CPU-light; it proxies HTTP queries to engines.
     requests:
@@ -173,7 +182,7 @@ gateway:
       memory: "1Gi"
   service:
     type: ClusterIP   # ClusterIP | LoadBalancer | NodePort
-    port: 3473
+    port: 80          # External service port; proxied to containerPort
   # Organization identity — required when gateway.enabled is true.
   # The gateway validates account_id on every incoming request. Clients must
   # pass it as a URL query parameter: ?account_id=<value>

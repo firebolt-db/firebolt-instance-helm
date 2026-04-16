@@ -17,7 +17,7 @@ data:
         <log_level>{{ .Values.metadata.server.log_level }}</log_level>
         <metadata_storage>
           <postgresql>
-            {{- if .Values.postgresql.enabled }}
+            {{- if .Values.postgresql.local_enabled }}
             <host>{{ include "fbinstance.fullname" . }}-metadata-pg</host>
             {{- else }}
             <host>{{ .Values.postgresql.host }}</host>

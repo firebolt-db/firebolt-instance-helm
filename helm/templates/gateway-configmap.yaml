@@ -9,33 +9,34 @@ metadata:
     firebolt/component: gateway
 data:
   core-gateway.yaml: |
-    http_server:
-      address: ":3473"
-      shutdown_delay: 5s
-      shutdown_timeout: 30s
     organization:
       name: {{ .Values.gateway.organization.name | quote }}
       account_id: {{ .Values.gateway.organization.accountId | quote }}
-      internal_service_suffix: "-svc"
+      namespace: {{ .Release.Namespace | quote }}
+      internal_service_suffix: "-service"
       internal_service_port: 3473
+      deployment_suffix: "-g"
       engines:
 {{- range .Values.engines }}
         - {{ .name }}
 {{- end }}
+    http_server:
+      address: ":{{ .Values.gateway.containerPort }}"
+      shutdown_delay: 5s
+      shutdown_timeout: 30s
     auth:
 {{- if .Values.gateway.auth.directAccessSecret }}
       direct_access_secret: {{ .Values.gateway.auth.directAccessSecret | quote }}
 {{- end }}
-      oidc:
-        enabled: {{ eq .Values.auth.mode "sso" }}
+      enabled: {{ eq .Values.auth.mode "sso" }}
     telemetry:
       log_level: "info"
       log_all_requests: false
-      log_response_size_threshold: 10240
     transport_config:
       max_idle_conns_per_host: 100
       idle_conn_timeout: 60s
       flush_interval: -1
+    filter_headers: true
     rendezvous_routing:
       enabled: false
     autoscaler:
