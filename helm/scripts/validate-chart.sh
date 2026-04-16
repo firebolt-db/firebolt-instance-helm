@@ -25,7 +25,6 @@ echo ""
 
 echo "Step 0: Building chart dependencies..."
 echo "-----------------------------------"
-helm repo add bitnami https://charts.bitnami.com/bitnami
 if helm dependency build "$HELM_DIR/"; then
     echo "✓ helm dependency build passed"
 else
@@ -70,13 +69,11 @@ fi
 
 echo "Extracting firebolt-instance templates (excluding subcharts)..."
 # Split the rendered output so we only lint our own templates, not third-party
-# subcharts (e.g. Bitnami PostgreSQL) whose style we don't control.
+# subcharts whose style we don't control.
 csplit -z -f "$TEMP_DIR/doc-" "$TEMP_DIR/helm-template-output.yaml" '/^---$/' '{*}' > /dev/null
 cat /dev/null > "$TEMP_DIR/firebolt-templates.yaml"
 for f in "$TEMP_DIR"/doc-*; do
-    if ! grep -q 'charts/postgresql' "$f"; then
-        cat "$f" >> "$TEMP_DIR/firebolt-templates.yaml"
-    fi
+    cat "$f" >> "$TEMP_DIR/firebolt-templates.yaml"
 done
 
 echo "Running yamllint on firebolt-instance templates..."
