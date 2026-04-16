@@ -1,47 +1,55 @@
 ---
 
-# Registry credentials — must be a pre-created docker-registry Secret in the
-# deployment namespace. The Makefile `create` target handles this for ECR.
-# Leave empty if your nodes have ambient registry access (e.g. node IAM role).
+# -- Registry credentials. Must be a pre-created docker-registry Secret in the
+# deployment namespace. Leave empty if nodes have ambient registry access (e.g. node IAM role).
 imagePullSecrets: []
 # - name: regcred
 
-# Extra labels applied to all resources and pods.
+# -- Extra labels applied to all resources and pods.
 extraLabels:
   firebolt/product: core
 
-# When true, a Namespace resource is included in the chart output.
-# Pair with: helm install --create-namespace --set createNamespace=false
-# (the Makefile create target handles this automatically).
+# -- When true, a Namespace resource is included in the chart output.
+# Pair with `helm install --create-namespace --set createNamespace=false`.
 createNamespace: false
 
-# ---------------------------------------------------------------------------
-# Shared engine pod defaults (apply to all engines unless overridden per-engine)
-# ---------------------------------------------------------------------------
+# @section -- Engine Defaults
+
+# -- Shared engine pod defaults applied to all engines unless overridden per-engine.
+# @default -- {}
 engineSpec:
   image:
-    # ECR repository for the firebolt-core engine image.
+    # -- ECR repository for the firebolt-core engine image.
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/firebolt-core
-    # Image tag. Defaults to Chart.appVersion when empty.
+    # -- Image tag. Defaults to `Chart.appVersion` when empty.
     tag: ""
+    # -- Image pull policy.
     pullPolicy: IfNotPresent
 
-  # When true, a readiness probe is added to the core container.
+  # -- When true, a readiness probe is added to the core container.
   readiness: true
 
+  # -- Run engine containers as non-root.
   nonRoot: true
+  # -- When true, a memlock-setup init container is added to configure memory locking limits.
   memlockSetup: true
+  # -- fsGroupChangePolicy for the engine pod security context.
   fsGroupChangePolicy: "OnRootMismatch"
+  # -- Termination grace period in seconds for engine pods.
   terminationGracePeriodSeconds: 5
+  # -- Service account name for engine pods.
   serviceAccount: default
+  # -- Tolerations for engine pod scheduling.
   tolerations: []
+  # -- Affinity rules for engine pod scheduling.
   affinity: {}
+  # -- Node selector for engine pod scheduling.
   nodeSelector: {}
 
-  # Deploy a Core UI sidecar for each engine pod.
+  # -- Deploy a Core UI sidecar for each engine pod.
   uiSidecar: false
 
-  # Custom init containers injected into engine pods (supports templating).
+  # -- Custom init containers injected into engine pods (supports templating).
   customInitContainersTemplate: []
   # Example:
   # customInitContainersTemplate:
@@ -49,7 +57,7 @@ engineSpec:
   #     image: busybox:latest
   #     command: ['sh', '-c', 'echo "Custom init container"']
 
-  # Custom volumes injected into engine pods.
+  # -- Custom volumes injected into engine pods.
   customVolumes: []
   # Example:
   # customVolumes:
@@ -57,82 +65,101 @@ engineSpec:
   #     configMap:
   #       name: my-config
 
-  # When true, uses hostPath instead of PVC for engine data.
+  # -- When true, uses hostPath instead of PVC for engine data.
   hostPathStorageEnabled: false
+  # -- Host path configuration used when `hostPathStorageEnabled` is true.
+  # @default -- {}
   storageHostPath:
+    # -- Host path for engine data.
     path: /var/lib/firebolt-core
+    # -- Host path type.
     type: DirectoryOrCreate
 
-  # Suffix appended after .svc in node FQDNs in config.json.
+  # -- Suffix appended after `.svc` in node FQDNs in `config.json`.
   nodeHostSuffix: ".cluster.local"
 
-  # ---------------------------------------------------------------------------
-  # Default PVC storage spec for engines
-  # ---------------------------------------------------------------------------
-  # storageClassName is intentionally absent — the cluster default storage class
-  # is used. Override here or per-engine if your cluster requires a specific class
-  # (e.g. storageClassName: gp3).
+  # -- Default PVC storage spec for engines. `storageClassName` is intentionally absent —
+  # the cluster default storage class is used. Override here or per-engine to specify a class
+  # (e.g. `storageClassName: gp3`).
+  # @default -- {}
   defaultStorage:
+    # -- Access modes for the default PVC.
     accessModes: [ReadWriteOnce]
     resources:
       requests:
+        # -- Default storage size for engine PVCs.
         storage: 100Gi
 
-# ---------------------------------------------------------------------------
-# Metadata service
-# ---------------------------------------------------------------------------
+# @section -- Metadata Service
+
+# -- Metadata service (Pensieve) configuration.
+# @default -- {}
 metadata:
   image:
-    # ECR repository for the pensieve-dedicated metadata service.
+    # -- ECR repository for the Pensieve metadata service image.
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/dedicated-pensieve
-    # Pensieve is versioned independently from firebolt-core.
-    # Set explicitly in your values override.
+    # -- Pensieve image tag. Versioned independently from firebolt-core; set explicitly in your values override.
     tag: "4.32.0-pre.0.20260331033249.e67bde0be1cd"
+    # -- Image pull policy.
     pullPolicy: IfNotPresent
 
+  # -- Resource requests and limits for the metadata service container.
+  # Pensieve is a lightweight gRPC service; increase memory if you run many engines.
   resources:
-    # Pensieve is a lightweight gRPC metadata service. These defaults are
-    # sufficient for most deployments; increase memory if you run many engines.
     requests:
       cpu: "100m"
       memory: "512Mi"
     limits:
       memory: "1Gi"
 
-  # gRPC server configuration.
+  # -- gRPC server configuration for the metadata service.
+  # @default -- {}
   server:
+    # -- gRPC server listen address.
     host: "0.0.0.0"
+    # -- gRPC server port.
     port: 7000
-    threads: 0          # 0 = use all available cores
+    # -- Number of server threads. `0` uses all available cores.
+    threads: 0
+    # -- Log level for the metadata service.
     log_level: "information"
 
+  # -- Deployment-level settings for the metadata service.
+  # @default -- {}
   deployment:
+    # -- Termination grace period in seconds.
     terminationGracePeriodSeconds: 30
+    # -- Pod-level security context.
     securityContext: {}
 
-  podTemplate: {}   # nodeSelector / tolerations / affinity
+  # -- Pod template overrides for the metadata service (nodeSelector, tolerations, affinity).
+  podTemplate: {}
 
-# ---------------------------------------------------------------------------
-# PostgreSQL — native deployment or external connection
-# ---------------------------------------------------------------------------
-# When local_enabled: true the chart deploys a single-replica postgres:16-alpine
-# StatefulSet. Host is derived automatically.
-# When local_enabled: false supply host/port/database and credentials for an
-# external database.
+# @section -- PostgreSQL
+
+# -- PostgreSQL configuration. When `local_enabled: true` the chart deploys a single-replica
+# `postgres:16-alpine` StatefulSet. Set `local_enabled: false` and supply connection details
+# for an external database.
+# @default -- {}
 postgresql:
+  # -- When true, deploys a bundled PostgreSQL StatefulSet. Set to false to use an external database.
   local_enabled: true
+  # -- PostgreSQL image used for the bundled StatefulSet.
   image: "postgres:16-alpine"
-  # Connection settings — used by the Pensieve ConfigMap.
-  # When local_enabled: true, host is auto-derived and database comes from this block.
-  # When local_enabled: false, set host explicitly.
+  # -- PostgreSQL host. Auto-derived when `local_enabled` is true; must be set explicitly for external databases.
   host: ""
+  # -- PostgreSQL port.
   port: 5432
+  # -- Database name.
   database: firebolt_metadata
+  # -- Database username.
   username: firebolt
-  # Required when local_enabled: true — set a strong password in your values override.
-  # For external PG, set here or use existingSecret.
+  # -- Database password. Required when `local_enabled` is true.
+  # For external databases, set here or use `postgresql.credentials.existingSecret`.
   password: ""
+  # -- PostgreSQL schema.
   schema: "public"
+  # -- Resource requests and limits for the bundled PostgreSQL container.
   resources:
     requests:
       cpu: "25m"
@@ -140,135 +167,180 @@ postgresql:
     limits:
       cpu: "250m"
       memory: "256Mi"
+  # -- TCP keepalive settings for the PostgreSQL connection.
+  # @default -- {}
   keepalive:
+    # -- Enable TCP keepalive (`1` = enabled).
     enabled: 1
+    # -- Keepalive idle time in seconds.
     idle_sec: 120
+    # -- Keepalive probe interval in seconds.
     interval_sec: 30
+    # -- Maximum number of keepalive probes before dropping the connection.
     count: 5
+  # -- Connection timeout in seconds.
   connect_timeout_sec: 5
+  # -- PostgreSQL credentials Secret configuration.
+  # @default -- {}
   credentials:
+    # -- Mount path for the credentials Secret inside the metadata service container.
     mountPath: /secrets/postgres
-    # existingSecret: reference an externally-managed Secret (e.g. via ESO).
-    # When set, the chart will NOT create a Secret of its own.
-    # Ignored when postgresql.local_enabled=true.
+    # -- Reference an externally-managed Secret (e.g. via ESO). When set, the chart will
+    # not create its own Secret. Ignored when `postgresql.local_enabled` is true.
     existingSecret: ""
+  # -- Persistence configuration for the bundled PostgreSQL StatefulSet.
+  # @default -- {}
   persistence:
+    # -- PVC size for bundled PostgreSQL data.
     size: 10Gi
 
-# ---------------------------------------------------------------------------
-# Gateway — core-gateway
-# ---------------------------------------------------------------------------
+# @section -- Gateway
+
+# -- Gateway (`core-gateway`) configuration.
+# @default -- {}
 gateway:
-  # Set to true to deploy the gateway.
-  # Requires either gateway.auth.directAccessSecret to be set, or
-  # auth.mode: sso with OIDC fully configured.
-  enabled: false
+  # -- Set to true to deploy the gateway. Requires either `gateway.auth.directAccessSecret`
+  # or `auth.mode: sso` with OIDC fully configured.
+  enabled: true
+  # -- Number of gateway replicas.
   replicas: 2
   image:
-    # ECR repository for the core-gateway image.
+    # -- ECR repository for the core-gateway image.
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/core-gateway
-    # Gateway follows its own semver release cadence (v-prefixed, e.g. "v1.55.2").
-    # Set explicitly in your values override.
+    # -- Gateway image tag (v-prefixed semver, e.g. `v1.55.2`). Set explicitly in your values override.
     tag: "v1.55.2"
+    # -- Image pull policy.
     pullPolicy: IfNotPresent
-  # Container port the gateway process listens on. The operator uses 5050.
+  # -- Container port the gateway process listens on.
   containerPort: 5050
+  # -- Resource requests and limits for the gateway container.
+  # The gateway is stateless and CPU-light; it proxies HTTP queries to engines.
   resources:
-    # Gateway is stateless and CPU-light; it proxies HTTP queries to engines.
     requests:
       cpu: "500m"
       memory: "512Mi"
     limits:
       memory: "1Gi"
+  # -- Gateway Service configuration.
+  # @default -- {}
   service:
-    type: ClusterIP   # ClusterIP | LoadBalancer | NodePort
-    port: 80          # External service port; proxied to containerPort
-  # Organization identity — required when gateway.enabled is true.
-  # The gateway validates account_id on every incoming request. Clients must
-  # pass it as a URL query parameter: ?account_id=<value>
-  # For self-hosted deployments any non-empty string works; use a consistent
-  # value across your gateway config and all client requests.
+    # -- Service type. One of `ClusterIP`, `LoadBalancer`, or `NodePort`.
+    type: ClusterIP
+    # -- External service port proxied to `containerPort`.
+    port: 80
+  # -- Organization identity. Required when `gateway.enabled` is true.
+  # The gateway validates `account_id` on every incoming request.
+  # Clients must pass it as a URL query parameter: `?account_id=<value>`.
+  # @default -- {}
   organization:
-    name: ""        # Label used in gateway logs and metrics.
-    accountId: ""   # Checked against ?account_id= in every query request.
-  # At least one auth option must be configured when gateway.enabled is true.
+    # -- Label used in gateway logs and metrics.
+    name: "default-org"
+    # -- Checked against `?account_id=` query parameter in every request.
+    accountId: "default-account-id"
+  # -- Gateway authentication configuration. At least one option must be set when `gateway.enabled` is true.
+  # @default -- {}
   auth:
-    # directAccessSecret: a shared token clients send as X-Auth-Token: <value>.
-    # Suitable for testing and internal deployments without an IdP.
-    directAccessSecret: ""
-  podTemplate: {}   # nodeSelector / tolerations / affinity
+    # -- Shared token clients send as `X-Auth-Token`. Suitable for testing and internal deployments without an IdP.
+    directAccessSecret: "default-access-secret"
+  # -- Pod template overrides for gateway pods (nodeSelector, tolerations, affinity).
+  podTemplate: {}
 
-# ---------------------------------------------------------------------------
-# Authentication — configures firebolt-core auth.json
-# ---------------------------------------------------------------------------
+# @section -- Authentication
+
+# -- Authentication configuration for firebolt-core `auth.json`.
+# @default -- {}
 auth:
-  mode: none   # none | local | sso
+  # -- Authentication mode. One of `none`, `local`, or `sso`.
+  mode: none
 
-  # Used when mode: local
+  # -- Local authentication configuration. Used when `mode: local`.
+  # @default -- {}
   local:
-    credentialsSecretRef: ""   # name of a Secret with username/password or API keys
+    # -- Name of a Secret containing username/password or API keys.
+    credentialsSecretRef: ""
 
-  # Used when mode: sso
+  # -- OIDC/SSO configuration. Used when `mode: sso`.
+  # @default -- {}
   oidc:
+    # -- OIDC issuer URL.
     issuerURL: ""
+    # -- OIDC client ID.
     clientID: ""
+    # -- Claim mappings for OIDC token fields.
+    # @default -- {}
     claimMappings:
+      # -- OIDC claim used as the username.
       username: "email"
 
-# ---------------------------------------------------------------------------
-# Engines
-# ---------------------------------------------------------------------------
-# Each entry produces one StatefulSet per node (replicas controls the count),
-# plus a shared headless Service, ClusterIP Service and ConfigMap.
-# Per-engine values override the shared engineSpec defaults above.
+# @section -- Engines
+
+# -- Engine definitions. Each entry produces one StatefulSet per node (`replicas` controls
+# node count), plus a shared headless Service, ClusterIP Service, and ConfigMap.
+# Per-engine values override the shared `engineSpec` defaults.
+# @default -- []
 engines:
-  - name: default
+  - # -- Engine name. Used to derive resource names across the chart.
+    name: default
+    # -- Number of nodes in this engine group (one StatefulSet replica per node).
     replicas: 1
+    # -- Resource requests and limits for engine containers.
+    # Firebolt Core is memory-bound: more RAM directly improves cache hit rates and query
+    # throughput. CPU governs parallel query execution threads.
+    #
+    # Typical sizing guidance:
+    #   Development / functional testing:  2 vCPU  /  8 Gi  (request)
+    #   Small production workload:         4 vCPU  / 32 Gi
+    #   Medium production workload:        8 vCPU  / 64 Gi
+    #   Large production workload:        16 vCPU  / 128 Gi
+    #
+    # Storage I/O is also significant — use an SSD-backed StorageClass and
+    # size the PVC to hold your working dataset plus ~30 % headroom.
     resources:
-      # Firebolt Core is memory-bound: more RAM directly improves cache hit
-      # rates and query throughput. CPU governs parallel query execution threads.
-      #
-      # Typical sizing guidance:
-      #   Development / functional testing:  2 vCPU  /  8 Gi  (request)
-      #   Small production workload:         4 vCPU  / 32 Gi
-      #   Medium production workload:        8 vCPU  / 64 Gi
-      #   Large production workload:        16 vCPU  / 128 Gi
-      #
-      # Storage I/O is also significant — use an SSD-backed StorageClass and
-      # size the PVC to hold your working dataset plus ~30 % headroom.
       requests:
         cpu: "1"
         memory: "4Gi"
       limits:
         memory: "4Gi"
-    # Storage for this engine's PVC (falls back to defaultStorage if omitted).
+    # -- PVC storage configuration for this engine. Falls back to `engineSpec.defaultStorage` if omitted.
     storage:
       accessModes: [ReadWriteOnce]
       resources:
         requests:
           storage: 100Gi
-    # Per-engine pod scheduling overrides (optional).
+    # -- Priority class name for engine pods.
     priorityClassName: ""
+    # -- Tolerations for engine pod scheduling.
     tolerations: []
+    # -- Affinity rules for engine pod scheduling.
     affinity: {}
+    # -- Node selector for engine pod scheduling.
     nodeSelector: {}
+    # -- Annotations applied to engine pods.
     podAnnotations: {}
 
-# Custom configuration merged into each engine's config.config object.
+# @section -- Global
+
+# -- Custom configuration merged into each engine's `config.config` object.
+# @default -- {}
 customNodeConfig:
+  # -- Account ID for the Firebolt instance.
   account_id: "default-account-id"
+  # -- Account name for the Firebolt instance.
   account_name: "default-account"
+  # -- Organization ID for the Firebolt instance.
   organization_id: "01KP98J0000000000000000000"
+  # -- Organization name for the Firebolt instance.
   organization_name: "default-org"
+  # -- Cluster ID for the Firebolt instance.
   cluster_id: "default-cluster"
 
-# Deploy a PodMonitor for Prometheus metrics scraping.
+# -- Deploy a PodMonitor for Prometheus metrics scraping.
 podMonitor: false
 
-# Security context capabilities for engine containers.
+# -- Security context capabilities for engine containers.
 securityContextCapabilities:
   drop:
     - ALL
 
-# Image used for utility init/sidecar containers (e.g. memlock-setup sidecar).
+# -- Image used for utility init/sidecar containers (e.g. the memlock-setup sidecar).
 utilitiesImage: debian:stable-slim

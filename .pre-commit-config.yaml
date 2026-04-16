@@ -1,0 +1,34 @@
+repos:
+  - repo: local
+    hooks:
+      - id: helm-docs
+        name: helm-docs
+        description: >
+          Generate Helm chart documentation and stage the result.
+          On first run the commit is aborted because README.md changed —
+          simply re-run `git commit`; the staged README.md is already included.
+        language: system
+        entry: bash -c 'helm-docs --chart-search-root=helm && git add helm/README.md'
+        pass_filenames: false
+        files: ^helm/(Chart\.yaml|values\.yaml|README\.md\.gotmpl)$
+
+      - id: helm-lint
+        name: helm lint
+        description: >
+          Validate chart structure, metadata, and templates.
+          --strict promotes warnings to errors.
+        language: system
+        entry: helm lint --strict helm/
+        pass_filenames: false
+        files: ^helm/
+
+      - id: helm-template-default
+        name: helm template (default values)
+        description: >
+          Render all templates with default values to verify Go template correctness.
+          Catches undefined variables, type errors, and broken control flow.
+        language: system
+        entry: bash -c 'helm template firebolt helm/ > /dev/null'
+        pass_filenames: false
+        files: ^helm/
+

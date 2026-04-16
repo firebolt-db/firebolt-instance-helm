@@ -5,7 +5,33 @@ VALUES_FILE  := $(CHART)/values.local.yaml
 ECR_REGISTRY := 000000000000.dkr.ecr.us-east-1.amazonaws.com
 AWS_REGION   := us-east-1
 
-.PHONY: install upgrade delete
+.PHONY: install upgrade delete check-pre-commit check-helm-docs setup-pre-commit docs lint
+
+check-pre-commit:
+	@command -v pre-commit >/dev/null 2>&1 || { \
+		echo "Error: pre-commit is not installed."; \
+		echo "Install it from https://github.com/pre-commit/pre-commit"; \
+		exit 1; \
+	}
+
+check-helm-docs:
+	@command -v helm-docs >/dev/null 2>&1 || { \
+		echo "Error: helm-docs is not installed."; \
+		echo "Install it from https://github.com/norwoodj/helm-docs"; \
+		exit 1; \
+	}
+
+setup-pre-commit: check-pre-commit check-helm-docs
+	pre-commit install
+	pre-commit install-hooks
+
+docs: check-helm-docs
+	helm-docs --chart-search-root=helm
+
+lint:
+	helm lint --strict $(CHART)
+	helm template $(RELEASE) $(CHART) > /dev/null
+	@echo "All helm checks passed."
 
 install:
 	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -

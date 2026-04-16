@@ -1,6 +1,6 @@
 # firebolt-instance
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: release-4.32.0-pre.0.20260414104905.92750f097354-amd64](https://img.shields.io/badge/AppVersion-release--4.32.0--pre.0.20260414104905.92750f097354--amd64-informational?style=flat-square)
 
 Firebolt Instance on Kubernetes — gateway, metadata, auth, and engines
 
@@ -10,37 +10,117 @@ Firebolt Instance on Kubernetes — gateway, metadata, auth, and engines
 
 * <https://github.com/firebolt-db/firebolt-instance-helm>
 
-## Requirements
-
-| Repository | Name | Version |
-|------------|------|---------|
-| https://charts.bitnami.com/bitnami | postgresql | ~18.0.0 |
-
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| affinity | object | `{}` |  |
-| auth | object | `{"local":{"credentialsSecretRef":""},"mode":"none","oidc":{"claimMappings":{"username":"email"},"clientID":"","issuerURL":""}}` | ------------------------------------------------------------------------- |
-| createNamespace | bool | `true` |  |
-| customNodeConfig | object | `{}` |  |
-| defaultStorage | object | `{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"100Gi"}}}` | ------------------------------------------------------------------------- storageClassName is intentionally absent — the cluster default storage class is used. Override here or per-engine if your cluster requires a specific class (e.g. storageClassName: gp3). |
-| engines | list | `[{"affinity":{},"name":"default","nodeSelector":{},"podAnnotations":{},"priorityClassName":"","replicas":1,"resources":{"limits":{"cpu":"8","memory":"64Gi"},"requests":{"cpu":"4","memory":"32Gi"}},"storage":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"100Gi"}}},"tolerations":[]}]` | ------------------------------------------------------------------------- Each entry produces one StatefulSet + headless Service + ClusterIP Service + ConfigMap. Per-engine values override the shared pod defaults above. |
-| fsGroupChangePolicy | string | `"OnRootMismatch"` |  |
-| gateway | object | `{"auth":{"directAccessSecret":""},"enabled":false,"image":{"repository":"000000000000.dkr.ecr.us-east-1.amazonaws.com/core-gateway","tag":""},"organization":{"accountId":"","name":""},"podTemplate":{},"replicas":1,"resources":{"limits":{"memory":"1Gi"},"requests":{"cpu":"500m","memory":"512Mi"}},"service":{"port":3473,"type":"ClusterIP"}}` | ------------------------------------------------------------------------- |
-| image.pullPolicy | string | `"Always"` |  |
-| image.repository | string | `"000000000000.dkr.ecr.us-east-1.amazonaws.com/firebolt-core"` |  |
-| imagePullSecrets | list | `[]` |  |
-| memlockSetup | bool | `true` |  |
-| metadata | object | `{"deployment":{"securityContext":{},"terminationGracePeriodSeconds":30},"image":{"repository":"000000000000.dkr.ecr.us-east-1.amazonaws.com/dedicated-pensieve","tag":""},"podTemplate":{},"postgresql":{"connect_timeout_sec":5,"credentials":{"existingSecret":"","mountPath":"/secrets/postgres","password":"","username":""},"database":"","host":"","keepalive":{"count":5,"enabled":1,"idle_sec":120,"interval_sec":30},"port":5432,"schema":"public"},"resources":{"limits":{"memory":"1Gi"},"requests":{"cpu":"100m","memory":"512Mi"}},"server":{"host":"0.0.0.0","log_level":"information","port":7000,"threads":0}}` | ------------------------------------------------------------------------- |
-| nodeSelector | object | `{}` |  |
-| nonRoot | bool | `true` | ------------------------------------------------------------------------- |
-| podMonitor | bool | `false` |  |
-| postgresql | object | `{"auth":{"database":"firebolt_metadata","password":"","username":"firebolt"},"enabled":true,"primary":{"persistence":{"size":"10Gi"}}}` | ------------------------------------------------------------------------- Set enabled: false and configure metadata.postgresql for an external database. |
-| securityContextCapabilities.drop[0] | string | `"ALL"` |  |
-| serviceAccount | string | `"default"` |  |
-| terminationGracePeriodSeconds | int | `5` |  |
-| tolerations | list | `[]` |  |
-| utilitiesImage | string | `"debian:stable-slim"` |  |
-| version | string | `""` |  |
+| auth | object | {} | Authentication configuration for firebolt-core `auth.json`. |
+| auth.local | object | {} | Local authentication configuration. Used when `mode: local`. |
+| auth.local.credentialsSecretRef | string | `""` | Name of a Secret containing username/password or API keys. |
+| auth.mode | string | `"none"` | Authentication mode. One of `none`, `local`, or `sso`. |
+| auth.oidc | object | {} | OIDC/SSO configuration. Used when `mode: sso`. |
+| auth.oidc.claimMappings | object | {} | Claim mappings for OIDC token fields. |
+| auth.oidc.claimMappings.username | string | `"email"` | OIDC claim used as the username. |
+| auth.oidc.clientID | string | `""` | OIDC client ID. |
+| auth.oidc.issuerURL | string | `""` | OIDC issuer URL. |
+| createNamespace | bool | `false` | When true, a Namespace resource is included in the chart output. Pair with `helm install --create-namespace --set createNamespace=false`. |
+| customNodeConfig | object | {} | Custom configuration merged into each engine's `config.config` object. |
+| customNodeConfig.account_id | string | `"default-account-id"` | Account ID for the Firebolt instance. |
+| customNodeConfig.account_name | string | `"default-account"` | Account name for the Firebolt instance. |
+| customNodeConfig.cluster_id | string | `"default-cluster"` | Cluster ID for the Firebolt instance. |
+| customNodeConfig.organization_id | string | `"01KP98J0000000000000000000"` | Organization ID for the Firebolt instance. |
+| customNodeConfig.organization_name | string | `"default-org"` | Organization name for the Firebolt instance. |
+| engineSpec | object | {} | Shared engine pod defaults applied to all engines unless overridden per-engine. |
+| engineSpec.affinity | object | `{}` | Affinity rules for engine pod scheduling. |
+| engineSpec.customInitContainersTemplate | list | `[]` | Custom init containers injected into engine pods (supports templating). |
+| engineSpec.customVolumes | list | `[]` | Custom volumes injected into engine pods. |
+| engineSpec.defaultStorage | object | {} | Default PVC storage spec for engines. `storageClassName` is intentionally absent — the cluster default storage class is used. Override here or per-engine to specify a class (e.g. `storageClassName: gp3`). |
+| engineSpec.defaultStorage.accessModes | list | `["ReadWriteOnce"]` | Access modes for the default PVC. |
+| engineSpec.defaultStorage.resources.requests.storage | string | `"100Gi"` | Default storage size for engine PVCs. |
+| engineSpec.fsGroupChangePolicy | string | `"OnRootMismatch"` | fsGroupChangePolicy for the engine pod security context. |
+| engineSpec.hostPathStorageEnabled | bool | `false` | When true, uses hostPath instead of PVC for engine data. |
+| engineSpec.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
+| engineSpec.image.repository | string | `"000000000000.dkr.ecr.us-east-1.amazonaws.com/firebolt-core"` | ECR repository for the firebolt-core engine image. |
+| engineSpec.image.tag | string | `""` | Image tag. Defaults to `Chart.appVersion` when empty. |
+| engineSpec.memlockSetup | bool | `true` | When true, a memlock-setup init container is added to configure memory locking limits. |
+| engineSpec.nodeHostSuffix | string | `".cluster.local"` | Suffix appended after `.svc` in node FQDNs in `config.json`. |
+| engineSpec.nodeSelector | object | `{}` | Node selector for engine pod scheduling. |
+| engineSpec.nonRoot | bool | `true` | Run engine containers as non-root. |
+| engineSpec.readiness | bool | `true` | When true, a readiness probe is added to the core container. |
+| engineSpec.serviceAccount | string | `"default"` | Service account name for engine pods. |
+| engineSpec.storageHostPath | object | {} | Host path configuration used when `hostPathStorageEnabled` is true. |
+| engineSpec.storageHostPath.path | string | `"/var/lib/firebolt-core"` | Host path for engine data. |
+| engineSpec.storageHostPath.type | string | `"DirectoryOrCreate"` | Host path type. |
+| engineSpec.terminationGracePeriodSeconds | int | `5` | Termination grace period in seconds for engine pods. |
+| engineSpec.tolerations | list | `[]` | Tolerations for engine pod scheduling. |
+| engineSpec.uiSidecar | bool | `false` | Deploy a Core UI sidecar for each engine pod. |
+| engines | list | [] | Engine definitions. Each entry produces one StatefulSet per node (`replicas` controls node count), plus a shared headless Service, ClusterIP Service, and ConfigMap. Per-engine values override the shared `engineSpec` defaults. |
+| engines[0].affinity | object | `{}` | Affinity rules for engine pod scheduling. |
+| engines[0].name | string | `"default"` | Engine name. Used to derive resource names across the chart. |
+| engines[0].nodeSelector | object | `{}` | Node selector for engine pod scheduling. |
+| engines[0].podAnnotations | object | `{}` | Annotations applied to engine pods. |
+| engines[0].priorityClassName | string | `""` | Priority class name for engine pods. |
+| engines[0].replicas | int | `1` | Number of nodes in this engine group (one StatefulSet replica per node). |
+| engines[0].resources | object | `{"limits":{"memory":"4Gi"},"requests":{"cpu":"1","memory":"4Gi"}}` | Resource requests and limits for engine containers. Firebolt Core is memory-bound: more RAM directly improves cache hit rates and query throughput. CPU governs parallel query execution threads.  Typical sizing guidance:   Development / functional testing:  2 vCPU  /  8 Gi  (request)   Small production workload:         4 vCPU  / 32 Gi   Medium production workload:        8 vCPU  / 64 Gi   Large production workload:        16 vCPU  / 128 Gi  Storage I/O is also significant — use an SSD-backed StorageClass and size the PVC to hold your working dataset plus ~30 % headroom. |
+| engines[0].storage | object | `{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"100Gi"}}}` | PVC storage configuration for this engine. Falls back to `engineSpec.defaultStorage` if omitted. |
+| engines[0].tolerations | list | `[]` | Tolerations for engine pod scheduling. |
+| extraLabels | object | `{"firebolt/product":"core"}` | Extra labels applied to all resources and pods. |
+| gateway | object | {} | Gateway (`core-gateway`) configuration. |
+| gateway.auth | object | {} | Gateway authentication configuration. At least one option must be set when `gateway.enabled` is true. |
+| gateway.auth.directAccessSecret | string | `"default-access-secret"` | Shared token clients send as `X-Auth-Token`. Suitable for testing and internal deployments without an IdP. |
+| gateway.containerPort | int | `5050` | Container port the gateway process listens on. |
+| gateway.enabled | bool | `true` | Set to true to deploy the gateway. Requires either `gateway.auth.directAccessSecret` or `auth.mode: sso` with OIDC fully configured. |
+| gateway.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
+| gateway.image.repository | string | `"000000000000.dkr.ecr.us-east-1.amazonaws.com/core-gateway"` | ECR repository for the core-gateway image. |
+| gateway.image.tag | string | `"v1.55.2"` | Gateway image tag (v-prefixed semver, e.g. `v1.55.2`). Set explicitly in your values override. |
+| gateway.organization | object | {} | Organization identity. Required when `gateway.enabled` is true. The gateway validates `account_id` on every incoming request. Clients must pass it as a URL query parameter: `?account_id=<value>`. |
+| gateway.organization.accountId | string | `"default-account-id"` | Checked against `?account_id=` query parameter in every request. |
+| gateway.organization.name | string | `"default-org"` | Label used in gateway logs and metrics. |
+| gateway.podTemplate | object | `{}` | Pod template overrides for gateway pods (nodeSelector, tolerations, affinity). |
+| gateway.replicas | int | `2` | Number of gateway replicas. |
+| gateway.resources | object | `{"limits":{"memory":"1Gi"},"requests":{"cpu":"500m","memory":"512Mi"}}` | Resource requests and limits for the gateway container. The gateway is stateless and CPU-light; it proxies HTTP queries to engines. |
+| gateway.service | object | {} | Gateway Service configuration. |
+| gateway.service.port | int | `80` | External service port proxied to `containerPort`. |
+| gateway.service.type | string | `"ClusterIP"` | Service type. One of `ClusterIP`, `LoadBalancer`, or `NodePort`. |
+| imagePullSecrets | list | `[]` | Registry credentials. Must be a pre-created docker-registry Secret in the deployment namespace. Leave empty if nodes have ambient registry access (e.g. node IAM role). |
+| metadata | object | {} | Metadata service (Pensieve) configuration. |
+| metadata.deployment | object | {} | Deployment-level settings for the metadata service. |
+| metadata.deployment.securityContext | object | `{}` | Pod-level security context. |
+| metadata.deployment.terminationGracePeriodSeconds | int | `30` | Termination grace period in seconds. |
+| metadata.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
+| metadata.image.repository | string | `"000000000000.dkr.ecr.us-east-1.amazonaws.com/dedicated-pensieve"` | ECR repository for the Pensieve metadata service image. |
+| metadata.image.tag | string | `"4.32.0-pre.0.20260331033249.e67bde0be1cd"` | Pensieve image tag. Versioned independently from firebolt-core; set explicitly in your values override. |
+| metadata.podTemplate | object | `{}` | Pod template overrides for the metadata service (nodeSelector, tolerations, affinity). |
+| metadata.resources | object | `{"limits":{"memory":"1Gi"},"requests":{"cpu":"100m","memory":"512Mi"}}` | Resource requests and limits for the metadata service container. Pensieve is a lightweight gRPC service; increase memory if you run many engines. |
+| metadata.server | object | {} | gRPC server configuration for the metadata service. |
+| metadata.server.host | string | `"0.0.0.0"` | gRPC server listen address. |
+| metadata.server.log_level | string | `"information"` | Log level for the metadata service. |
+| metadata.server.port | int | `7000` | gRPC server port. |
+| metadata.server.threads | int | `0` | Number of server threads. `0` uses all available cores. |
+| podMonitor | bool | `false` | Deploy a PodMonitor for Prometheus metrics scraping. |
+| postgresql | object | {} | PostgreSQL configuration. When `local_enabled: true` the chart deploys a single-replica `postgres:16-alpine` StatefulSet. Set `local_enabled: false` and supply connection details for an external database. |
+| postgresql.connect_timeout_sec | int | `5` | Connection timeout in seconds. |
+| postgresql.credentials | object | {} | PostgreSQL credentials Secret configuration. |
+| postgresql.credentials.existingSecret | string | `""` | Reference an externally-managed Secret (e.g. via ESO). When set, the chart will not create its own Secret. Ignored when `postgresql.local_enabled` is true. |
+| postgresql.credentials.mountPath | string | `"/secrets/postgres"` | Mount path for the credentials Secret inside the metadata service container. |
+| postgresql.database | string | `"firebolt_metadata"` | Database name. |
+| postgresql.host | string | `""` | PostgreSQL host. Auto-derived when `local_enabled` is true; must be set explicitly for external databases. |
+| postgresql.image | string | `"postgres:16-alpine"` | PostgreSQL image used for the bundled StatefulSet. |
+| postgresql.keepalive | object | {} | TCP keepalive settings for the PostgreSQL connection. |
+| postgresql.keepalive.count | int | `5` | Maximum number of keepalive probes before dropping the connection. |
+| postgresql.keepalive.enabled | int | `1` | Enable TCP keepalive (`1` = enabled). |
+| postgresql.keepalive.idle_sec | int | `120` | Keepalive idle time in seconds. |
+| postgresql.keepalive.interval_sec | int | `30` | Keepalive probe interval in seconds. |
+| postgresql.local_enabled | bool | `true` | When true, deploys a bundled PostgreSQL StatefulSet. Set to false to use an external database. |
+| postgresql.password | string | `""` | Database password. Required when `local_enabled` is true. For external databases, set here or use `postgresql.credentials.existingSecret`. |
+| postgresql.persistence | object | {} | Persistence configuration for the bundled PostgreSQL StatefulSet. |
+| postgresql.persistence.size | string | `"10Gi"` | PVC size for bundled PostgreSQL data. |
+| postgresql.port | int | `5432` | PostgreSQL port. |
+| postgresql.resources | object | `{"limits":{"cpu":"250m","memory":"256Mi"},"requests":{"cpu":"25m","memory":"64Mi"}}` | Resource requests and limits for the bundled PostgreSQL container. |
+| postgresql.schema | string | `"public"` | PostgreSQL schema. |
+| postgresql.username | string | `"firebolt"` | Database username. |
+| securityContextCapabilities | object | `{"drop":["ALL"]}` | Security context capabilities for engine containers. |
+| utilitiesImage | string | `"debian:stable-slim"` | Image used for utility init/sidecar containers (e.g. the memlock-setup sidecar). |
 
+----------------------------------------------
+Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)
