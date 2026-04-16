@@ -8,37 +8,78 @@ metadata:
     {{- include "fbinstance.labels" . | nindent 4 }}
     firebolt/component: gateway
 data:
-  core-gateway.yaml: |
-    organization:
-      name: {{ .Values.gateway.organization.name | quote }}
-      account_id: {{ .Values.gateway.organization.accountId | quote }}
-      namespace: {{ .Release.Namespace | quote }}
-      internal_service_suffix: "-service"
-      internal_service_port: 3473
-      deployment_suffix: "-g"
-      engines:
-{{- range .Values.engines }}
-        - {{ .name }}
-{{- end }}
-    http_server:
-      address: ":{{ .Values.gateway.containerPort }}"
-      shutdown_delay: 5s
-      shutdown_timeout: 30s
-    auth:
-{{- if .Values.gateway.auth.directAccessSecret }}
-      direct_access_secret: {{ .Values.gateway.auth.directAccessSecret | quote }}
-{{- end }}
-      enabled: {{ eq .Values.auth.mode "sso" }}
-    telemetry:
-      log_level: "info"
-      log_all_requests: false
-    transport_config:
-      max_idle_conns_per_host: 100
-      idle_conn_timeout: 60s
-      flush_interval: -1
-    filter_headers: true
-    rendezvous_routing:
-      enabled: false
-    autoscaler:
-      enabled: false
+  envoy.yaml: |
+    static_resources:
+      listeners:
+        - name: listener
+          address:
+            socket_address:
+              address: 0.0.0.0
+              port_value: {{ .Values.gateway.containerPort }}
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: gateway
+                    access_log:
+                      - name: envoy.access_loggers.stdout
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                    http_filters:
+                      - name: envoy.filters.http.lua
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+                          default_source_code:
+                            inline_string: |
+                              function envoy_on_request(handle)
+                                local engine = handle:headers():get("x-firebolt-engine")
+                                if engine == nil or engine == "" then
+                                  handle:respond({[":status"] = "400"}, "missing X-Firebolt-Engine header")
+                                  return
+                                end
+                                -- TODO: remove advanced_mode once Core supports x-request-id
+                                local path = handle:headers():get(":path")
+                                if path:find("?") then
+                                  handle:headers():replace(":path", path .. "&advanced_mode=true")
+                                else
+                                  handle:headers():replace(":path", path .. "?advanced_mode=true")
+                                end
+                                handle:headers():replace(":authority", engine .. "-service.{{ .Release.Namespace }}.svc.cluster.local:3473")
+                              end
+                      - name: envoy.filters.http.dynamic_forward_proxy
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+                          dns_cache_config:
+                            name: dynamic_forward_proxy_cache
+                            dns_lookup_family: V4_ONLY
+                      - name: envoy.filters.http.router
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                    route_config:
+                      name: local_route
+                      virtual_hosts:
+                        - name: default
+                          domains: ["*"]
+                          routes:
+                            - match:
+                                prefix: "/"
+                              route:
+                                cluster: dynamic_forward_proxy
+                                timeout: 0s
+      clusters:
+        - name: dynamic_forward_proxy
+          lb_policy: CLUSTER_PROVIDED
+          cluster_type:
+            name: envoy.clusters.dynamic_forward_proxy
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+              dns_cache_config:
+                name: dynamic_forward_proxy_cache
+                dns_lookup_family: V4_ONLY
+    admin:
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: {{ .Values.gateway.adminPort }}
 {{- end }}

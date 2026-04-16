@@ -1,3 +1,4 @@
+{{- if .Values.gateway.enabled }}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -15,8 +16,9 @@ spec:
         - sh
         - -c
         - |
-          URL="http://{{ include "fbinstance.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.gateway.service.port }}/health/ready"
+          URL="http://{{ include "fbinstance.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.gateway.service.port }}/ready"
           echo "GET $URL ..."
           curl --fail --retry 5 --retry-delay 3 --retry-connrefused "$URL" \
             && echo "PASS: gateway is ready" \
             || { echo "FAIL: gateway health check failed"; exit 1; }
+{{- end }}

@@ -196,31 +196,33 @@ postgresql:
 
 # @section -- Gateway
 
-# -- Gateway (`core-gateway`) configuration.
+# -- Envoy gateway proxy configuration. Routes queries to engine Services based on the
+# `X-Firebolt-Engine` HTTP header. A Lua filter extracts the engine name and rewrites
+# the upstream to `{engine}-service:3473` via dynamic forward proxy.
 # @default -- {}
 gateway:
-  # -- Set to true to deploy the gateway. Requires either `gateway.auth.directAccessSecret`
-  # or `auth.mode: sso` with OIDC fully configured.
+  # -- Set to true to deploy the Envoy gateway proxy.
   enabled: true
   # -- Number of gateway replicas.
   replicas: 2
   image:
-    # -- ECR repository for the core-gateway image.
-    repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/core-gateway
-    # -- Gateway image tag (v-prefixed semver, e.g. `v1.55.2`). Set explicitly in your values override.
-    tag: "v1.55.2"
+    # -- Envoy proxy container image.
+    repository: envoyproxy/envoy
+    # -- Envoy image tag.
+    tag: "v1.33-latest"
     # -- Image pull policy.
     pullPolicy: IfNotPresent
-  # -- Container port the gateway process listens on.
-  containerPort: 5050
-  # -- Resource requests and limits for the gateway container.
-  # The gateway is stateless and CPU-light; it proxies HTTP queries to engines.
+  # -- Envoy listener port for client traffic.
+  containerPort: 8080
+  # -- Envoy admin interface port (used for health checks).
+  adminPort: 9901
+  # -- Resource requests and limits for the Envoy container.
   resources:
     requests:
-      cpu: "500m"
-      memory: "512Mi"
+      cpu: "100m"
+      memory: "256Mi"
     limits:
-      memory: "1Gi"
+      memory: "512Mi"
   # -- Gateway Service configuration.
   # @default -- {}
   service:
@@ -228,20 +230,6 @@ gateway:
     type: ClusterIP
     # -- External service port proxied to `containerPort`.
     port: 80
-  # -- Organization identity. Required when `gateway.enabled` is true.
-  # The gateway validates `account_id` on every incoming request.
-  # Clients must pass it as a URL query parameter: `?account_id=<value>`.
-  # @default -- {}
-  organization:
-    # -- Label used in gateway logs and metrics.
-    name: "default-org"
-    # -- Checked against `?account_id=` query parameter in every request.
-    accountId: "default-account-id"
-  # -- Gateway authentication configuration. At least one option must be set when `gateway.enabled` is true.
-  # @default -- {}
-  auth:
-    # -- Shared token clients send as `X-Auth-Token`. Suitable for testing and internal deployments without an IdP.
-    directAccessSecret: "default-access-secret"
   # -- Pod template overrides for gateway pods (nodeSelector, tolerations, affinity).
   podTemplate: {}
 

@@ -1,8 +1,8 @@
 # firebolt-instance
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: release-4.32.0-pre.0.20260414104905.92750f097354-amd64](https://img.shields.io/badge/AppVersion-release--4.32.0--pre.0.20260414104905.92750f097354--amd64-informational?style=flat-square)
+![Version: 0.2.1](https://img.shields.io/badge/Version-0.2.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: release-4.32.0-pre.0.20260414104905.92750f097354-amd64](https://img.shields.io/badge/AppVersion-release--4.32.0--pre.0.20260414104905.92750f097354--amd64-informational?style=flat-square)
 
-Firebolt Instance on Kubernetes — gateway, metadata, auth, and engines
+Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 
 **Homepage:** <https://github.com/firebolt-db/firebolt-instance-helm>
 
@@ -65,20 +65,16 @@ Firebolt Instance on Kubernetes — gateway, metadata, auth, and engines
 | engines[0].storage | object | `{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"100Gi"}}}` | PVC storage configuration for this engine. Falls back to `engineSpec.defaultStorage` if omitted. |
 | engines[0].tolerations | list | `[]` | Tolerations for engine pod scheduling. |
 | extraLabels | object | `{"firebolt/product":"core"}` | Extra labels applied to all resources and pods. |
-| gateway | object | {} | Gateway (`core-gateway`) configuration. |
-| gateway.auth | object | {} | Gateway authentication configuration. At least one option must be set when `gateway.enabled` is true. |
-| gateway.auth.directAccessSecret | string | `"default-access-secret"` | Shared token clients send as `X-Auth-Token`. Suitable for testing and internal deployments without an IdP. |
-| gateway.containerPort | int | `5050` | Container port the gateway process listens on. |
-| gateway.enabled | bool | `true` | Set to true to deploy the gateway. Requires either `gateway.auth.directAccessSecret` or `auth.mode: sso` with OIDC fully configured. |
+| gateway | object | {} | Envoy gateway proxy configuration. Routes queries to engine Services based on the `X-Firebolt-Engine` HTTP header. A Lua filter extracts the engine name and rewrites the upstream to `{engine}-service:3473` via dynamic forward proxy. |
+| gateway.adminPort | int | `9901` | Envoy admin interface port (used for health checks). |
+| gateway.containerPort | int | `8080` | Envoy listener port for client traffic. |
+| gateway.enabled | bool | `true` | Set to true to deploy the Envoy gateway proxy. |
 | gateway.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
-| gateway.image.repository | string | `"000000000000.dkr.ecr.us-east-1.amazonaws.com/core-gateway"` | ECR repository for the core-gateway image. |
-| gateway.image.tag | string | `"v1.55.2"` | Gateway image tag (v-prefixed semver, e.g. `v1.55.2`). Set explicitly in your values override. |
-| gateway.organization | object | {} | Organization identity. Required when `gateway.enabled` is true. The gateway validates `account_id` on every incoming request. Clients must pass it as a URL query parameter: `?account_id=<value>`. |
-| gateway.organization.accountId | string | `"default-account-id"` | Checked against `?account_id=` query parameter in every request. |
-| gateway.organization.name | string | `"default-org"` | Label used in gateway logs and metrics. |
+| gateway.image.repository | string | `"envoyproxy/envoy"` | Envoy proxy container image. |
+| gateway.image.tag | string | `"v1.33-latest"` | Envoy image tag. |
 | gateway.podTemplate | object | `{}` | Pod template overrides for gateway pods (nodeSelector, tolerations, affinity). |
 | gateway.replicas | int | `2` | Number of gateway replicas. |
-| gateway.resources | object | `{"limits":{"memory":"1Gi"},"requests":{"cpu":"500m","memory":"512Mi"}}` | Resource requests and limits for the gateway container. The gateway is stateless and CPU-light; it proxies HTTP queries to engines. |
+| gateway.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the Envoy container. |
 | gateway.service | object | {} | Gateway Service configuration. |
 | gateway.service.port | int | `80` | External service port proxied to `containerPort`. |
 | gateway.service.type | string | `"ClusterIP"` | Service type. One of `ClusterIP`, `LoadBalancer`, or `NodePort`. |

@@ -1,7 +1,7 @@
 ---
 apiVersion: v2
 name: firebolt-instance
-description: Firebolt Instance on Kubernetes — gateway, metadata, auth, and engines
+description: Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 type: application
 icon: https://raw.githubusercontent.com/firebolt-db/firebolt-instance-helm/refs/heads/main/static/firebolt.png
 home: "https://github.com/firebolt-db/firebolt-instance-helm"
