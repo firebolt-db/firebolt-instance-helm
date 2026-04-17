@@ -22,10 +22,14 @@ spec:
           BASE="{{ include "fbinstance.fullname" . }}"
           NS="{{ .Release.Namespace }}"
 
-          echo "=== Gateway health (Envoy admin) ==="
-          curl --fail --retry 5 --retry-delay 3 --retry-connrefused \
-            "http://${BASE}-gateway.${NS}.svc.cluster.local:{{ .Values.gateway.service.port }}/ready"
-          echo "PASS: gateway ready"
+          echo "=== Gateway health ==="
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 3 --retry-connrefused \
+            "http://${BASE}-gateway.${NS}.svc.cluster.local:{{ .Values.gateway.service.port }}/healthz")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "PASS: gateway is healthy"
+          else
+            echo "FAIL: expected 200 but got $HTTP_CODE"; exit 1
+          fi
 
           echo "=== MetadataService reachable ==="
           (echo > /dev/tcp/${BASE}-metadata-service.${NS}.svc.cluster.local/{{ .Values.metadata.server.port }}) 2>/dev/null \

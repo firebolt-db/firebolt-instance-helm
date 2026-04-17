@@ -59,15 +59,15 @@ spec:
           livenessProbe:
             tcpSocket:
               port: grpc
-            initialDelaySeconds: 10
-            periodSeconds: 15
+            initialDelaySeconds: 2
+            periodSeconds: 10
             failureThreshold: 3
           readinessProbe:
             grpc:
               port: {{ .Values.metadata.server.port }}
               service: ""
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            initialDelaySeconds: 2
+            periodSeconds: 5
             failureThreshold: 3
           volumeMounts:
             - name: config

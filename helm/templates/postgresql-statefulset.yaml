@@ -57,12 +57,12 @@ spec:
           readinessProbe:
             tcpSocket:
               port: 5432
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            initialDelaySeconds: 1
+            periodSeconds: 5
           livenessProbe:
             exec:
               command: ["pg_isready", "-U", {{ .Values.postgresql.username | quote }}]
-            initialDelaySeconds: 30
+            initialDelaySeconds: 5
             periodSeconds: 10
   volumeClaimTemplates:
     - metadata:

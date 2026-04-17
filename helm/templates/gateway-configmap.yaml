@@ -27,6 +27,14 @@ data:
                         typed_config:
                           "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
                     http_filters:
+                      - name: envoy.filters.http.health_check
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+                          pass_through_mode: false
+                          headers:
+                            - name: ":path"
+                              string_match:
+                                exact: "/healthz"
                       - name: envoy.filters.http.lua
                         typed_config:
                           "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
@@ -40,7 +48,7 @@ data:
                                 end
                                 -- TODO: remove advanced_mode once Core supports x-request-id
                                 local path = handle:headers():get(":path")
-                                if path:find("?") then
+                                if path:find("?", 1, true) then
                                   handle:headers():replace(":path", path .. "&advanced_mode=true")
                                 else
                                   handle:headers():replace(":path", path .. "?advanced_mode=true")
@@ -80,6 +88,6 @@ data:
     admin:
       address:
         socket_address:
-          address: 0.0.0.0
+          address: 127.0.0.1
           port_value: {{ .Values.gateway.adminPort }}
 {{- end }}

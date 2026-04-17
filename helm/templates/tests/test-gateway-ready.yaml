@@ -16,9 +16,13 @@ spec:
         - sh
         - -c
         - |
-          URL="http://{{ include "fbinstance.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.gateway.service.port }}/ready"
-          echo "GET $URL ..."
-          curl --fail --retry 5 --retry-delay 3 --retry-connrefused "$URL" \
-            && echo "PASS: gateway is ready" \
-            || { echo "FAIL: gateway health check failed"; exit 1; }
+          URL="http://{{ include "fbinstance.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.gateway.service.port }}/healthz"
+          echo "GET $URL (expecting 200) ..."
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 3 --retry-connrefused "$URL")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "PASS: gateway is healthy"
+          else
+            echo "FAIL: expected HTTP 200 but got $HTTP_CODE"
+            exit 1
+          fi
 {{- end }}

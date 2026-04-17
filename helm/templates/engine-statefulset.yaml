@@ -175,7 +175,7 @@ spec:
               containerPort: 9090
               protocol: TCP
           livenessProbe:
-            initialDelaySeconds: 30
+            initialDelaySeconds: 2
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 6
@@ -184,8 +184,8 @@ spec:
               port: 8122
           {{- if $.Values.engineSpec.readiness }}
           readinessProbe:
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 1
+            periodSeconds: 3
             timeoutSeconds: 3
             failureThreshold: 6
             httpGet:

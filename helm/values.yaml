@@ -236,6 +236,8 @@ gateway:
 # @section -- Authentication
 
 # -- Authentication configuration for firebolt-core `auth.json`.
+# Not enforced yet; reserved for future engine-level auth propagation.
+# TODO: wire auth fields into Envoy config or engine auth once supported.
 # @default -- {}
 auth:
   # -- Authentication mode. One of `none`, `local`, or `sso`.

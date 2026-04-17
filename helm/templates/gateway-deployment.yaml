@@ -42,28 +42,26 @@ spec:
             - name: http
               containerPort: {{ .Values.gateway.containerPort }}
               protocol: TCP
-            - name: admin
-              containerPort: {{ .Values.gateway.adminPort }}
-              protocol: TCP
-          resources:
-            {{- toYaml .Values.gateway.resources | nindent 12 }}
           livenessProbe:
             httpGet:
-              path: /ready
-              port: admin
+              path: /healthz
+              port: http
             initialDelaySeconds: 1
             periodSeconds: 15
-            timeoutSeconds: 5
+            timeoutSeconds: 3
           readinessProbe:
             httpGet:
-              path: /ready
-              port: admin
-            initialDelaySeconds: 2
+              path: /healthz
+              port: http
+            initialDelaySeconds: 1
             periodSeconds: 3
-            timeoutSeconds: 5
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
           securityContext:
             runAsUser: 101
             runAsNonRoot: true
+            readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop:
@@ -72,6 +70,8 @@ spec:
             - name: gateway-config
               mountPath: /etc/envoy
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: gateway-config
           configMap:
@@ -79,4 +79,6 @@ spec:
             items:
               - key: envoy.yaml
                 path: envoy.yaml
+        - name: tmp
+          emptyDir: {}
 {{- end }}
