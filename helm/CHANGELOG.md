@@ -1,3 +1,7 @@
+# 0.3.1
+
+fix: health checks for envoy (FB-557) (#22)
+
 # 0.3.0
 
 feat: replace Core Gateway with Envoy (FB-557) (#21)
