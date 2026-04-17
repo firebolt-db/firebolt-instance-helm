@@ -1,3 +1,7 @@
+# 0.3.2
+
+fix(helm): align gateway and engine config with operator (FB-661) (#23)
+
 # 0.3.1
 
 fix: health checks for envoy (FB-557) (#22)
