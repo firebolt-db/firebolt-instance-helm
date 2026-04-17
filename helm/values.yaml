@@ -323,6 +323,10 @@ customNodeConfig:
   organization_name: "default-org"
   # -- Cluster ID for the Firebolt instance.
   cluster_id: "default-cluster"
+  # -- Logger output format. Use "json" for structured logging.
+  logger_formatting: "json"
+  # -- When false, logs are written to stdout only (no file output).
+  logger_use_files: false
 
 # -- Deploy a PodMonitor for Prometheus metrics scraping.
 podMonitor: false

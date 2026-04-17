@@ -40,10 +40,17 @@ data:
                           "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
                           default_source_code:
                             inline_string: |
+                              local function is_valid_engine(s)
+                                if s == nil or #s == 0 or #s > 63 then return false end
+                                if not string.match(s, "^[%%l%%d][-%%l%%d]*$") then return false end
+                                if string.sub(s, -1) == "-" then return false end
+                                return true
+                              end
+
                               function envoy_on_request(handle)
                                 local engine = handle:headers():get("x-firebolt-engine")
-                                if engine == nil or engine == "" then
-                                  handle:respond({[":status"] = "400"}, "missing X-Firebolt-Engine header")
+                                if not is_valid_engine(engine) then
+                                  handle:respond({[":status"] = "400"}, "invalid or missing X-Firebolt-Engine header")
                                   return
                                 end
                                 -- TODO: remove advanced_mode once Core supports x-request-id
@@ -61,6 +68,11 @@ data:
                           dns_cache_config:
                             name: dynamic_forward_proxy_cache
                             dns_lookup_family: V4_ONLY
+                            dns_refresh_rate: 1s
+                            dns_failure_refresh_rate:
+                              base_interval: 1s
+                              max_interval: 5s
+                            host_ttl: 5s
                       - name: envoy.filters.http.router
                         typed_config:
                           "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -75,6 +87,9 @@ data:
                               route:
                                 cluster: dynamic_forward_proxy
                                 timeout: 0s
+                                retry_policy:
+                                  retry_on: connect-failure,refused-stream,reset
+                                  num_retries: 2
       clusters:
         - name: dynamic_forward_proxy
           lb_policy: CLUSTER_PROVIDED
@@ -85,6 +100,11 @@ data:
               dns_cache_config:
                 name: dynamic_forward_proxy_cache
                 dns_lookup_family: V4_ONLY
+                dns_refresh_rate: 1s
+                dns_failure_refresh_rate:
+                  base_interval: 1s
+                  max_interval: 5s
+                host_ttl: 5s
     admin:
       address:
         socket_address:
