@@ -37,6 +37,12 @@ jobs:
           private-key: ${{ secrets.GH_APP_FB_DB_CI_WRITER_APP_KEY_PEM }}
           permission-contents: write
 
+      - name: Install helm-docs
+        run: |
+          HELM_DOCS_VERSION=1.14.2
+          curl -sSL "https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_Linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin helm-docs
+
       - name: Determine chart version
         id: chart
         env:
@@ -87,9 +93,11 @@ jobs:
             | cat - helm/CHANGELOG.md > /tmp/CHANGELOG.md
           mv /tmp/CHANGELOG.md helm/CHANGELOG.md
 
+          helm-docs --chart-search-root=helm
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add helm/Chart.yaml helm/CHANGELOG.md
+          git add helm/Chart.yaml helm/CHANGELOG.md helm/README.md
           git commit -m "chore(helm): bump chart to $NEW_VERSION"
           git push "https://x-access-token:${GH_APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
 
