@@ -209,7 +209,7 @@ gateway:
     # -- Envoy proxy container image.
     repository: envoyproxy/envoy
     # -- Envoy image tag.
-    tag: "v1.33-latest"
+    tag: "v1.37.2"
     # -- Image pull policy.
     pullPolicy: IfNotPresent
   # -- Envoy listener port for client traffic.
