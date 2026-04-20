@@ -1,3 +1,7 @@
+# 0.3.4
+
+fix(postgres): change labeling to allow upgrade (FB-740) (#27)
+
 # 0.3.3
 
 chore(envoy): bump to v1.37.2 (FB-720) (#26)
