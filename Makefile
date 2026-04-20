@@ -5,7 +5,7 @@ VALUES_FILE  := $(CHART)/values.local.yaml
 ECR_REGISTRY := 000000000000.dkr.ecr.us-east-1.amazonaws.com
 AWS_REGION   := us-east-1
 
-.PHONY: install upgrade delete check-pre-commit check-helm-docs setup-pre-commit docs lint
+.PHONY: create install upgrade uninstall delete check-pre-commit check-helm-docs setup-pre-commit docs lint
 
 check-pre-commit:
 	@command -v pre-commit >/dev/null 2>&1 || { \
@@ -33,6 +33,9 @@ lint:
 	helm template $(RELEASE) $(CHART) > /dev/null
 	@echo "All helm checks passed."
 
+create:
+	kind create cluster
+
 install:
 	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 	kubectl create secret docker-registry regcred \
@@ -47,6 +50,9 @@ install:
 upgrade:
 	helm upgrade $(RELEASE) $(CHART) --namespace $(NAMESPACE) -f $(VALUES_FILE)
 
-delete:
+uninstall:
 	helm uninstall $(RELEASE) --namespace $(NAMESPACE)
 	kubectl delete secret regcred --namespace $(NAMESPACE) --ignore-not-found
+
+delete:
+	kind delete cluster
