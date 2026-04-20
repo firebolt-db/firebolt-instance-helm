@@ -68,7 +68,7 @@ spec:
     - metadata:
         name: data
         labels:
-          {{- include "fbinstance.labels" . | nindent 10 }}
+          {{- include "fbinstance.podLabels" . | nindent 10 }}
           firebolt/component: metadata-pg
       spec:
         accessModes:
