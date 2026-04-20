@@ -1,3 +1,7 @@
+# 0.3.3
+
+chore(envoy): bump to v1.37.2 (FB-720) (#26)
+
 # 0.3.2
 
 fix(helm): align gateway and engine config with operator (FB-661) (#23)
