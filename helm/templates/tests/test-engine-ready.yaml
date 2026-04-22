@@ -1,8 +1,10 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: {{ include "fbinstance.fullname" . }}-test-engine-pods
+  name: {{ include "fbinstance.fullname" . }}-test-engine-ready
   namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" . | nindent 4 }}
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
@@ -10,7 +12,7 @@ spec:
   restartPolicy: Never
   containers:
     - name: check
-      image: busybox:stable
+      image: curlimages/curl:latest
       command:
         - sh
         - -c
@@ -20,8 +22,12 @@ spec:
           {{- range $engine := .Values.engines }}
           {{- range $i := until (int $engine.replicas) }}
           HOST="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl.{{ $.Release.Namespace }}.svc.cluster.local"
-          log "Reachability: engine {{ $engine.name }} node-{{ $i }} ($HOST:8122)"
-          nc -z -w 5 "$HOST" 8122 || fail "{{ $engine.name }} node-{{ $i }} health port unreachable"
-          pass "{{ $engine.name }} node-{{ $i }} health port reachable"
+          log "Readiness: engine {{ $engine.name }} node-{{ $i }} (GET http://$HOST:8122/health/ready)"
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+            --retry 12 --retry-delay 5 --retry-connrefused \
+            "http://${HOST}:8122/health/ready")
+          [ "$HTTP_CODE" = "200" ] \
+            || fail "{{ $engine.name }} node-{{ $i }} /health/ready returned HTTP $HTTP_CODE (expected 200)"
+          pass "{{ $engine.name }} node-{{ $i }} is ready"
           {{- end }}
           {{- end }}

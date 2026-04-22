@@ -20,12 +20,14 @@ spec:
         - -c
         - |
           set -e
+          {{- include "fbinstance.testShellHelpers" . | nindent 10 }}
           FILE="/auth/auth.json"
-          [ -s "$FILE" ] || { echo "FAIL: auth.json missing or empty"; exit 1; }
-          grep -q '"mode"' "$FILE" || { echo "FAIL: missing mode key"; exit 1; }
+          log "Auth ConfigMap ($FILE)"
+          [ -s "$FILE" ] || fail "auth.json missing or empty"
+          grep -q '"mode"' "$FILE" || fail "missing mode key"
           grep -q '"mode": "{{ .Values.auth.mode }}"' "$FILE" \
-            || { echo "FAIL: mode mismatch, expected {{ .Values.auth.mode }}"; exit 1; }
-          echo "PASS: auth.json mode={{ .Values.auth.mode }}"
+            || fail "mode mismatch, expected {{ .Values.auth.mode }}"
+          pass "auth.json mode={{ .Values.auth.mode }}"
       volumeMounts:
         - name: auth-config
           mountPath: /auth

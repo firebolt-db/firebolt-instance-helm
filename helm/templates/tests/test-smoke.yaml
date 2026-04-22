@@ -13,4 +13,28 @@ spec:
   containers:
     - name: smoke
       image: busybox:stable
-      command: ["sh", "-c", "echo 'chart installed successfully'; exit 0"]
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+          {{- include "fbinstance.testShellHelpers" . | nindent 10 }}
+          resolve() {
+            svc="$1"
+            label="$2"
+            nslookup "$svc" >/dev/null 2>&1 || fail "$label DNS failed ($svc)"
+            pass "$label DNS resolves ($svc)"
+          }
+          log "Core service DNS resolution"
+          {{- if .Values.gateway.enabled }}
+          resolve "{{ include "fbinstance.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local" "gateway"
+          {{- end }}
+          resolve "{{ include "fbinstance.fullname" . }}-metadata-service.{{ .Release.Namespace }}.svc.cluster.local" "metadata-service"
+          {{- if .Values.postgresql.local_enabled }}
+          resolve "{{ include "fbinstance.fullname" . }}-metadata-pg.{{ .Release.Namespace }}.svc.cluster.local" "postgresql"
+          {{- end }}
+          log "Engine service DNS resolution"
+          {{- range .Values.engines }}
+          resolve "{{ .name }}-service.{{ $.Release.Namespace }}.svc.cluster.local" "engine {{ .name }} service"
+          {{- end }}
+          pass "all smoke checks passed"

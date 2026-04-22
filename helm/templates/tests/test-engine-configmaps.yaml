@@ -22,13 +22,14 @@ spec:
         - -c
         - |
           set -e
+          {{- include "fbinstance.testShellHelpers" $ | nindent 10 }}
           {{- range .Values.engines }}
           FILE="/configs/{{ .name }}/config.json"
-          echo "Validating $FILE ..."
-          [ -s "$FILE" ] || { echo "FAIL: $FILE is missing or empty"; exit 1; }
-          grep -q '"nodes"' "$FILE"             || { echo "FAIL: missing nodes key"; exit 1; }
-          grep -q '"pensieve_endpoint"' "$FILE" || { echo "FAIL: missing pensieve_endpoint key"; exit 1; }
-          echo "PASS: {{ .name }} config.json is valid"
+          log "Engine {{ .name }} config.json"
+          [ -s "$FILE" ] || fail "$FILE is missing or empty"
+          grep -q '"nodes"' "$FILE"                || fail "missing nodes key"
+          grep -q '"multi_engine_endpoint"' "$FILE" || fail "missing multi_engine_endpoint key"
+          pass "{{ .name }} config.json is valid"
           {{- end }}
       volumeMounts:
         {{- range .Values.engines }}

@@ -282,7 +282,7 @@ spec:
               mountPath: /firebolt-core/volume
         {{- end }}
 {{- $hpEnabled := $.Values.engineSpec.hostPathStorageEnabled }}
-{{- if or $hpEnabled $.Values.engineSpec.customInitContainersTemplate }}
+{{- if or $.Values.engineSpec.customInitContainersTemplate $hpEnabled }}
       initContainers:
         {{- if $.Values.engineSpec.customInitContainersTemplate }}
         {{- tpl (toYaml $.Values.engineSpec.customInitContainersTemplate) $ | nindent 8 }}

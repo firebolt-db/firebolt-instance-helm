@@ -16,13 +16,11 @@ spec:
         - sh
         - -c
         - |
+          set -e
+          {{- include "fbinstance.testShellHelpers" . | nindent 10 }}
           URL="http://{{ include "fbinstance.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.gateway.service.port }}/healthz"
-          echo "GET $URL (expecting 200) ..."
+          log "Gateway readiness (GET $URL)"
           HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 3 --retry-connrefused "$URL")
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "PASS: gateway is healthy"
-          else
-            echo "FAIL: expected HTTP 200 but got $HTTP_CODE"
-            exit 1
-          fi
+          [ "$HTTP_CODE" = "200" ] || fail "expected HTTP 200 but got $HTTP_CODE"
+          pass "gateway is healthy"
 {{- end }}

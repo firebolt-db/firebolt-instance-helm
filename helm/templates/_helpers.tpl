@@ -148,3 +148,18 @@ Memlock setup sidecar script — loaded from files/memlock-setup.sh
 {{- define "fbinstance.memlockSetupScript" -}}
 {{ .Files.Get "files/memlock-setup.sh" }}
 {{- end }}
+
+{{/*
+Shared colored log/pass/fail helpers for helm test pods.
+Usage inside a test script:
+    set -e
+    {{`{{- include "fbinstance.testShellHelpers" . | nindent 10 }}`}}
+    log  "section header"
+    pass "success message"
+    fail "failure reason (exits 1)"
+*/}}
+{{- define "fbinstance.testShellHelpers" -}}
+log()  { printf '\n\033[1;36m=== %s ===\033[0m\n' "$*"; }
+pass() { printf '\033[1;32mPASS:\033[0m %s\n' "$*"; }
+fail() { printf '\033[1;31mFAIL:\033[0m %s\n' "$*" >&2; exit 1; }
+{{- end }}

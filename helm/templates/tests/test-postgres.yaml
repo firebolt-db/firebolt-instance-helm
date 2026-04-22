@@ -16,9 +16,11 @@ spec:
         - sh
         - -c
         - |
+          set -e
+          {{- include "fbinstance.testShellHelpers" . | nindent 10 }}
           HOST="{{ include "fbinstance.fullname" . }}-metadata-pg.{{ .Release.Namespace }}.svc.cluster.local"
-          echo "Running pg_isready against $HOST:5432 ..."
-          pg_isready -h "$HOST" -p 5432 -U {{ .Values.postgresql.username }} \
-            && echo "PASS: PostgreSQL is accepting connections" \
-            || { echo "FAIL: PostgreSQL not ready"; exit 1; }
+          log "PostgreSQL readiness (pg_isready $HOST:5432)"
+          pg_isready -h "$HOST" -p 5432 -U {{ .Values.postgresql.username }} -d {{ .Values.postgresql.database }} \
+            || fail "PostgreSQL not ready"
+          pass "PostgreSQL is accepting connections"
 {{- end }}

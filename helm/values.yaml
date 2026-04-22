@@ -32,7 +32,7 @@ engineSpec:
   # -- Run engine containers as non-root.
   nonRoot: true
   # -- When true, a memlock-setup init container is added to configure memory locking limits.
-  memlockSetup: true
+  memlockSetup: false
   # -- fsGroupChangePolicy for the engine pod security context.
   fsGroupChangePolicy: "OnRootMismatch"
   # -- Termination grace period in seconds for engine pods.
@@ -98,8 +98,11 @@ metadata:
   image:
     # -- ECR repository for the Pensieve metadata service image.
     repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/dedicated-pensieve
-    # -- Pensieve image tag. Versioned independently from firebolt-core; set explicitly in your values override.
-    tag: "4.32.0-pre.0.20260331033249.e67bde0be1cd"
+    # -- Pensieve image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty.
+    # The template strips any `release-` or `debug-` prefix from `Chart.appVersion` when falling back,
+    # since the pensieve release pipeline tags images without that prefix.
+    # Override explicitly only when the metadata service must run a version other than the engine.
+    tag: ""
     # -- Image pull policy.
     pullPolicy: IfNotPresent
 
@@ -193,7 +196,6 @@ postgresql:
   persistence:
     # -- PVC size for bundled PostgreSQL data.
     size: 10Gi
-
 # @section -- Gateway
 
 # -- Envoy gateway proxy configuration. Routes queries to engine Services based on the
@@ -313,12 +315,14 @@ engines:
 # -- Custom configuration merged into each engine's `config.config` object.
 # @default -- {}
 customNodeConfig:
-  # -- Account ID for the Firebolt instance.
-  account_id: "default-account-id"
+  # -- Account ID for the Firebolt instance. Must match the account reconciled by
+  # Dedicated Pensieve at startup (see `pensieve_lite.default_account_id`, which
+  # defaults to this ULID).
+  account_id: "01KP98J0000000000000000000"
   # -- Account name for the Firebolt instance.
   account_name: "default-account"
   # -- Organization ID for the Firebolt instance.
-  organization_id: "01KP98J0000000000000000000"
+  organization_id: "01KP98J0000000000000000001"
   # -- Organization name for the Firebolt instance.
   organization_name: "default-org"
   # -- Cluster ID for the Firebolt instance.

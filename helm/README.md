@@ -1,6 +1,6 @@
 # firebolt-instance
 
-![Version: 0.3.4](https://img.shields.io/badge/Version-0.3.4-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: release-4.32.0-pre.0.20260414104905.92750f097354-amd64](https://img.shields.io/badge/AppVersion-release--4.32.0--pre.0.20260414104905.92750f097354--amd64-informational?style=flat-square)
+![Version: 0.3.4](https://img.shields.io/badge/Version-0.3.4-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: debug-4.32.0-pre.0.20260422071140.2d2717ea5675](https://img.shields.io/badge/AppVersion-debug--4.32.0--pre.0.20260422071140.2d2717ea5675-informational?style=flat-square)
 
 Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 
@@ -25,12 +25,12 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | auth.oidc.issuerURL | string | `""` | OIDC issuer URL. |
 | createNamespace | bool | `false` | When true, a Namespace resource is included in the chart output. Pair with `helm install --create-namespace --set createNamespace=false`. |
 | customNodeConfig | object | {} | Custom configuration merged into each engine's `config.config` object. |
-| customNodeConfig.account_id | string | `"default-account-id"` | Account ID for the Firebolt instance. |
+| customNodeConfig.account_id | string | `"01KP98J0000000000000000000"` | Account ID for the Firebolt instance. Must match the account reconciled by Dedicated Pensieve at startup (see `pensieve_lite.default_account_id`, which defaults to this ULID). |
 | customNodeConfig.account_name | string | `"default-account"` | Account name for the Firebolt instance. |
 | customNodeConfig.cluster_id | string | `"default-cluster"` | Cluster ID for the Firebolt instance. |
 | customNodeConfig.logger_formatting | string | `"json"` | Logger output format. Use "json" for structured logging. |
 | customNodeConfig.logger_use_files | bool | `false` | When false, logs are written to stdout only (no file output). |
-| customNodeConfig.organization_id | string | `"01KP98J0000000000000000000"` | Organization ID for the Firebolt instance. |
+| customNodeConfig.organization_id | string | `"01KP98J0000000000000000001"` | Organization ID for the Firebolt instance. |
 | customNodeConfig.organization_name | string | `"default-org"` | Organization name for the Firebolt instance. |
 | engineSpec | object | {} | Shared engine pod defaults applied to all engines unless overridden per-engine. |
 | engineSpec.affinity | object | `{}` | Affinity rules for engine pod scheduling. |
@@ -44,7 +44,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | engineSpec.image.repository | string | `"000000000000.dkr.ecr.us-east-1.amazonaws.com/firebolt-core"` | ECR repository for the firebolt-core engine image. |
 | engineSpec.image.tag | string | `""` | Image tag. Defaults to `Chart.appVersion` when empty. |
-| engineSpec.memlockSetup | bool | `true` | When true, a memlock-setup init container is added to configure memory locking limits. |
+| engineSpec.memlockSetup | bool | `false` | When true, a memlock-setup init container is added to configure memory locking limits. |
 | engineSpec.nodeHostSuffix | string | `".cluster.local"` | Suffix appended after `.svc` in node FQDNs in `config.json`. |
 | engineSpec.nodeSelector | object | `{}` | Node selector for engine pod scheduling. |
 | engineSpec.nonRoot | bool | `true` | Run engine containers as non-root. |
@@ -87,7 +87,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | metadata.deployment.terminationGracePeriodSeconds | int | `30` | Termination grace period in seconds. |
 | metadata.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | metadata.image.repository | string | `"000000000000.dkr.ecr.us-east-1.amazonaws.com/dedicated-pensieve"` | ECR repository for the Pensieve metadata service image. |
-| metadata.image.tag | string | `"4.32.0-pre.0.20260331033249.e67bde0be1cd"` | Pensieve image tag. Versioned independently from firebolt-core; set explicitly in your values override. |
+| metadata.image.tag | string | `""` | Pensieve image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty. The template strips any `release-` or `debug-` prefix from `Chart.appVersion` when falling back, since the pensieve release pipeline tags images without that prefix. Override explicitly only when the metadata service must run a version other than the engine. |
 | metadata.podTemplate | object | `{}` | Pod template overrides for the metadata service (nodeSelector, tolerations, affinity). |
 | metadata.resources | object | `{"limits":{"memory":"1Gi"},"requests":{"cpu":"100m","memory":"512Mi"}}` | Resource requests and limits for the metadata service container. Pensieve is a lightweight gRPC service; increase memory if you run many engines. |
 | metadata.server | object | {} | gRPC server configuration for the metadata service. |

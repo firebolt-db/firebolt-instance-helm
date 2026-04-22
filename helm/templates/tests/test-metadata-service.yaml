@@ -15,8 +15,20 @@ spec:
         - sh
         - -c
         - |
+          set -e
+          {{- include "fbinstance.testShellHelpers" . | nindent 10 }}
           HOST="{{ include "fbinstance.fullname" . }}-metadata-service.{{ .Release.Namespace }}.svc.cluster.local"
-          echo "Probing MetadataService at $HOST:{{ .Values.metadata.server.port }} ..."
-          nc -z -w 10 "$HOST" {{ .Values.metadata.server.port }} \
-            && echo "PASS: MetadataService port {{ .Values.metadata.server.port }} reachable" \
-            || { echo "FAIL: could not reach MetadataService"; exit 1; }
+          PORT="{{ .Values.metadata.server.port }}"
+          MAX_ATTEMPTS=12
+          log "MetadataService gRPC port ($HOST:$PORT)"
+          ATTEMPT=1
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            if nc -z -w 3 "$HOST" "$PORT"; then
+              pass "MetadataService port $PORT reachable on attempt $ATTEMPT"
+              exit 0
+            fi
+            echo "  attempt $ATTEMPT/$MAX_ATTEMPTS — not reachable yet, retrying in 5s..."
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 5
+          done
+          fail "MetadataService unreachable at $HOST:$PORT after $((MAX_ATTEMPTS * 5))s"

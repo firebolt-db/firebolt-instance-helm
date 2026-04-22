@@ -15,8 +15,10 @@ spec:
         - sh
         - -c
         - |
+          set -e
+          {{- include "fbinstance.testShellHelpers" . | nindent 10 }}
           SVC="{{ include "fbinstance.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local"
-          echo "Resolving $SVC ..."
-          nslookup "$SVC" \
-            && echo "PASS: namespace DNS resolves" \
-            || { echo "FAIL: DNS resolution failed — namespace may not exist or DNS is broken"; exit 1; }
+          log "DNS: $SVC"
+          nslookup "$SVC" >/dev/null 2>&1 \
+            || fail "DNS resolution failed — namespace may not exist or DNS is broken"
+          pass "namespace DNS resolves"

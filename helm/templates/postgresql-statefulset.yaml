@@ -61,7 +61,7 @@ spec:
             periodSeconds: 5
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", {{ .Values.postgresql.username | quote }}]
+              command: ["pg_isready", "-U", {{ .Values.postgresql.username | quote }}, "-d", {{ .Values.postgresql.database | quote }}]
             initialDelaySeconds: 5
             periodSeconds: 10
   volumeClaimTemplates:

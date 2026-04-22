@@ -47,9 +47,34 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.postgresql.local_enabled }}
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ .Values.postgresql.image }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready \
+                  -h {{ include "fbinstance.fullname" . }}-metadata-pg \
+                  -p {{ .Values.postgresql.port }} \
+                  -U {{ .Values.postgresql.username }} \
+                  -d {{ .Values.postgresql.database }}; do
+                echo "Waiting for PostgreSQL to accept connections..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready"
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              memory: "64Mi"
+      {{- end }}
       containers:
         - name: metadata-service
-          image: "{{ .Values.metadata.image.repository }}:{{ .Values.metadata.image.tag }}"
+          image: "{{ .Values.metadata.image.repository }}:{{ default (.Chart.AppVersion | trimPrefix "release-" | trimPrefix "debug-") .Values.metadata.image.tag }}"
           imagePullPolicy: {{ .Values.metadata.image.pullPolicy }}
           command: ["/dedicated-pensieve", "--config", "/configs/config.xml"]
           ports:

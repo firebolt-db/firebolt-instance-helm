@@ -42,7 +42,7 @@ data:
                             inline_string: |
                               local function is_valid_engine(s)
                                 if s == nil or #s == 0 or #s > 63 then return false end
-                                if not string.match(s, "^[%%l%%d][-%%l%%d]*$") then return false end
+                                if not string.match(s, "^[%l%d][-%l%d]*$") then return false end
                                 if string.sub(s, -1) == "-" then return false end
                                 return true
                               end
