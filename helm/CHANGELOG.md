@@ -1,3 +1,7 @@
+# 0.4.0
+
+feat: implement helm tests (FB-719) (#28)
+
 # 0.3.4
 
 fix(postgres): change labeling to allow upgrade (FB-740) (#27)
