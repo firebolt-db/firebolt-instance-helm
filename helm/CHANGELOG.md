@@ -1,3 +1,7 @@
+# 0.4.1
+
+fix(metadata): set default_account_id in pensieve_lite config (FB-769) (#31)
+
 # 0.4.0
 
 feat: implement helm tests (FB-719) (#28)
