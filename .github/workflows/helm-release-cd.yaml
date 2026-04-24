@@ -111,7 +111,7 @@ jobs:
       - name: Login to GitHub Container Registry (Helm)
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" \
-            | helm registry login ${{ env.GHCR_REGISTRY }} --username ${GITHUB_ACTOR} --password-stdin
+            | helm registry login "${{ env.GHCR_REGISTRY }}" --username "${GITHUB_ACTOR}" --password-stdin
 
       - name: Package Helm chart
         run: |
@@ -122,8 +122,8 @@ jobs:
       - name: Push chart to GitHub Container Registry
         run: |
           helm push \
-            /tmp/helm-packages/firebolt-instance-${STEPS_CHART_OUTPUTS_CHART_VERSION}.tgz \
-            oci://${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.HELM_CHARTS_NAMESPACE }}
+            "/tmp/helm-packages/firebolt-instance-${STEPS_CHART_OUTPUTS_CHART_VERSION}.tgz" \
+            "oci://${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.HELM_CHARTS_NAMESPACE }}"
           echo "Pushed firebolt-instance:${STEPS_CHART_OUTPUTS_CHART_VERSION} to GHCR"
 
         env:
