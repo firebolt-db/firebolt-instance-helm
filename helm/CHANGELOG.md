@@ -1,3 +1,7 @@
+# 0.4.2
+
+fix: disallow 2 metadata service instances running at the same time (FB-828) (#35)
+
 # 0.4.1
 
 fix(metadata): set default_account_id in pensieve_lite config (FB-769) (#31)
