@@ -112,8 +112,8 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{-   $nodes = append $nodes (dict "host" $fqdn) -}}
 {{- end -}}
 {{- $innerConfig := dict "multi_engine_endpoint" (printf "%s.%s.svc.cluster.local:%d" $pensieveSvc $ns (int $root.Values.metadata.server.port)) "multi_engine_mode_enabled" true "engine_id" $engine.name "engine_name" $engine.name -}}
-{{- if $root.Values.customNodeConfig -}}
-{{-   $innerConfig = merge $innerConfig $root.Values.customNodeConfig -}}
+{{- if $root.Values.customEngineConfig -}}
+{{-   $innerConfig = merge $innerConfig $root.Values.customEngineConfig -}}
 {{- end -}}
 {{- $config := dict "config" $innerConfig "nodes" $nodes -}}
 {{ $config | toPrettyJson }}

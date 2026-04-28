@@ -317,7 +317,7 @@ engines:
 
 # -- Custom configuration merged into each engine's `config.config` object.
 # @default -- {}
-customNodeConfig:
+customEngineConfig:
   # -- Account ID for the Firebolt instance. Must match the account reconciled by
   # Dedicated Pensieve at startup (see `pensieve_lite.default_account_id`, which
   # defaults to this ULID).

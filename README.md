@@ -184,7 +184,7 @@ is already wired to use it.
 
 ### Identity
 
-`customNodeConfig.account_id` must match the account Pensieve reconciles at
+`customEngineConfig.account_id` must match the account Pensieve reconciles at
 startup. The defaults shipped in [`values.yaml`](./helm/values.yaml) work
 out-of-the-box; override together if you change them.
 

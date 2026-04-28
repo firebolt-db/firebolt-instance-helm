@@ -11,7 +11,7 @@ data:
     <?xml version="1.0"?>
     <config>
       <pensieve_lite>
-        <default_account_id>{{ .Values.customNodeConfig.account_id }}</default_account_id>
+        <default_account_id>{{ .Values.customEngineConfig.account_id }}</default_account_id>
         <host>{{ .Values.metadata.server.host }}</host>
         <port>{{ .Values.metadata.server.port }}</port>
         <server_threads>{{ .Values.metadata.server.threads }}</server_threads>
