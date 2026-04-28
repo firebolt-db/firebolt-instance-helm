@@ -1,3 +1,7 @@
+# 0.5.3
+
+fix: rename customNodeConfig -> customEngineConfig (FB-866) (#41)
+
 # 0.5.2
 
 chore: change default registry (FB-865) (#40)
