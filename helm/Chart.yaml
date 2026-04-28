@@ -6,5 +6,5 @@ type: application
 icon: https://raw.githubusercontent.com/firebolt-db/firebolt-instance-helm/refs/heads/main/static/firebolt.png
 home: "https://github.com/firebolt-db/firebolt-instance-helm"
 sources: ["https://github.com/firebolt-db/firebolt-instance-helm"]
-version: 0.5.1
+version: 0.5.2
 appVersion: "release-4.32.0-pre.0.20260428130742.c646c07228db"

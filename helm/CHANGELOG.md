@@ -1,3 +1,7 @@
+# 0.5.2
+
+chore: change default registry (FB-865) (#40)
+
 # 0.5.1
 
 chore: bump AppVersion and remove obsolete init container (FB-858) (#37)
