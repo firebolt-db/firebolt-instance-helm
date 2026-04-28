@@ -1,3 +1,7 @@
+# 0.5.1
+
+chore: bump AppVersion and remove obsolete init container (FB-858) (#37)
+
 # 0.5.0
 
 feat(o11y): add pod monitor for envoy gateway (FB-855) (#36)
