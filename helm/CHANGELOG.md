@@ -1,3 +1,7 @@
+# 0.5.0
+
+feat(o11y): add pod monitor for envoy gateway (FB-855) (#36)
+
 # 0.4.2
 
 fix: disallow 2 metadata service instances running at the same time (FB-828) (#35)

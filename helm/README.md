@@ -1,6 +1,6 @@
 # firebolt-instance
 
-![Version: 0.4.2](https://img.shields.io/badge/Version-0.4.2-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: debug-4.32.0-pre.0.20260422071140.2d2717ea5675](https://img.shields.io/badge/AppVersion-debug--4.32.0--pre.0.20260422071140.2d2717ea5675-informational?style=flat-square)
+![Version: 0.5.0](https://img.shields.io/badge/Version-0.5.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: debug-4.32.0-pre.0.20260422071140.2d2717ea5675](https://img.shields.io/badge/AppVersion-debug--4.32.0--pre.0.20260422071140.2d2717ea5675-informational?style=flat-square)
 
 Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 
@@ -74,6 +74,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | gateway.image.repository | string | `"envoyproxy/envoy"` | Envoy proxy container image. |
 | gateway.image.tag | string | `"v1.37.2"` | Envoy image tag. |
+| gateway.metricsPort | int | `9090` | Container port that exposes Envoy Prometheus metrics (/stats/prometheus). A dedicated stats listener proxies requests to the Envoy admin on loopback. |
 | gateway.podTemplate | object | `{}` | Pod template overrides for gateway pods (nodeSelector, tolerations, affinity). |
 | gateway.replicas | int | `2` | Number of gateway replicas. |
 | gateway.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the Envoy container. |
@@ -95,7 +96,9 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | metadata.server.log_level | string | `"information"` | Log level for the metadata service. |
 | metadata.server.port | int | `7000` | gRPC server port. |
 | metadata.server.threads | int | `0` | Number of server threads. `0` uses all available cores. |
-| podMonitor | bool | `false` | Deploy a PodMonitor for Prometheus metrics scraping. |
+| podMonitor | object | {} | PodMonitor configuration for Prometheus metrics scraping. Requires the Prometheus Operator CRDs to be installed. |
+| podMonitor.engines | object | `{"enabled":false,"interval":"15s"}` | Create a PodMonitor for engine pods (port 9090, /metrics). |
+| podMonitor.gateway | object | `{"enabled":false,"interval":"15s"}` | Create a PodMonitor for gateway pods (/stats/prometheus). |
 | postgresql | object | {} | PostgreSQL configuration. When `local_enabled: true` the chart deploys a single-replica `postgres:16-alpine` StatefulSet. Set `local_enabled: false` and supply connection details for an external database. |
 | postgresql.connect_timeout_sec | int | `5` | Connection timeout in seconds. |
 | postgresql.credentials | object | {} | PostgreSQL credentials Secret configuration. |
