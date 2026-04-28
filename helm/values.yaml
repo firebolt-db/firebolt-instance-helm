@@ -232,6 +232,9 @@ gateway:
     type: ClusterIP
     # -- External service port proxied to `containerPort`.
     port: 80
+  # -- Container port that exposes Envoy Prometheus metrics (/stats/prometheus).
+  # A dedicated stats listener proxies requests to the Envoy admin on loopback.
+  metricsPort: 9090
   # -- Pod template overrides for gateway pods (nodeSelector, tolerations, affinity).
   podTemplate: {}
 
@@ -332,8 +335,18 @@ customNodeConfig:
   # -- When false, logs are written to stdout only (no file output).
   logger_use_files: false
 
-# -- Deploy a PodMonitor for Prometheus metrics scraping.
-podMonitor: false
+# -- PodMonitor configuration for Prometheus metrics scraping.
+# Requires the Prometheus Operator CRDs to be installed.
+# @default -- {}
+podMonitor:
+  # -- Create a PodMonitor for engine pods (port 9090, /metrics).
+  engines:
+    enabled: false
+    interval: 15s
+  # -- Create a PodMonitor for gateway pods (/stats/prometheus).
+  gateway:
+    enabled: false
+    interval: 15s
 
 # -- Security context capabilities for engine containers.
 securityContextCapabilities:

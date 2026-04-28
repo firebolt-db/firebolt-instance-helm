@@ -190,7 +190,11 @@ out-of-the-box; override together if you change them.
 ### Observability
 
 ```yaml
-podMonitor: true              # requires the Prometheus Operator CRDs
+podMonitor:
+  engines:
+    enabled: true             # requires the Prometheus Operator CRDs
+  gateway:
+    enabled: true
 ```
 
 ## Testing

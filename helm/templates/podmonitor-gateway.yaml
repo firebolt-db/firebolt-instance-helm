@@ -1,22 +1,21 @@
-{{- if .Values.podMonitor.engines.enabled -}}
+{{- if .Values.podMonitor.gateway.enabled -}}
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: {{ include "fbinstance.fullname" . }}-engines
+  name: {{ include "fbinstance.fullname" . }}-gateway
   labels:
     {{- include "fbinstance.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
       {{- include "fbinstance.selectorLabels" . | nindent 6 }}
-      firebolt/component: engine
+      firebolt/component: gateway
   podMetricsEndpoints:
-    - interval: {{ .Values.podMonitor.engines.interval }}
-      path: /metrics
+    - interval: {{ .Values.podMonitor.gateway.interval }}
+      path: /stats/prometheus
       port: metrics
   podTargetLabels:
     - app.kubernetes.io/name
     - app.kubernetes.io/namespace
-    - firebolt/engine
 {{- end }}

@@ -42,6 +42,9 @@ spec:
             - name: http
               containerPort: {{ .Values.gateway.containerPort }}
               protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.gateway.metricsPort }}
+              protocol: TCP
           livenessProbe:
             httpGet:
               path: /healthz
