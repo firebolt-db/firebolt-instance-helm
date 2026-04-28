@@ -42,7 +42,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.fsGroupChangePolicy | string | `"OnRootMismatch"` | fsGroupChangePolicy for the engine pod security context. |
 | engineSpec.hostPathStorageEnabled | bool | `false` | When true, uses hostPath instead of PVC for engine data. |
 | engineSpec.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
-| engineSpec.image.repository | string | `"000000000000.dkr.ecr.us-east-1.amazonaws.com/firebolt-core"` | ECR repository for the firebolt-core engine image. |
+| engineSpec.image.repository | string | `"ghcr.io/firebolt-db/firebolt-db"` | Container repository for the firebolt-core engine image. |
 | engineSpec.image.tag | string | `""` | Image tag. Defaults to `Chart.appVersion` when empty. |
 | engineSpec.memlockSetup | bool | `false` | When true, a memlock-setup init container is added to configure memory locking limits. |
 | engineSpec.nodeHostSuffix | string | `".cluster.local"` | Suffix appended after `.svc` in node FQDNs in `config.json`. |
@@ -87,7 +87,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | metadata.deployment.securityContext | object | `{}` | Pod-level security context. |
 | metadata.deployment.terminationGracePeriodSeconds | int | `30` | Termination grace period in seconds. |
 | metadata.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
-| metadata.image.repository | string | `"000000000000.dkr.ecr.us-east-1.amazonaws.com/dedicated-pensieve"` | ECR repository for the Pensieve metadata service image. |
+| metadata.image.repository | string | `"ghcr.io/firebolt-db/dedicated-pensieve"` | Container repository for the Pensieve metadata service image. |
 | metadata.image.tag | string | `""` | Pensieve image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty. The template strips any `release-` or `debug-` prefix from `Chart.appVersion` when falling back, since the pensieve release pipeline tags images without that prefix. Override explicitly only when the metadata service must run a version other than the engine. |
 | metadata.podTemplate | object | `{}` | Pod template overrides for the metadata service (nodeSelector, tolerations, affinity). |
 | metadata.resources | object | `{"limits":{"memory":"1Gi"},"requests":{"cpu":"100m","memory":"512Mi"}}` | Resource requests and limits for the metadata service container. Pensieve is a lightweight gRPC service; increase memory if you run many engines. |

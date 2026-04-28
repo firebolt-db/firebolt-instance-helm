@@ -19,8 +19,8 @@ createNamespace: false
 # @default -- {}
 engineSpec:
   image:
-    # -- ECR repository for the firebolt-core engine image.
-    repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/firebolt-core
+    # -- Container repository for the firebolt-core engine image.
+    repository: ghcr.io/firebolt-db/firebolt-db
     # -- Image tag. Defaults to `Chart.appVersion` when empty.
     tag: ""
     # -- Image pull policy.
@@ -96,8 +96,8 @@ engineSpec:
 # @default -- {}
 metadata:
   image:
-    # -- ECR repository for the Pensieve metadata service image.
-    repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/dedicated-pensieve
+    # -- Container repository for the Pensieve metadata service image.
+    repository: ghcr.io/firebolt-db/dedicated-pensieve
     # -- Pensieve image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty.
     # The template strips any `release-` or `debug-` prefix from `Chart.appVersion` when falling back,
     # since the pensieve release pipeline tags images without that prefix.

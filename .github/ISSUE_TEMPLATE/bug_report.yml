@@ -39,7 +39,7 @@ body:
 
         If using Docker:
         ```console
-        $ docker run -it --rm ghcr.io/firebolt-db/firebolt-core:preview-rc --version
+        $ docker run -it --rm ghcr.io/firebolt-db/firebolt-db:preview-rc --version
         # paste output here
         ```
 

@@ -15,8 +15,9 @@ metadata service, PostgreSQL, and one or more query engine StatefulSets.
 
 - `kubectl` and `helm` (v3) on your `PATH`
 - Access to a Kubernetes cluster. For local use, `kind` is enough
-- AWS credentials with `ecr:GetAuthorizationToken` for `000000000000.dkr.ecr.us-east-1.amazonaws.com`
-  (the chart pulls `firebolt-core` and `dedicated-pensieve` from this registry by default)
+- The chart pulls `firebolt-core` and `dedicated-pensieve` from `ghcr.io/firebolt-db`
+  by default. Override `engineSpec.image.repository` and `metadata.image.repository`
+  to use a different registry.
 - Optional, for contributors: `pre-commit`, `helm-docs`
 
 ## Quick start (local kind cluster)
