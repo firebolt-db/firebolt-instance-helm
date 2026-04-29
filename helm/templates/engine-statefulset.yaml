@@ -189,6 +189,13 @@ spec:
               path: /health/ready
               port: 8122
           {{- end }}
+          startupProbe:
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+            httpGet:
+              path: /health/live
+              port: 8122
           resources:
             {{- toYaml $engine.resources | nindent 12 }}
           terminationMessagePath: /dev/termination-log
