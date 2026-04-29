@@ -1,3 +1,7 @@
+# 0.5.7
+
+chore: add podSecurityContext configuration option (FB-884) (#44)
+
 # 0.5.6
 
 chore: adjust terminationGracePeriod (FB-883) (#43)
