@@ -360,25 +360,36 @@ engines:
 
 # @section -- Global
 
-# -- Custom configuration merged into each engine's `config.config` object.
+# -- Custom engine configuration deep-merged into the rendered engine
+# config.json at the root. The rendered document has shape
+# `{"config": {...}, "nodes": [...]}`; keys nested under `config:` merge
+# into the inner config block, and any keys placed at the top of
+# customEngineConfig become siblings of `config` and `nodes`.
+#
+# Chart-authoritative paths are silently stripped from this input and
+# cannot be overridden: `nodes` (root), `config.engine_id`,
+# `config.engine_name`, and `config.multi_engine_endpoint`.
 # @default -- {}
 customEngineConfig:
-  # -- Account ID for the Firebolt instance. Must match the account reconciled by
-  # Dedicated Pensieve at startup (see `pensieve_lite.default_account_id`, which
-  # defaults to this ULID).
-  account_id: "01KP98J0000000000000000000"
-  # -- Account name for the Firebolt instance.
-  account_name: "default-account"
-  # -- Organization ID for the Firebolt instance.
-  organization_id: "01KP98J0000000000000000001"
-  # -- Organization name for the Firebolt instance.
-  organization_name: "default-org"
-  # -- Cluster ID for the Firebolt instance.
-  cluster_id: "default-cluster"
-  # -- Logger output format. Use "json" for structured logging.
-  logger_formatting: "json"
-  # -- When false, logs are written to stdout only (no file output).
-  logger_use_files: false
+  # -- Engine config block deep-merged with chart-built defaults.
+  # @default -- {}
+  config:
+    # -- Account ID for the Firebolt instance. Must match the account reconciled by
+    # Dedicated Pensieve at startup (see `pensieve_lite.default_account_id`, which
+    # defaults to this ULID).
+    account_id: "01KP98J0000000000000000000"
+    # -- Account name for the Firebolt instance.
+    account_name: "default-account"
+    # -- Organization ID for the Firebolt instance.
+    organization_id: "01KP98J0000000000000000001"
+    # -- Organization name for the Firebolt instance.
+    organization_name: "default-org"
+    # -- Cluster ID for the Firebolt instance.
+    cluster_id: "default-cluster"
+    # -- Logger output format. Use "json" for structured logging.
+    logger_formatting: "json"
+    # -- When false, logs are written to stdout only (no file output).
+    logger_use_files: false
 
 # -- PodMonitor configuration for Prometheus metrics scraping.
 # Requires the Prometheus Operator CRDs to be installed.

@@ -96,7 +96,14 @@ Common engine ports
 
 {{/*
 Engine config JSON helper.
-Produces a JSON object with nodes (Pod FQDNs) and the metadata endpoint.
+Produces the rendered engine config.json document. The canonical document
+has shape `{"config": {...}, "nodes": [...]}`. .Values.customEngineConfig
+is deep-merged on top of the canonical document at the root: keys nested
+under `config:` merge into the inner config block, and keys placed at the
+top become siblings of `config` and `nodes`. Chart-authoritative paths
+(nodes, config.engine_id, config.engine_name, config.multi_engine_endpoint)
+are silently stripped from the user input before the merge, so the same
+customEngineConfig stays portable across chart versions.
 Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 */}}
 {{- define "fbinstance.engineConfig" -}}
@@ -111,12 +118,31 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{-   $fqdn := printf "%s-node-%d-0.%s.%s.svc%s" $baseName $i $svcName $ns $root.Values.engineSpec.nodeHostSuffix -}}
 {{-   $nodes = append $nodes (dict "host" $fqdn) -}}
 {{- end -}}
-{{- $innerConfig := dict "multi_engine_endpoint" (printf "%s.%s.svc.cluster.local:%d" $pensieveSvc $ns (int $root.Values.metadata.server.port)) "multi_engine_mode_enabled" true "engine_id" $engine.name "engine_name" $engine.name -}}
-{{- if $root.Values.customEngineConfig -}}
-{{-   $innerConfig = merge $innerConfig $root.Values.customEngineConfig -}}
+{{- $defaults := dict
+      "multi_engine_endpoint" (printf "%s.%s.svc.cluster.local:%d" $pensieveSvc $ns (int $root.Values.metadata.server.port))
+      "multi_engine_mode_enabled" true
+      "engine_id" $engine.name
+      "engine_name" $engine.name
+-}}
+{{- $canonical := dict "config" $defaults "nodes" $nodes -}}
+{{- $user := deepCopy (default (dict) $root.Values.customEngineConfig) -}}
+{{- $_ := unset $user "nodes" -}}
+{{/*
+  When user.config is not a map (string, number, list…) drop it entirely:
+  mergeOverwrite would otherwise replace the chart-built config block
+  wholesale with the user's scalar, losing every authoritative key.
+*/}}
+{{- if hasKey $user "config" -}}
+{{-   if kindIs "map" $user.config -}}
+{{-     $_ := unset $user.config "engine_id" -}}
+{{-     $_ := unset $user.config "engine_name" -}}
+{{-     $_ := unset $user.config "multi_engine_endpoint" -}}
+{{-   else -}}
+{{-     $_ := unset $user "config" -}}
+{{-   end -}}
 {{- end -}}
-{{- $config := dict "config" $innerConfig "nodes" $nodes -}}
-{{ $config | toPrettyJson }}
+{{- $merged := mergeOverwrite $canonical $user -}}
+{{ $merged | toPrettyJson }}
 {{- end -}}
 
 {{/*
