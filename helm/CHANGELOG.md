@@ -1,3 +1,7 @@
+# 0.5.9
+
+fix: add gateway pdb (FB-887) (#46)
+
 # 0.5.8
 
 fix: add startupProbe (FB-886) (#45)
