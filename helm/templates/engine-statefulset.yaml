@@ -45,7 +45,7 @@ spec:
       terminationGracePeriodSeconds: {{ $.Values.engineSpec.terminationGracePeriodSeconds }}
       {{- if $.Values.engineSpec.nonRoot }}
       securityContext:
-        fsGroup: 1111
+        fsGroup: 3473
         {{- if $.Values.engineSpec.fsGroupChangePolicy }}
         fsGroupChangePolicy: {{ $.Values.engineSpec.fsGroupChangePolicy }}
         {{- end }}
@@ -211,8 +211,8 @@ spec:
             readOnlyRootFilesystem: false
             {{- if $.Values.engineSpec.nonRoot }}
             runAsNonRoot: true
-            runAsUser: 1111
-            runAsGroup: 1111
+            runAsUser: 3473
+            runAsGroup: 3473
             {{- end }}
             allowPrivilegeEscalation: false
             capabilities:
@@ -241,8 +241,8 @@ spec:
                 - ALL
             readOnlyRootFilesystem: true
             runAsNonRoot: true
-            runAsUser: 1111
-            runAsGroup: 1111
+            runAsUser: 3473
+            runAsGroup: 3473
           volumeMounts:
             - name: nginx-writable-dir
               mountPath: /var/tmp
@@ -294,8 +294,8 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |
-              echo "[Setup] changing ownership of /firebolt-core/volume to UID 1111"
-              chown -R 1111:1111 /firebolt-core/volume
+              echo "[Setup] changing ownership of /firebolt-core/volume to UID 3473"
+              chown -R 3473:3473 /firebolt-core/volume
           resources:
             limits:
               memory: 24Mi
