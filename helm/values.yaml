@@ -35,8 +35,10 @@ engineSpec:
   memlockSetup: false
   # -- fsGroupChangePolicy for the engine pod security context.
   fsGroupChangePolicy: "OnRootMismatch"
-  # -- Termination grace period in seconds for engine pods.
-  terminationGracePeriodSeconds: 5
+  # -- Termination grace period in seconds for engine pods. Sized to give
+  # in-flight queries time to drain before SIGKILL during rolling updates
+  # and node drains.
+  terminationGracePeriodSeconds: 60
   # -- Service account name for engine pods.
   serviceAccount: default
   # -- Tolerations for engine pod scheduling.
