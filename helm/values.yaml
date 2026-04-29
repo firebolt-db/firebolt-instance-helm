@@ -262,8 +262,26 @@ gateway:
   # -- Container port that exposes Envoy Prometheus metrics (/stats/prometheus).
   # A dedicated stats listener proxies requests to the Envoy admin on loopback.
   metricsPort: 9090
-  # -- Pod template overrides for gateway pods (nodeSelector, tolerations, affinity).
-  podTemplate: {}
+  # -- Pod template overrides for gateway pods. Only the keys listed below
+  # are read by the chart; arbitrary [PodSpec](https://pkg.go.dev/k8s.io/api/core/v1#PodSpec)
+  # fields supplied here are silently ignored. This mirrors the operator's
+  # closed `ComponentSpec` schema.
+  # @default -- {}
+  podTemplate:
+    # -- Node selector for gateway pod scheduling.
+    nodeSelector: {}
+    # -- Affinity rules for gateway pod scheduling.
+    affinity: {}
+    # -- Tolerations for gateway pod scheduling.
+    tolerations: []
+    # -- Topology spread constraints. With 2 default replicas, set this to
+    # force zone or node spread so a single failure cannot take down both
+    # gateway pods at once.
+    topologySpreadConstraints: []
+    # -- Pod priority class. Reference a `PriorityClass` to let the gateway
+    # preempt lower-priority workloads when the cluster is under resource
+    # pressure — useful when query routing must stay up during incidents.
+    priorityClassName: ""
 
 # @section -- Authentication
 

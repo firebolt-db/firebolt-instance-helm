@@ -81,7 +81,12 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.pdb.enabled | bool | `true` | Emit a PodDisruptionBudget for the gateway. Set to `false` when an external policy controller (Kyverno, OPA Gatekeeper, etc.) or a cluster-wide PDB tool already manages disruption budgets, so the chart's PDB does not conflict with theirs. |
 | gateway.pdb.maxUnavailable | int | `1` | Maximum gateway pods that may be unavailable simultaneously during voluntary disruption. Mutually exclusive with `minAvailable` — set one and leave the other `null`. |
 | gateway.pdb.minAvailable | string | `nil` | Minimum gateway pods that must remain available during voluntary disruption. Mutually exclusive with `maxUnavailable`. |
-| gateway.podTemplate | object | `{}` | Pod template overrides for gateway pods (nodeSelector, tolerations, affinity). |
+| gateway.podTemplate | object | {} | Pod template overrides for gateway pods. Only the keys listed below are read by the chart; arbitrary [PodSpec](https://pkg.go.dev/k8s.io/api/core/v1#PodSpec) fields supplied here are silently ignored. This mirrors the operator's closed `ComponentSpec` schema. |
+| gateway.podTemplate.affinity | object | `{}` | Affinity rules for gateway pod scheduling. |
+| gateway.podTemplate.nodeSelector | object | `{}` | Node selector for gateway pod scheduling. |
+| gateway.podTemplate.priorityClassName | string | `""` | Pod priority class. Reference a `PriorityClass` to let the gateway preempt lower-priority workloads when the cluster is under resource pressure — useful when query routing must stay up during incidents. |
+| gateway.podTemplate.tolerations | list | `[]` | Tolerations for gateway pod scheduling. |
+| gateway.podTemplate.topologySpreadConstraints | list | `[]` | Topology spread constraints. With 2 default replicas, set this to force zone or node spread so a single failure cannot take down both gateway pods at once. |
 | gateway.replicas | int | `2` | Number of gateway replicas. |
 | gateway.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the Envoy container. |
 | gateway.service | object | {} | Gateway Service configuration. |
