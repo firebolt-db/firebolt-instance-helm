@@ -218,6 +218,22 @@ gateway:
   enabled: true
   # -- Number of gateway replicas.
   replicas: 2
+  # -- PodDisruptionBudget for gateway pods. Prevents node drains from
+  # evicting all replicas at once.
+  # @default -- {}
+  pdb:
+    # -- Emit a PodDisruptionBudget for the gateway. Set to `false` when
+    # an external policy controller (Kyverno, OPA Gatekeeper, etc.) or a
+    # cluster-wide PDB tool already manages disruption budgets, so the
+    # chart's PDB does not conflict with theirs.
+    enabled: true
+    # -- Maximum gateway pods that may be unavailable simultaneously during
+    # voluntary disruption. Mutually exclusive with `minAvailable` — set
+    # one and leave the other `null`.
+    maxUnavailable: 1
+    # -- Minimum gateway pods that must remain available during voluntary
+    # disruption. Mutually exclusive with `maxUnavailable`.
+    minAvailable: null
   image:
     # -- Envoy proxy container image.
     repository: envoyproxy/envoy

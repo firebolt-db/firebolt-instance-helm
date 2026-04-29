@@ -1,0 +1,24 @@
+{{- if and .Values.gateway.enabled .Values.gateway.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" . | nindent 4 }}
+    firebolt/component: gateway
+spec:
+  {{- if and (ne .Values.gateway.pdb.minAvailable nil) (ne .Values.gateway.pdb.maxUnavailable nil) }}
+  {{- fail "gateway.pdb.minAvailable and gateway.pdb.maxUnavailable are mutually exclusive — set only one." }}
+  {{- end }}
+  {{- with .Values.gateway.pdb.minAvailable }}
+  minAvailable: {{ . }}
+  {{- end }}
+  {{- with .Values.gateway.pdb.maxUnavailable }}
+  maxUnavailable: {{ . }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "fbinstance.selectorLabels" . | nindent 6 }}
+      firebolt/component: gateway
+{{- end }}

@@ -77,6 +77,10 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.image.repository | string | `"envoyproxy/envoy"` | Envoy proxy container image. |
 | gateway.image.tag | string | `"v1.37.2"` | Envoy image tag. |
 | gateway.metricsPort | int | `9090` | Container port that exposes Envoy Prometheus metrics (/stats/prometheus). A dedicated stats listener proxies requests to the Envoy admin on loopback. |
+| gateway.pdb | object | {} | PodDisruptionBudget for gateway pods. Prevents node drains from evicting all replicas at once. |
+| gateway.pdb.enabled | bool | `true` | Emit a PodDisruptionBudget for the gateway. Set to `false` when an external policy controller (Kyverno, OPA Gatekeeper, etc.) or a cluster-wide PDB tool already manages disruption budgets, so the chart's PDB does not conflict with theirs. |
+| gateway.pdb.maxUnavailable | int | `1` | Maximum gateway pods that may be unavailable simultaneously during voluntary disruption. Mutually exclusive with `minAvailable` — set one and leave the other `null`. |
+| gateway.pdb.minAvailable | string | `nil` | Minimum gateway pods that must remain available during voluntary disruption. Mutually exclusive with `maxUnavailable`. |
 | gateway.podTemplate | object | `{}` | Pod template overrides for gateway pods (nodeSelector, tolerations, affinity). |
 | gateway.replicas | int | `2` | Number of gateway replicas. |
 | gateway.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the Envoy container. |
