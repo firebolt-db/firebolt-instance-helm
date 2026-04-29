@@ -1,3 +1,7 @@
+# 0.5.10
+
+fix: terminationGracePeriod and preStop (FB-888) (#47)
+
 # 0.5.9
 
 fix: add gateway pdb (FB-887) (#46)
