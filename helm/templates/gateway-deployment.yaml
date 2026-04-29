@@ -26,6 +26,8 @@ spec:
         {{- include "fbinstance.podLabels" . | nindent 8 }}
         firebolt/component: gateway
     spec:
+      # 15s = 8s preStop /healthcheck/fail propagation + ~7s Envoy drain budget.
+      terminationGracePeriodSeconds: 15
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -45,6 +47,22 @@ spec:
             - name: metrics
               containerPort: {{ .Values.gateway.metricsPort }}
               protocol: TCP
+          lifecycle:
+            preStop:
+              exec:
+                # Flip Envoy's health filter to 503 via /dev/tcp (no curl in the
+                # image), then sleep so Cilium drops the pod from Service
+                # endpoints before SIGTERM. New SYNs stop landing here while
+                # in-flight streams keep draining.
+                command:
+                  - bash
+                  - -c
+                  - |
+                    exec 3<>/dev/tcp/127.0.0.1/{{ .Values.gateway.adminPort }}
+                    printf 'POST /healthcheck/fail HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n' >&3
+                    cat <&3 >/dev/null
+                    exec 3<&- 3>&-
+                    sleep 8
           livenessProbe:
             httpGet:
               path: /healthz
@@ -57,8 +75,12 @@ spec:
               path: /healthz
               port: http
             initialDelaySeconds: 1
-            periodSeconds: 3
-            timeoutSeconds: 3
+            # ~4s worst-case detection (period × failureThreshold) fits inside
+            # the 8s preStop window while still requiring two consecutive bad
+            # probes so a single hiccup does not flap the pod out of Service.
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 2
           resources:
             {{- toYaml .Values.gateway.resources | nindent 12 }}
           securityContext:
