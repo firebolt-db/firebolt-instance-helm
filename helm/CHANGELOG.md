@@ -1,3 +1,7 @@
+# 0.5.6
+
+chore: adjust terminationGracePeriod (FB-883) (#43)
+
 # 0.5.5
 
 fix: use UID/GID 3473 to match current Docker image (FB-873) (#42)
