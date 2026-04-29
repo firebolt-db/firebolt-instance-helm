@@ -1,3 +1,7 @@
+# 0.5.12
+
+chore: make gateway.podTemplate fields explicit (FB-890) (#49)
+
 # 0.5.11
 
 chore: document deployment divergence (FB-889) (#48)
