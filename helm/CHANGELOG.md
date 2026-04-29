@@ -1,3 +1,7 @@
+# 0.5.5
+
+fix: use UID/GID 3473 to match current Docker image (FB-873) (#42)
+
 # 0.5.4
 
 chore: bump versions (FB-858) (#39)
