@@ -29,12 +29,21 @@ engineSpec:
   # -- When true, a readiness probe is added to the core container.
   readiness: true
 
-  # -- Run engine containers as non-root.
-  nonRoot: true
   # -- When true, a memlock-setup init container is added to configure memory locking limits.
   memlockSetup: false
-  # -- fsGroupChangePolicy for the engine pod security context.
-  fsGroupChangePolicy: "OnRootMismatch"
+  # -- Pod-level security context for engine pods.
+  # @default -- {}
+  podSecurityContext:
+    # -- Reject the pod if any container runs as UID 0. Also gates the
+    # chart's container-level `runAs*` defaults, memlock init, and the
+    # entrypoint UID check.
+    runAsNonRoot: true
+    # -- Group applied to mounted volumes. Matches the engine UID/GID so
+    # the data PVC is chowned on mount.
+    fsGroup: 3473
+    # -- When to re-apply `fsGroup` ownership. `OnRootMismatch` skips the
+    # chown when already correct — much faster on large PVCs.
+    fsGroupChangePolicy: OnRootMismatch
   # -- Termination grace period in seconds for engine pods. Sized to give
   # in-flight queries time to drain before SIGKILL during rolling updates
   # and node drains.

@@ -39,7 +39,6 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.defaultStorage | object | {} | Default PVC storage spec for engines. `storageClassName` is intentionally absent — the cluster default storage class is used. Override here or per-engine to specify a class (e.g. `storageClassName: gp3`). |
 | engineSpec.defaultStorage.accessModes | list | `["ReadWriteOnce"]` | Access modes for the default PVC. |
 | engineSpec.defaultStorage.resources.requests.storage | string | `"100Gi"` | Default storage size for engine PVCs. |
-| engineSpec.fsGroupChangePolicy | string | `"OnRootMismatch"` | fsGroupChangePolicy for the engine pod security context. |
 | engineSpec.hostPathStorageEnabled | bool | `false` | When true, uses hostPath instead of PVC for engine data. |
 | engineSpec.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | engineSpec.image.repository | string | `"ghcr.io/firebolt-db/firebolt-db"` | Container repository for the firebolt-core engine image. |
@@ -47,7 +46,10 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.memlockSetup | bool | `false` | When true, a memlock-setup init container is added to configure memory locking limits. |
 | engineSpec.nodeHostSuffix | string | `".cluster.local"` | Suffix appended after `.svc` in node FQDNs in `config.json`. |
 | engineSpec.nodeSelector | object | `{}` | Node selector for engine pod scheduling. |
-| engineSpec.nonRoot | bool | `true` | Run engine containers as non-root. |
+| engineSpec.podSecurityContext | object | {} | Pod-level security context for engine pods. |
+| engineSpec.podSecurityContext.fsGroup | int | `3473` | Group applied to mounted volumes. Matches the engine UID/GID so the data PVC is chowned on mount. |
+| engineSpec.podSecurityContext.fsGroupChangePolicy | string | `"OnRootMismatch"` | When to re-apply `fsGroup` ownership. `OnRootMismatch` skips the chown when already correct — much faster on large PVCs. |
+| engineSpec.podSecurityContext.runAsNonRoot | bool | `true` | Reject the pod if any container runs as UID 0. Also gates the chart's container-level `runAs*` defaults, memlock init, and the entrypoint UID check. |
 | engineSpec.readiness | bool | `true` | When true, a readiness probe is added to the core container. |
 | engineSpec.serviceAccount | string | `"default"` | Service account name for engine pods. |
 | engineSpec.storageHostPath | object | {} | Host path configuration used when `hostPathStorageEnabled` is true. |

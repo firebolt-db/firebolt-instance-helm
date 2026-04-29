@@ -43,14 +43,11 @@ spec:
       serviceAccount: {{ $.Values.engineSpec.serviceAccount }}
       serviceAccountName: {{ $.Values.engineSpec.serviceAccount }}
       terminationGracePeriodSeconds: {{ $.Values.engineSpec.terminationGracePeriodSeconds }}
-      {{- if $.Values.engineSpec.nonRoot }}
+      {{- with $.Values.engineSpec.podSecurityContext }}
       securityContext:
-        fsGroup: 3473
-        {{- if $.Values.engineSpec.fsGroupChangePolicy }}
-        fsGroupChangePolicy: {{ $.Values.engineSpec.fsGroupChangePolicy }}
-        {{- end }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if and $.Values.engineSpec.memlockSetup $.Values.engineSpec.nonRoot }}
+      {{- if and $.Values.engineSpec.memlockSetup $.Values.engineSpec.podSecurityContext.runAsNonRoot }}
       shareProcessNamespace: true
       {{- end }}
       {{- with ($engine.tolerations | default $.Values.engineSpec.tolerations) }}
@@ -111,9 +108,9 @@ spec:
               echo -n "[Setup] Firebolt Core version "
               /firebolt-core/firebolt-core --version
 
-              {{- if $.Values.engineSpec.nonRoot }}
+              {{- if $.Values.engineSpec.podSecurityContext.runAsNonRoot }}
               if [[ $(id -u) -eq 0 ]]; then
-                echo "[Setup] Core container is running as root, however deployment used nonRoot=false" 1>&2
+                echo "[Setup] Core container is running as root, however deployment used podSecurityContext.runAsNonRoot=true" 1>&2
                 exit 4
               fi
 
@@ -133,13 +130,13 @@ spec:
               {{- end }}
               {{- else }}
               if [[ $(id -u) -ne 0 ]]; then
-                echo "[Setup] Core container is not running as root, however deployment used nonRoot=true" 1>&2
+                echo "[Setup] Core container is not running as root, however deployment used podSecurityContext.runAsNonRoot=false (or unset)" 1>&2
                 exit 4
               fi
 
               {{- if $.Values.engineSpec.memlockSetup }}
               ## NOTE: no 'ulimit' call happens here because root images support is soon to be deprecated
-              echo "WARNING: memlockSetup=true is unnecessary with nonRoot=false" 1>&2
+              echo "WARNING: memlockSetup=true is unnecessary when podSecurityContext.runAsNonRoot is false (or unset)" 1>&2
               {{- end }}
 
               {{- end }}
@@ -209,7 +206,7 @@ spec:
               readOnly: true
           securityContext:
             readOnlyRootFilesystem: false
-            {{- if $.Values.engineSpec.nonRoot }}
+            {{- if $.Values.engineSpec.podSecurityContext.runAsNonRoot }}
             runAsNonRoot: true
             runAsUser: 3473
             runAsGroup: 3473
@@ -251,7 +248,7 @@ spec:
             - name: nginx-writable-dir
               mountPath: /var/run/nginx
         {{- end }}
-        {{- if and $.Values.engineSpec.memlockSetup $.Values.engineSpec.nonRoot }}
+        {{- if and $.Values.engineSpec.memlockSetup $.Values.engineSpec.podSecurityContext.runAsNonRoot }}
         - name: memlock-setup
           image: {{ $.Values.utilitiesImage }}
           imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
