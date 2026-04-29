@@ -1,3 +1,7 @@
+# 0.5.8
+
+fix: add startupProbe (FB-886) (#45)
+
 # 0.5.7
 
 chore: add podSecurityContext configuration option (FB-884) (#44)
