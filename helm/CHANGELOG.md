@@ -1,3 +1,7 @@
+# 0.5.13
+
+fix: allow overriding engine config fields at root (FB-902) (#50)
+
 # 0.5.12
 
 chore: make gateway.podTemplate fields explicit (FB-890) (#49)
