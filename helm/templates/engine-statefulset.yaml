@@ -1,3 +1,16 @@
+{{- /*
+One 1-replica StatefulSet per engine node — `range $i := until $engine.replicas`
+expands `replicas: N` into N independent StatefulSets, each with `replicas: 1`.
+The engine binary does not support a single multi-replica StatefulSet here;
+the operator-managed deployment handles multi-replica via blue-green
+generation rollouts that this chart deliberately does not implement.
+
+Consequence: do NOT add `persistentVolumeClaimRetentionPolicy: { whenDeleted:
+Delete, ... }` to align with the operator. The operator's Delete-on-STS-
+deletion makes sense for stale generation cleanup; in this chart, an STS is
+deleted whenever a user reduces `replicas`, so Delete would silently destroy
+the removed node's data PVC. Stick with the K8s default (Retain).
+*/ -}}
 {{- range .Values.engines }}
 {{- $engine := . }}
 {{- range $i := until (int $engine.replicas) }}

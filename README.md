@@ -101,9 +101,24 @@ Other image tags worth knowing:
 
 ### Engines: sizing, replicas, storage
 
-Each entry in `engines:` becomes its own StatefulSet, headless Service,
-ClusterIP Service, and ConfigMap. `replicas` is the node count for that engine
-group. Per-engine values override `engineSpec` defaults.
+Each entry in `engines:` produces one headless Service, one ClusterIP Service,
+one ConfigMap, and **one 1-replica StatefulSet per node** — so an engine with
+`replicas: 3` renders three StatefulSets named `-engine-{name}-node-{0,1,2}`,
+not a single 3-replica STS. The Firebolt Core binary does not support a
+single multi-replica StatefulSet in this deployment path; the
+operator-managed deployment handles multi-replica via blue-green generation
+rollouts that this chart deliberately does not implement.
+
+Practical implications:
+
+- Adding a node = a new StatefulSet appears on the next `helm upgrade`.
+- Removing a node = the corresponding StatefulSet is deleted.
+- The chart relies on the Kubernetes default PVC retention policy (`Retain`
+  on StatefulSet deletion). An accidental `replicas` reduction therefore
+  leaves the removed node's PVC behind for recovery rather than reclaiming
+  it. Reuse, manual reattach, or explicit cleanup is your responsibility.
+
+Per-engine values override `engineSpec` defaults.
 
 ```yaml
 engines:
