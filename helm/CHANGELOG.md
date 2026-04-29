@@ -1,3 +1,7 @@
+# 0.5.4
+
+chore: bump versions (FB-858) (#39)
+
 # 0.5.3
 
 fix: rename customNodeConfig -> customEngineConfig (FB-866) (#41)
