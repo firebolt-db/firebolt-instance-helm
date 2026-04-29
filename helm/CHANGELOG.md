@@ -1,3 +1,7 @@
+# 0.5.11
+
+chore: document deployment divergence (FB-889) (#48)
+
 # 0.5.10
 
 fix: terminationGracePeriod and preStop (FB-888) (#47)
