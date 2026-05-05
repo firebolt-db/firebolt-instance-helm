@@ -7,4 +7,4 @@ icon: https://raw.githubusercontent.com/firebolt-db/firebolt-instance-helm/refs/
 home: "https://github.com/firebolt-db/firebolt-instance-helm"
 sources: ["https://github.com/firebolt-db/firebolt-instance-helm"]
 version: 0.5.14
-appVersion: "debug-4.32.0-pre.0.20260428141824.5abdf30556cd"
+appVersion: "debug-4.32.0-pre.0.20260505103729.c1bdd880cb63"
