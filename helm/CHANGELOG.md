@@ -1,3 +1,7 @@
+# 0.5.15
+
+chore: use latest version of engine/metadata images (FB-908) (#52)
+
 # 0.5.14
 
 chore: agentify repo (FB-923) (#51)
