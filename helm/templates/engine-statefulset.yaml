@@ -290,6 +290,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.uid
+            - name: FIREBOLT_ALLOW_AWS_IRSA
+              value: "true"
           command: ["/bin/bash", "-c"]
           args:
             - |
