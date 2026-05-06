@@ -1,3 +1,7 @@
+# 0.6.0
+
+feat: enable AWS IRSA by default (FB-875) (#53)
+
 # 0.5.15
 
 chore: use latest version of engine/metadata images (FB-908) (#52)
