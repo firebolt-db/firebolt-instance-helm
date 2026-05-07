@@ -12,6 +12,27 @@ data:
     static_resources:
       listeners:
         - name: listener
+          # per_connection_buffer_limit_bytes caps both downstream-receive
+          # and upstream-send buffering on this listener AND is the budget
+          # the router uses when deciding whether to BUFFER a request body
+          # for retry: a request larger than this is dispatched without
+          # buffering and any 503 it returns - including the retry-safe
+          # X-Firebolt-Drained 503 from the engine's pre-work shutdown
+          # fence - propagates to the client unretried.
+          #
+          # Hard-coded at 2 MiB to match the operator-managed deployment
+          # path (firebolt-core-operator's gatewayPerConnectionBufferLimitBytes
+          # in instance_gateway.go) so both paths render the same buffer.
+          # Intentionally NOT a Helm value: the number sits inside two
+          # invariants - (a) which requests can be retried under the
+          # zero-downtime contract, and (b) gateway memory budget under
+          # concurrent load. A per-install override invites settings that
+          # silently break either. If 2 MiB is too small for your workload,
+          # raise it in BOTH this chart and the operator at the same time
+          # and audit gateway.replicas / gateway.resources.limits.memory
+          # to absorb the new peak (~ concurrent_requests * (1 + retry_factor)
+          # * buffer_limit).
+          per_connection_buffer_limit_bytes: 2097152  # 2 MiB; see comment above.
           address:
             socket_address:
               address: 0.0.0.0
@@ -87,9 +108,47 @@ data:
                               route:
                                 cluster: dynamic_forward_proxy
                                 timeout: 0s
+                                # Retry contract:
+                                #   - connect-failure / refused-stream / reset:
+                                #     transport-level failures where the engine
+                                #     could not have observed the request, so a
+                                #     retry cannot duplicate side effects.
+                                #   - retriable-headers (X-Firebolt-Drained):
+                                #     a 503 produced by the engine's pre-work
+                                #     shutdown fence (HTTPHandler::handleRequestImpl
+                                #     fast-fails before any executor / Storage
+                                #     Manager work). The fence sets this header
+                                #     ONLY on that early-bail path, so retrying
+                                #     is provably side-effect free. Without
+                                #     this rule, a request that lands on a pod
+                                #     between SIGTERM and the next health-check
+                                #     ejection would propagate a 503 to the
+                                #     client.
+                                # We deliberately do NOT match bare 5xx: a
+                                # 5xx returned by the engine after work has
+                                # started may have applied side effects.
+                                # IMPORTANT: a retry can only be issued when
+                                # the entire request body fits in Envoy's
+                                # per_connection_buffer_limit_bytes (1 MiB
+                                # default). Larger requests are dispatched
+                                # without buffering and propagate the 503 to
+                                # the client even when the header is present.
+                                # previous_hosts retry-host predicate keeps
+                                # the retry off the same upstream IP; it is
+                                # a best-effort guard here because DFP in
+                                # dns_cache_config mode collapses the host
+                                # set to a single logical entry per authority.
                                 retry_policy:
-                                  retry_on: connect-failure,refused-stream,reset
+                                  retry_on: connect-failure,refused-stream,reset,retriable-headers
+                                  retriable_headers:
+                                    - name: X-Firebolt-Drained
+                                      present_match: true
                                   num_retries: 2
+                                  retry_host_predicate:
+                                    - name: envoy.retry_host_predicates.previous_hosts
+                                      typed_config:
+                                        "@type": type.googleapis.com/envoy.extensions.retry.host.previous_hosts.v3.PreviousHostsPredicate
+                                  host_selection_retry_max_attempts: 5
         - name: stats_listener
           address:
             socket_address:
@@ -118,6 +177,12 @@ data:
       clusters:
         - name: dynamic_forward_proxy
           lb_policy: CLUSTER_PROVIDED
+          # Mirror the listener's per_connection_buffer_limit_bytes onto
+          # the cluster so upstream connection buffering matches the
+          # downstream limit. The router consults the smaller of the
+          # two when deciding whether a retry's request body fits, so
+          # raising one without the other has no effect on retry coverage.
+          per_connection_buffer_limit_bytes: 2097152  # 2 MiB; see comment above.
           cluster_type:
             name: envoy.clusters.dynamic_forward_proxy
             typed_config:
