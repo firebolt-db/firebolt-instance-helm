@@ -1,3 +1,7 @@
+# 0.7.0
+
+feat(gateway): support X-Firebolt-Drained and expose envoy per_connection_buffer_limit_bytes (FB-849) (#54)
+
 # 0.6.0
 
 feat: enable AWS IRSA by default (FB-875) (#53)
