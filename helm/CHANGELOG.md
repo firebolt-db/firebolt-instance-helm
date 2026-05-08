@@ -1,3 +1,7 @@
+# 0.8.0
+
+feat: use YAML format for engine configuration and switch to new structure (FB-959) (#55)
+
 # 0.7.0
 
 feat(gateway): support X-Firebolt-Drained and expose envoy per_connection_buffer_limit_bytes (FB-849) (#54)
