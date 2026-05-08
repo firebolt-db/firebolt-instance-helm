@@ -217,8 +217,8 @@ spec:
             - name: data
               mountPath: /firebolt-core/volume
             - name: engine-config
-              mountPath: /firebolt-core/config.json
-              subPath: config.json
+              mountPath: /firebolt-core/config.yaml
+              subPath: config.yaml
               readOnly: true
             - name: auth-config
               mountPath: /firebolt-core/auth.json

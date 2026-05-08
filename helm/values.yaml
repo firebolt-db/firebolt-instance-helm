@@ -86,7 +86,7 @@ engineSpec:
     # -- Host path type.
     type: DirectoryOrCreate
 
-  # -- Suffix appended after `.svc` in node FQDNs in `config.json`.
+  # -- Suffix appended after `.svc` in node FQDNs in `config.yaml`.
   nodeHostSuffix: ".cluster.local"
 
   # -- Default PVC storage spec for engines. `storageClassName` is intentionally absent —
@@ -361,35 +361,28 @@ engines:
 # @section -- Global
 
 # -- Custom engine configuration deep-merged into the rendered engine
-# config.json at the root. The rendered document has shape
-# `{"config": {...}, "nodes": [...]}`; keys nested under `config:` merge
-# into the inner config block, and any keys placed at the top of
-# customEngineConfig become siblings of `config` and `nodes`.
+# config.yaml at the root. The rendered document follows the Firebolt
+# Core configuration schema (`schema_version: "1.0"`); user-supplied
+# keys at the top of `customEngineConfig` become siblings of the
+# chart-managed `engine:` and `instance:` blocks (e.g. `auth:`,
+# `logging:`), and keys nested under `instance:` merge into the
+# instance block (e.g. `instance.id`).
 #
 # Chart-authoritative paths are silently stripped from this input and
-# cannot be overridden: `nodes` (root), `config.engine_id`,
-# `config.engine_name`, and `config.multi_engine_endpoint`.
+# cannot be overridden: `schema_version`, `engine.id`, `engine.nodes`,
+# `instance.type`, and `instance.multi_engine`.
 # @default -- {}
 customEngineConfig:
-  # -- Engine config block deep-merged with chart-built defaults.
+  # -- Instance identity. `id` propagates internally to `account_id`,
+  # `account_name`, `organization_id`, and `organization_name`, so the
+  # chart only needs to set the ULID once.
   # @default -- {}
-  config:
-    # -- Account ID for the Firebolt instance. Must match the account reconciled by
-    # Dedicated Pensieve at startup (see `pensieve_lite.default_account_id`, which
-    # defaults to this ULID).
-    account_id: "01KP98J0000000000000000000"
-    # -- Account name for the Firebolt instance.
-    account_name: "default-account"
-    # -- Organization ID for the Firebolt instance.
-    organization_id: "01KP98J0000000000000000001"
-    # -- Organization name for the Firebolt instance.
-    organization_name: "default-org"
-    # -- Cluster ID for the Firebolt instance.
-    cluster_id: "default-cluster"
-    # -- Logger output format. Use "json" for structured logging.
-    logger_formatting: "json"
-    # -- When false, logs are written to stdout only (no file output).
-    logger_use_files: false
+  instance:
+    # -- ULID for the Firebolt instance. Must match the account
+    # reconciled by Dedicated Pensieve at startup (the metadata
+    # service template uses this same value for
+    # `pensieve_lite.default_account_id`).
+    id: "01KP98J0000000000000000000"
 
 # -- PodMonitor configuration for Prometheus metrics scraping.
 # Requires the Prometheus Operator CRDs to be installed.

@@ -95,15 +95,33 @@ Common engine ports
 {{- end }}
 
 {{/*
-Engine config JSON helper.
-Produces the rendered engine config.json document. The canonical document
-has shape `{"config": {...}, "nodes": [...]}`. .Values.customEngineConfig
-is deep-merged on top of the canonical document at the root: keys nested
-under `config:` merge into the inner config block, and keys placed at the
-top become siblings of `config` and `nodes`. Chart-authoritative paths
-(nodes, config.engine_id, config.engine_name, config.multi_engine_endpoint)
-are silently stripped from the user input before the merge, so the same
-customEngineConfig stays portable across chart versions.
+Engine config YAML helper.
+Produces the rendered engine config.yaml document following the
+Firebolt Core configuration schema (`schema_version: "1.0"`). The
+canonical document has shape:
+
+    schema_version: "1.0"
+    engine:
+      id: <engine name>
+      nodes:
+        - host: <fqdn>
+    instance:
+      type: multi_engine
+      multi_engine:
+        metadata_endpoint: <pensieve gRPC endpoint>
+
+.Values.customEngineConfig is deep-merged on top of the canonical
+document at the root: keys at the top become siblings of `engine`
+and `instance` (e.g. `auth:`, `logging:`), and keys nested under
+`instance:` merge into the inner instance block (e.g. `instance.id`,
+which the engine internally propagates to account_id, account_name,
+organization_id, and organization_name).
+
+Chart-authoritative paths are silently stripped from the user input
+before the merge: `schema_version`, `engine.id`, `engine.nodes`,
+`instance.type`, `instance.multi_engine`. The same customEngineConfig
+therefore stays portable across chart versions.
+
 Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 */}}
 {{- define "fbinstance.engineConfig" -}}
@@ -118,31 +136,37 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{-   $fqdn := printf "%s-node-%d-0.%s.%s.svc%s" $baseName $i $svcName $ns $root.Values.engineSpec.nodeHostSuffix -}}
 {{-   $nodes = append $nodes (dict "host" $fqdn) -}}
 {{- end -}}
-{{- $defaults := dict
-      "multi_engine_endpoint" (printf "%s.%s.svc.cluster.local:%d" $pensieveSvc $ns (int $root.Values.metadata.server.port))
-      "multi_engine_mode_enabled" true
-      "engine_id" $engine.name
-      "engine_name" $engine.name
+{{- $metadataEndpoint := printf "%s.%s.svc.cluster.local:%d" $pensieveSvc $ns (int $root.Values.metadata.server.port) -}}
+{{- $canonical := dict
+      "schema_version" "1.0"
+      "engine" (dict "id" $engine.name "nodes" $nodes)
+      "instance" (dict "type" "multi_engine" "multi_engine" (dict "metadata_endpoint" $metadataEndpoint))
 -}}
-{{- $canonical := dict "config" $defaults "nodes" $nodes -}}
 {{- $user := deepCopy (default (dict) $root.Values.customEngineConfig) -}}
-{{- $_ := unset $user "nodes" -}}
+{{- $_ := unset $user "schema_version" -}}
 {{/*
-  When user.config is not a map (string, number, list…) drop it entirely:
-  mergeOverwrite would otherwise replace the chart-built config block
+  When user.engine / user.instance is not a map (string, number, list…) drop
+  it entirely: mergeOverwrite would otherwise replace the chart-built block
   wholesale with the user's scalar, losing every authoritative key.
 */}}
-{{- if hasKey $user "config" -}}
-{{-   if kindIs "map" $user.config -}}
-{{-     $_ := unset $user.config "engine_id" -}}
-{{-     $_ := unset $user.config "engine_name" -}}
-{{-     $_ := unset $user.config "multi_engine_endpoint" -}}
+{{- if hasKey $user "engine" -}}
+{{-   if kindIs "map" $user.engine -}}
+{{-     $_ := unset $user.engine "id" -}}
+{{-     $_ := unset $user.engine "nodes" -}}
 {{-   else -}}
-{{-     $_ := unset $user "config" -}}
+{{-     $_ := unset $user "engine" -}}
+{{-   end -}}
+{{- end -}}
+{{- if hasKey $user "instance" -}}
+{{-   if kindIs "map" $user.instance -}}
+{{-     $_ := unset $user.instance "type" -}}
+{{-     $_ := unset $user.instance "multi_engine" -}}
+{{-   else -}}
+{{-     $_ := unset $user "instance" -}}
 {{-   end -}}
 {{- end -}}
 {{- $merged := mergeOverwrite $canonical $user -}}
-{{ $merged | toPrettyJson }}
+{{ $merged | toYaml }}
 {{- end -}}
 
 {{/*

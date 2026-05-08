@@ -11,6 +11,6 @@ metadata:
     firebolt/component: engine
     firebolt/engine: {{ $engine.name }}
 data:
-  config.json: |
+  config.yaml: |
     {{- include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) | trim | nindent 4 }}
 {{- end }}
