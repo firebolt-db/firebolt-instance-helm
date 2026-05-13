@@ -1,3 +1,7 @@
+# 0.8.2
+
+refactor: drop intra-engine peer ports from engine resources (FB-985) (#57)
+
 # 0.8.1
 
 fix: invoke engine via 'firebolt server' with FIREBOLT_CORE_MODE (FB-1088) (#56)
