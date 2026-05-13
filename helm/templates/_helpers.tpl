@@ -60,7 +60,13 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
-Common engine ports
+Engine Service ports. Only externally-meaningful endpoints are declared:
+http-query (SQL), health (probe / Envoy active health check), metrics
+(Prometheus scrape), and optionally web-ui (sidecar). The intra-engine
+peer ports — aragog (5678), shufflepuff (16000), storage-manager (1717),
+storage-agent (3434) — are intentionally omitted: they're carried over
+the headless service's pod-IP DNS records, so no Service port entry is
+needed for engine nodes to reach each other.
 */}}
 {{- define "fbinstance.enginePorts" -}}
 - name: http-query
@@ -68,18 +74,6 @@ Common engine ports
   protocol: TCP
 - name: health
   port: 8122
-  protocol: TCP
-- name: execp
-  port: 5678
-  protocol: TCP
-- name: datacp
-  port: 16000
-  protocol: TCP
-- name: storage-manager
-  port: 1717
-  protocol: TCP
-- name: storage-agent
-  port: 3434
   protocol: TCP
 - name: metadata
   port: 6500

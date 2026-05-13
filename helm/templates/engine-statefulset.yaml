@@ -165,24 +165,17 @@ spec:
               rm -f "$PID_FILE"
 
               exec /firebolt-core/firebolt server --node "$FIREBOLT_CORE_NODE" --data-dir /firebolt-core
+          # Intra-engine peer ports (aragog/shufflepuff/storage-manager/
+          # storage-agent) are intentionally omitted. ContainerPort entries
+          # are informational only — the engine binary opens those
+          # listeners regardless — and they are reached via the headless
+          # service's pod-IP DNS records, not via a Service port.
           ports:
             - name: http-query
               containerPort: 3473
               protocol: TCP
             - name: health
               containerPort: 8122
-              protocol: TCP
-            - name: execp
-              containerPort: 5678
-              protocol: TCP
-            - name: datacp
-              containerPort: 16000
-              protocol: TCP
-            - name: storage-manager
-              containerPort: 1717
-              protocol: TCP
-            - name: storage-agent
-              containerPort: 3434
               protocol: TCP
             - name: metadata
               containerPort: 6500
