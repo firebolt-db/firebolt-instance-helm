@@ -1,3 +1,7 @@
+# 0.8.1
+
+fix: invoke engine via 'firebolt server' with FIREBOLT_CORE_MODE (FB-1088) (#56)
+
 # 0.8.0
 
 feat: use YAML format for engine configuration and switch to new structure (FB-959) (#55)
