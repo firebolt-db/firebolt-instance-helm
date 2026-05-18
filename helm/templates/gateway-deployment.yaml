@@ -26,6 +26,10 @@ spec:
         {{- include "fbinstance.podLabels" . | nindent 8 }}
         firebolt/component: gateway
     spec:
+      # See the equivalent comment in engine-statefulset.yaml: kill legacy
+      # service-link env injection, DNS is the only service-discovery
+      # channel needed.
+      enableServiceLinks: false
       # 15s = 8s preStop /healthcheck/fail propagation + ~7s Envoy drain budget.
       terminationGracePeriodSeconds: 15
       {{- with .Values.gateway.podTemplate.nodeSelector }}

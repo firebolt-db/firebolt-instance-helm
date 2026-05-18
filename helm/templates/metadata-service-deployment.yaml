@@ -30,6 +30,11 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      # See the equivalent comment in engine-statefulset.yaml: kill legacy
+      # service-link env injection. Pensieve is a Quarkus app and maps env
+      # vars to MicroProfile config keys, so the auto-injected vars are
+      # actively dangerous here (cf. floci's FLOCI_PORT collision).
+      enableServiceLinks: false
       terminationGracePeriodSeconds: {{ .Values.metadata.deployment.terminationGracePeriodSeconds }}
       {{- with .Values.metadata.podTemplate.nodeSelector }}
       nodeSelector:

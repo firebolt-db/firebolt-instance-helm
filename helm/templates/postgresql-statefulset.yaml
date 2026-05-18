@@ -20,6 +20,10 @@ spec:
         {{- include "fbinstance.podLabels" . | nindent 8 }}
         firebolt/component: metadata-pg
     spec:
+      # See the equivalent comment in engine-statefulset.yaml: kill legacy
+      # service-link env injection, DNS is the only service-discovery
+      # channel needed.
+      enableServiceLinks: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

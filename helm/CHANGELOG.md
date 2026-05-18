@@ -1,3 +1,8 @@
+# 0.8.3
+
+fix: disable service-link env injection on every pod (FB-1215)
+chore: bump engine/metadata to 4.32.0-pre.0.20260518071541.b02639bf849c (FB-1215)
+
 # 0.8.2
 
 refactor: drop intra-engine peer ports from engine resources (FB-985) (#57)

@@ -50,6 +50,13 @@ spec:
         firebolt/engine: {{ $engine.name }}
         firebolt/node: {{ $i | quote }}
     spec:
+      # Suppress legacy Docker-link env vars (`<SVC>_SERVICE_HOST`,
+      # `<SVC>_PORT=tcp://...`, etc.) the kubelet would otherwise inject
+      # for every Service in the namespace. DNS is the real service-
+      # discovery channel here; the auto-injected vars are dead weight
+      # that also risks colliding with firebolt-core's own config keys
+      # (the `FIREBOLT_*` prefix is owned by the engine binary).
+      enableServiceLinks: false
       {{- if $engine.priorityClassName }}
       priorityClassName: {{ $engine.priorityClassName }}
       {{- end }}

@@ -35,7 +35,16 @@ jobs:
         if: steps.helm-changes.outputs.helm_changed == 'true'
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
         with:
-          version: "latest"
+          # Pin to a specific helm v3 patch. `azure/setup-helm`'s version
+          # input is matched verbatim against the upstream tarball name
+          # (no semver-range support — "v3.x" 404s), and "latest" promoted
+          # to v4 once v4 went stable. Helm v4 emits a trailing newline at
+          # EOF of `helm template` output that trips yamllint's default
+          # `empty-lines.max-end: 0` rule in validate-chart.sh, so we stay
+          # on v3 until we've audited the v3-to-v4 behavioural diffs (env
+          # library calls, schema validation, templating semantics) and
+          # updated the chart accordingly.
+          version: "v3.16.3"
 
       - name: Install yamllint
         if: steps.helm-changes.outputs.helm_changed == 'true'
