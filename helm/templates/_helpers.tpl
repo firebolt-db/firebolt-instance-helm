@@ -99,6 +99,7 @@ canonical document has shape:
       id: <engine name>
       nodes:
         - host: <fqdn>
+      termination_grace_period: <pod TGPS minus 5s, in seconds>
     instance:
       type: multi_engine
       multi_engine:
@@ -113,8 +114,9 @@ organization_id, and organization_name).
 
 Chart-authoritative paths are silently stripped from the user input
 before the merge: `schema_version`, `engine.id`, `engine.nodes`,
-`instance.type`, `instance.multi_engine`. The same customEngineConfig
-therefore stays portable across chart versions.
+`engine.termination_grace_period`, `instance.type`,
+`instance.multi_engine`. The same customEngineConfig therefore stays
+portable across chart versions.
 
 Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 */}}
@@ -131,9 +133,18 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{-   $nodes = append $nodes (dict "host" $fqdn) -}}
 {{- end -}}
 {{- $metadataEndpoint := printf "%s.%s.svc.cluster.local:%d" $pensieveSvc $ns (int $root.Values.metadata.server.port) -}}
+{{/*
+  Engine's own post-SIGTERM in-flight-query budget: the pod's
+  terminationGracePeriodSeconds minus a 5s margin so the engine exits before
+  the kubelet escalates to SIGKILL, floored at 1s. A single clamp keeps the
+  budget monotonic non-decreasing in the grace period.
+*/}}
+{{- $gracePeriod := int $root.Values.engineSpec.terminationGracePeriodSeconds -}}
+{{- $shutdownWait := sub $gracePeriod 5 -}}
+{{- if lt $shutdownWait 1 -}}{{- $shutdownWait = 1 -}}{{- end -}}
 {{- $canonical := dict
       "schema_version" "1.0"
-      "engine" (dict "id" $engine.name "nodes" $nodes)
+      "engine" (dict "id" $engine.name "nodes" $nodes "termination_grace_period" (printf "%ds" $shutdownWait))
       "instance" (dict "type" "multi_engine" "multi_engine" (dict "metadata_endpoint" $metadataEndpoint))
 -}}
 {{- $user := deepCopy (default (dict) $root.Values.customEngineConfig) -}}
@@ -147,6 +158,7 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{-   if kindIs "map" $user.engine -}}
 {{-     $_ := unset $user.engine "id" -}}
 {{-     $_ := unset $user.engine "nodes" -}}
+{{-     $_ := unset $user.engine "termination_grace_period" -}}
 {{-   else -}}
 {{-     $_ := unset $user "engine" -}}
 {{-   end -}}

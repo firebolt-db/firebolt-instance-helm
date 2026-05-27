@@ -46,7 +46,9 @@ engineSpec:
     fsGroupChangePolicy: OnRootMismatch
   # -- Termination grace period in seconds for engine pods. Sized to give
   # in-flight queries time to drain before SIGKILL during rolling updates
-  # and node drains.
+  # and node drains. Also rendered into the engine `config.yaml` as
+  # `engine.termination_grace_period` with a 5s safety margin (floored at
+  # 1s), so the engine's own in-flight-query wait stays below this value.
   terminationGracePeriodSeconds: 60
   # -- Service account name for engine pods.
   serviceAccount: default

@@ -27,10 +27,11 @@ spec:
           FILE="/configs/{{ .name }}/config.yaml"
           log "Engine {{ .name }} config.yaml"
           [ -s "$FILE" ] || fail "$FILE is missing or empty"
-          grep -q '^schema_version:' "$FILE"   || fail "missing schema_version key"
-          grep -q '^engine:' "$FILE"           || fail "missing engine block"
-          grep -q '^instance:' "$FILE"         || fail "missing instance block"
-          grep -q 'metadata_endpoint:' "$FILE" || fail "missing metadata_endpoint key"
+          grep -q '^schema_version:' "$FILE"          || fail "missing schema_version key"
+          grep -q '^engine:' "$FILE"                  || fail "missing engine block"
+          grep -q '^instance:' "$FILE"                || fail "missing instance block"
+          grep -q 'metadata_endpoint:' "$FILE"        || fail "missing metadata_endpoint key"
+          grep -q 'termination_grace_period:' "$FILE" || fail "missing termination_grace_period key"
           pass "{{ .name }} config.yaml is valid"
           {{- end }}
       volumeMounts:

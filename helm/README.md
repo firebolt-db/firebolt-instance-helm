@@ -50,7 +50,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.storageHostPath | object | {} | Host path configuration used when `hostPathStorageEnabled` is true. |
 | engineSpec.storageHostPath.path | string | `"/var/lib/firebolt-core"` | Host path for engine data. |
 | engineSpec.storageHostPath.type | string | `"DirectoryOrCreate"` | Host path type. |
-| engineSpec.terminationGracePeriodSeconds | int | `60` | Termination grace period in seconds for engine pods. Sized to give in-flight queries time to drain before SIGKILL during rolling updates and node drains. |
+| engineSpec.terminationGracePeriodSeconds | int | `60` | Termination grace period in seconds for engine pods. Sized to give in-flight queries time to drain before SIGKILL during rolling updates and node drains. Also rendered into the engine `config.yaml` as `engine.termination_grace_period` with a 5s safety margin (floored at 1s), so the engine's own in-flight-query wait stays below this value. |
 | engineSpec.tolerations | list | `[]` | Tolerations for engine pod scheduling. |
 | engineSpec.uiSidecar | bool | `false` | Deploy a Core UI sidecar for each engine pod. |
 | engines | list | [] | Engine definitions. Each entry produces one StatefulSet per node (`replicas` controls node count), plus a shared headless Service, ClusterIP Service, and ConfigMap. Per-engine values override the shared `engineSpec` defaults. |
