@@ -1,3 +1,7 @@
+# 0.8.5
+
+chore(helm): align engine/metadata image defaults (FB-1299) (#59)
+
 # 0.8.4
 
 fix(helm): drop securityContextCapabilities value, hardcode capabilities.drop=ALL (FB-1297) (#61)
