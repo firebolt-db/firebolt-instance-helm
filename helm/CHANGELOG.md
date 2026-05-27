@@ -1,3 +1,7 @@
+# 0.8.4
+
+fix(helm): drop securityContextCapabilities value, hardcode capabilities.drop=ALL (FB-1297) (#61)
+
 # 0.8.3
 
 fix: disable service-link env injection on every pod (FB-1215)
