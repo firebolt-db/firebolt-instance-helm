@@ -41,7 +41,8 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 
 - `Chart.yaml` — chart and app version, name, icon, sources. Both bumped automatically by the release workflow (see project-specific rules in the root `AGENTS.md`).
 - `values.yaml` — configuration surface AND the source for the generated `README.md`. Annotate every value with `# --` for `helm-docs`.
-- `values.local.yaml` — minimal overlay used by `make install`. Wires the local pull secret and any registry overrides for internal use.
+- `values.local.yaml` — minimal overlay used by `make install`. Wires the local pull secret and any registry overrides for internal use. Gitignored.
+- `values-dev.yaml` — committed overlay that flips engine and metadata images to the mutable `:dev` tag for inner-loop work. The pinned `appVersion` stays the default for reproducible installs.
 - `README.md` — **generated.** Do not hand-edit. Run `make docs` from the repo root.
 - `CHANGELOG.md` — prepended one entry per release by the CD workflow.
 - `.helmignore` — excludes docs and scripts from the packaged chart.

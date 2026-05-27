@@ -46,6 +46,14 @@ helm install firebolt ./helm \
   -f my-values.yaml
 ```
 
+To track current-of-mainline engine and metadata builds rather than the pinned `appVersion`, layer `helm/values-dev.yaml` on top of your values — it flips both image tags to the mutable `:dev` alias:
+
+```sh
+helm install firebolt ./helm -f my-values.yaml -f helm/values-dev.yaml
+# or:
+make install VALUES_FILE=helm/values-dev.yaml
+```
+
 ## How it works
 
 The Envoy gateway extracts the `X-Firebolt-Engine` header via a Lua filter and rewrites the upstream to the matching engine Service. Pensieve coordinates engine registration and reconciles against the `customEngineConfig.account_id` you configure. PostgreSQL is bundled by default for development; production deployments should set `postgresql.local_enabled: false` and provide an external database.

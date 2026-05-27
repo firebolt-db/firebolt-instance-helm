@@ -7,4 +7,5 @@ icon: https://raw.githubusercontent.com/firebolt-db/firebolt-instance-helm/refs/
 home: "https://github.com/firebolt-db/firebolt-instance-helm"
 sources: ["https://github.com/firebolt-db/firebolt-instance-helm"]
 version: 0.8.4
+# Bumped by upstream image-release automation.
 appVersion: "debug-4.32.0-pre.0.20260518071541.b02639bf849c"

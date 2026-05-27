@@ -1,0 +1,14 @@
+---
+# Overlay that flips engine and metadata images to the mutable `:dev` tags.
+# Use for development against current-of-mainline, not for reproducible installs.
+#
+#   make install VALUES_FILE=helm/values-dev.yaml
+#   helm install firebolt ./helm -f values.yaml -f helm/values-dev.yaml
+
+engineSpec:
+  image:
+    tag: dev
+
+metadata:
+  image:
+    tag: dev
