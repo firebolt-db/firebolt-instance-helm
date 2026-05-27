@@ -1,3 +1,7 @@
+# 0.8.6
+
+fix(helm): roll engine pods on engine/auth ConfigMap change (FB-1281) (#60)
+
 # 0.8.5
 
 chore(helm): align engine/metadata image defaults (FB-1299) (#59)
