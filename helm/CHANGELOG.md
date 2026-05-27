@@ -1,3 +1,7 @@
+# 0.10.0
+
+feat(gateway): per-pod LB, active health checks and retry budget (FB-1279) (#63)
+
 # 0.9.0
 
 feat(helm): render engine.termination_grace_period in engine config (FB-1280) (#62)
