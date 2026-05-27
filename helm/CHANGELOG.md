@@ -1,3 +1,7 @@
+# 0.9.0
+
+feat(helm): render engine.termination_grace_period in engine config (FB-1280) (#62)
+
 # 0.8.6
 
 fix(helm): roll engine pods on engine/auth ConfigMap change (FB-1281) (#60)
