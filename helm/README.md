@@ -126,7 +126,6 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | postgresql.resources | object | `{"limits":{"cpu":"250m","memory":"256Mi"},"requests":{"cpu":"25m","memory":"64Mi"}}` | Resource requests and limits for the bundled PostgreSQL container. |
 | postgresql.schema | string | `"public"` | PostgreSQL schema. |
 | postgresql.username | string | `"firebolt"` | Database username. |
-| securityContextCapabilities | object | `{"drop":["ALL"]}` | Security context capabilities for engine containers. |
 | utilitiesImage | string | `"debian:stable-slim"` | Image used for utility init/sidecar containers (e.g. the memlock-setup sidecar). |
 
 ----------------------------------------------

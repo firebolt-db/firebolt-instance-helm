@@ -239,7 +239,8 @@ spec:
             {{- end }}
             allowPrivilegeEscalation: false
             capabilities:
-              {{- toYaml $.Values.securityContextCapabilities | nindent 14 }}
+              drop:
+                - ALL
         {{- if $.Values.engineSpec.uiSidecar }}
         - name: core-ui
           image: ghcr.io/firebolt-db/firebolt-core-ui:latest

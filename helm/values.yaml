@@ -397,10 +397,5 @@ podMonitor:
     enabled: false
     interval: 15s
 
-# -- Security context capabilities for engine containers.
-securityContextCapabilities:
-  drop:
-    - ALL
-
 # -- Image used for utility init/sidecar containers (e.g. the memlock-setup sidecar).
 utilitiesImage: debian:stable-slim
