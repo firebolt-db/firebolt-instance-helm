@@ -81,19 +81,18 @@ data:
                                 else
                                   handle:headers():replace(":path", path .. "?advanced_mode=true")
                                 end
-                                handle:headers():replace(":authority", engine .. "-service.{{ .Release.Namespace }}.svc.cluster.local:3473")
+                                -- Route to the engine's headless Service so Envoy resolves
+                                -- per-pod IPs and load-balances across them itself.
+                                handle:headers():replace(":authority", "{{ include "fbinstance.fullname" . }}-engine-" .. engine .. "-hl.{{ .Release.Namespace }}.svc.cluster.local:3473")
                               end
                       - name: envoy.filters.http.dynamic_forward_proxy
                         typed_config:
                           "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
-                          dns_cache_config:
-                            name: dynamic_forward_proxy_cache
-                            dns_lookup_family: V4_ONLY
-                            dns_refresh_rate: 1s
-                            dns_failure_refresh_rate:
-                              base_interval: 1s
-                              max_interval: 5s
-                            host_ttl: 5s
+                          # On-demand STRICT_DNS sub-cluster per engine authority.
+                          # cluster_init_timeout only applies to the first request
+                          # to a given engine; steady-state requests skip it.
+                          sub_cluster_config:
+                            cluster_init_timeout: 5s
                       - name: envoy.filters.http.router
                         typed_config:
                           "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -133,17 +132,22 @@ data:
                                 # default). Larger requests are dispatched
                                 # without buffering and propagate the 503 to
                                 # the client even when the header is present.
-                                # previous_hosts retry-host predicate keeps
-                                # the retry off the same upstream IP; it is
-                                # a best-effort guard here because DFP in
-                                # dns_cache_config mode collapses the host
-                                # set to a single logical entry per authority.
+                                # previous_hosts retry-host predicate keeps each
+                                # retry off pod IPs already tried; with the
+                                # STRICT_DNS sub-cluster it can sweep every pod
+                                # behind the engine's headless Service. num_retries
+                                # is set well above any single engine's pod count;
+                                # short exponential back-off lets a DNS refresh or
+                                # health-check ejection take effect between tries.
                                 retry_policy:
                                   retry_on: connect-failure,refused-stream,reset,retriable-headers
                                   retriable_headers:
                                     - name: X-Firebolt-Drained
                                       present_match: true
-                                  num_retries: 2
+                                  num_retries: 50
+                                  retry_back_off:
+                                    base_interval: 0.025s
+                                    max_interval: 0.25s
                                   retry_host_predicate:
                                     - name: envoy.retry_host_predicates.previous_hosts
                                       typed_config:
@@ -183,18 +187,35 @@ data:
           # two when deciding whether a retry's request body fits, so
           # raising one without the other has no effect on retry coverage.
           per_connection_buffer_limit_bytes: 2097152  # 2 MiB; see comment above.
+          # Short connect budget so the retry loop moves past a black-holed
+          # stale pod IP quickly instead of hanging on the kernel default.
+          connect_timeout: 0.25s
+          # One request per connection forces a fresh DNS lookup per query, so a
+          # draining pod's IP stops receiving new streams within one connect.
+          max_requests_per_connection: 1
+          # Active health checks on the query port: a pod that returns 503 on
+          # /health/ready (which the engine does on SIGTERM) is ejected from the
+          # load-balanced set within ~1s, so no new query lands on a draining pod.
+          health_checks:
+            - timeout: 0.5s
+              interval: 1s
+              # Probe idle sub-clusters at the same cadence as active ones; the
+              # 60s default would defeat fast drain detection.
+              no_traffic_interval: 1s
+              healthy_threshold: 1
+              unhealthy_threshold: 1
+              http_health_check:
+                path: /health/ready
           cluster_type:
             name: envoy.clusters.dynamic_forward_proxy
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-              dns_cache_config:
-                name: dynamic_forward_proxy_cache
-                dns_lookup_family: V4_ONLY
-                dns_refresh_rate: 1s
-                dns_failure_refresh_rate:
-                  base_interval: 1s
-                  max_interval: 5s
-                host_ttl: 5s
+              # STRICT_DNS sub-cluster per authority resolves the engine's
+              # headless Service to all pod IPs and load-balances across them —
+              # what makes per-pod health checks and previous_hosts meaningful.
+              sub_clusters_config:
+                lb_policy: ROUND_ROBIN
+                sub_cluster_ttl: 300s
         - name: admin_stats
           connect_timeout: 0.25s
           type: STATIC
