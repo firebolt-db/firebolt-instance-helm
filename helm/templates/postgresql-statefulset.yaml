@@ -24,6 +24,13 @@ spec:
       # service-link env injection, DNS is the only service-discovery
       # channel needed.
       enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -52,12 +59,33 @@ spec:
                 secretKeyRef:
                   name: {{ include "fbinstance.fullname" . }}-metadata-postgres-creds
                   key: database
+            # A sub-dir of the mounted PVC, created and owned by the postgres
+            # process. Required because the kubelet's fsGroup chgrp does not
+            # reach into a subPath bind mount, so initdb's chmod 0700 would
+            # fail under runAsNonRoot.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           resources:
             {{- toYaml .Values.postgresql.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 70
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
+            # Mount the PVC root, not a subPath (see PGDATA above). On-disk data
+            # still lives under pgdata/, so existing PVCs migrate cleanly.
             - name: data
               mountPath: /var/lib/postgresql/data
-              subPath: pgdata
+            # Scratch outside the read-only root filesystem: the unix socket and
+            # postmaster.pid, and initdb/runtime temp files respectively.
+            - name: run-postgresql
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             tcpSocket:
               port: 5432
@@ -68,6 +96,11 @@ spec:
               command: ["pg_isready", "-U", {{ .Values.postgresql.username | quote }}, "-d", {{ .Values.postgresql.database | quote }}]
             initialDelaySeconds: 5
             periodSeconds: 10
+      volumes:
+        - name: run-postgresql
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
   volumeClaimTemplates:
     - metadata:
         name: data
