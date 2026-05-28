@@ -1,3 +1,7 @@
+# 0.10.2
+
+fix(postgres): harden security context and drop subPath mount (FB-1282) (#65)
+
 # 0.10.1
 
 fix(metadata): harden pod and container security context (FB-1283) (#64)
