@@ -112,8 +112,6 @@ metadata:
     # -- Container repository for the Pensieve metadata service image.
     repository: ghcr.io/firebolt-db/metadata
     # -- Pensieve image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty.
-    # The template strips any `release-` or `debug-` prefix from `Chart.appVersion` when falling back,
-    # since the pensieve release pipeline tags images without that prefix.
     # Override explicitly only when the metadata service must run a version other than the engine.
     tag: ""
     # -- Image pull policy.
@@ -264,8 +262,7 @@ gateway:
   metricsPort: 9090
   # -- Pod template overrides for gateway pods. Only the keys listed below
   # are read by the chart; arbitrary [PodSpec](https://pkg.go.dev/k8s.io/api/core/v1#PodSpec)
-  # fields supplied here are silently ignored. This mirrors the operator's
-  # closed `ComponentSpec` schema.
+  # fields supplied here are silently ignored.
   # @default -- {}
   podTemplate:
     # -- Node selector for gateway pod scheduling.
@@ -357,6 +354,11 @@ engines:
     nodeSelector: {}
     # -- Annotations applied to engine pods.
     podAnnotations: {}
+    # -- Extra labels applied to this engine's pod template. Chart-reserved
+    # keys (`app.kubernetes.io/{name,instance,managed-by}` and
+    # `firebolt/{component,engine,node}`) are silently dropped from user
+    # input so the StatefulSet selector cannot be detached by a typo.
+    podLabels: {}
 
 # @section -- Global
 

@@ -58,6 +58,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engines[0].name | string | `"default"` | Engine name. Used to derive resource names across the chart. |
 | engines[0].nodeSelector | object | `{}` | Node selector for engine pod scheduling. |
 | engines[0].podAnnotations | object | `{}` | Annotations applied to engine pods. |
+| engines[0].podLabels | object | `{}` | Extra labels applied to this engine's pod template. Chart-reserved keys (`app.kubernetes.io/{name,instance,managed-by}` and `firebolt/{component,engine,node}`) are silently dropped from user input so the StatefulSet selector cannot be detached by a typo. |
 | engines[0].priorityClassName | string | `""` | Priority class name for engine pods. |
 | engines[0].replicas | int | `1` | Number of nodes in this engine group (one StatefulSet replica per node). |
 | engines[0].resources | object | `{"limits":{"memory":"4Gi"},"requests":{"cpu":"1","memory":"4Gi"}}` | Resource requests and limits for engine containers. Firebolt Core is memory-bound: more RAM directly improves cache hit rates and query throughput. CPU governs parallel query execution threads.  Typical sizing guidance:   Development / functional testing:  2 vCPU  /  8 Gi  (request)   Small production workload:         4 vCPU  / 32 Gi   Medium production workload:        8 vCPU  / 64 Gi   Large production workload:        16 vCPU  / 128 Gi  Storage I/O is also significant — use an SSD-backed StorageClass and size the PVC to hold your working dataset plus ~30 % headroom. |
@@ -76,7 +77,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.pdb.enabled | bool | `true` | Emit a PodDisruptionBudget for the gateway. Set to `false` when an external policy controller (Kyverno, OPA Gatekeeper, etc.) or a cluster-wide PDB tool already manages disruption budgets, so the chart's PDB does not conflict with theirs. |
 | gateway.pdb.maxUnavailable | int | `1` | Maximum gateway pods that may be unavailable simultaneously during voluntary disruption. Mutually exclusive with `minAvailable` — set one and leave the other `null`. |
 | gateway.pdb.minAvailable | string | `nil` | Minimum gateway pods that must remain available during voluntary disruption. Mutually exclusive with `maxUnavailable`. |
-| gateway.podTemplate | object | {} | Pod template overrides for gateway pods. Only the keys listed below are read by the chart; arbitrary [PodSpec](https://pkg.go.dev/k8s.io/api/core/v1#PodSpec) fields supplied here are silently ignored. This mirrors the operator's closed `ComponentSpec` schema. |
+| gateway.podTemplate | object | {} | Pod template overrides for gateway pods. Only the keys listed below are read by the chart; arbitrary [PodSpec](https://pkg.go.dev/k8s.io/api/core/v1#PodSpec) fields supplied here are silently ignored. |
 | gateway.podTemplate.affinity | object | `{}` | Affinity rules for gateway pod scheduling. |
 | gateway.podTemplate.nodeSelector | object | `{}` | Node selector for gateway pod scheduling. |
 | gateway.podTemplate.priorityClassName | string | `""` | Pod priority class. Reference a `PriorityClass` to let the gateway preempt lower-priority workloads when the cluster is under resource pressure — useful when query routing must stay up during incidents. |
@@ -93,7 +94,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | metadata.deployment.terminationGracePeriodSeconds | int | `30` | Termination grace period in seconds. |
 | metadata.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | metadata.image.repository | string | `"ghcr.io/firebolt-db/metadata"` | Container repository for the Pensieve metadata service image. |
-| metadata.image.tag | string | `""` | Pensieve image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty. The template strips any `release-` or `debug-` prefix from `Chart.appVersion` when falling back, since the pensieve release pipeline tags images without that prefix. Override explicitly only when the metadata service must run a version other than the engine. |
+| metadata.image.tag | string | `""` | Pensieve image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty. Override explicitly only when the metadata service must run a version other than the engine. |
 | metadata.podTemplate | object | `{}` | Pod template overrides for the metadata service (nodeSelector, tolerations, affinity). |
 | metadata.resources | object | `{"limits":{"memory":"1Gi"},"requests":{"cpu":"100m","memory":"512Mi"}}` | Resource requests and limits for the metadata service container. Pensieve is a lightweight gRPC service; increase memory if you run many engines. |
 | metadata.server | object | {} | gRPC server configuration for the metadata service. |

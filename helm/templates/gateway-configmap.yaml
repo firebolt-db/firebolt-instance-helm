@@ -47,6 +47,16 @@ data:
                       - name: envoy.access_loggers.stdout
                         typed_config:
                           "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                          # Structured format aimed at triaging 5xx during the retry/drain
+                          # layer: RESPONSE_FLAGS (UH/UF/UC/UT/NR/LR/DPE/...) categorises the
+                          # failure, RESPONSE_CODE_DETAILS pins the exact code path, and
+                          # UPSTREAM_TRANSPORT_FAILURE_REASON surfaces TLS/TCP-level errors.
+                          # Together they let us tell an Envoy-synthesized 5xx (safe to retry)
+                          # apart from one returned by the engine (potentially side-effectful).
+                          log_format:
+                            text_format_source:
+                              inline_string: |
+                                [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%" %RESPONSE_CODE% flags=%RESPONSE_FLAGS% details=%RESPONSE_CODE_DETAILS% tx_fail=%UPSTREAM_TRANSPORT_FAILURE_REASON% upstream=%UPSTREAM_HOST% cluster=%UPSTREAM_CLUSTER% duration=%DURATION%ms rx=%BYTES_RECEIVED% tx=%BYTES_SENT% authority=%REQ(:AUTHORITY)% engine=%REQ(X-FIREBOLT-ENGINE)%
                     http_filters:
                       - name: envoy.filters.http.health_check
                         typed_config:
@@ -193,6 +203,19 @@ data:
           # One request per connection forces a fresh DNS lookup per query, so a
           # draining pod's IP stops receiving new streams within one connect.
           max_requests_per_connection: 1
+          # Per-engine isolation: a misbehaving engine can't swamp the gateway
+          # with unbounded connections, queue depth, in-flight streams, or
+          # concurrent retries. A tripped breaker shows up as UO / UAEX / URX
+          # in the access_log RESPONSE_FLAGS. Hardcoded — these sit at the
+          # centre of the per-engine isolation contract; raise gateway.replicas
+          # rather than tuning the caps.
+          circuit_breakers:
+            thresholds:
+              - priority: DEFAULT
+                max_connections: 1024
+                max_pending_requests: 1024
+                max_requests: 1024
+                max_retries: 256
           # Active health checks on the query port: a pod that returns 503 on
           # /health/ready (which the engine does on SIGTERM) is ejected from the
           # load-balanced set within ~1s, so no new query lands on a draining pod.

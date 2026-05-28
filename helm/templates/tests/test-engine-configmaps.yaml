@@ -32,6 +32,7 @@ spec:
           grep -q '^instance:' "$FILE"                || fail "missing instance block"
           grep -q 'metadata_endpoint:' "$FILE"        || fail "missing metadata_endpoint key"
           grep -q 'termination_grace_period:' "$FILE" || fail "missing termination_grace_period key"
+          grep -q '^logging:' "$FILE"                 || fail "missing logging block"
           pass "{{ .name }} config.yaml is valid"
           {{- end }}
       volumeMounts:

@@ -62,7 +62,7 @@ spec:
       {{- end }}
       containers:
         - name: metadata-service
-          image: "{{ .Values.metadata.image.repository }}:{{ default (.Chart.AppVersion | trimPrefix "release-" | trimPrefix "debug-") .Values.metadata.image.tag }}"
+          image: "{{ .Values.metadata.image.repository }}:{{ default .Chart.AppVersion .Values.metadata.image.tag }}"
           imagePullPolicy: {{ .Values.metadata.image.pullPolicy }}
           command: ["/dedicated-pensieve", "--config", "/configs/config.xml"]
           ports:

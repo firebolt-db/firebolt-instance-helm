@@ -104,6 +104,8 @@ canonical document has shape:
       type: multi_engine
       multi_engine:
         metadata_endpoint: <pensieve gRPC endpoint>
+    logging:
+      format: json
 
 .Values.customEngineConfig is deep-merged on top of the canonical
 document at the root: keys at the top become siblings of `engine`
@@ -146,6 +148,7 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
       "schema_version" "1.0"
       "engine" (dict "id" $engine.name "nodes" $nodes "termination_grace_period" (printf "%ds" $shutdownWait))
       "instance" (dict "type" "multi_engine" "multi_engine" (dict "metadata_endpoint" $metadataEndpoint))
+      "logging" (dict "format" "json")
 -}}
 {{- $user := deepCopy (default (dict) $root.Values.customEngineConfig) -}}
 {{- $_ := unset $user "schema_version" -}}
@@ -173,6 +176,17 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{- end -}}
 {{- $merged := mergeOverwrite $canonical $user -}}
 {{ $merged | toYaml }}
+{{- end -}}
+
+{{/*
+XML element-text escape for user-controlled strings interpolated into the
+rendered metadata config.xml. Replaces the three element-content
+metacharacters; the `&` substitution MUST run first so its entity
+reference isn't re-escaped. Defense-in-depth alongside the
+values.schema.json patterns.
+*/}}
+{{- define "fbinstance.xmlEscape" -}}
+{{- . | replace "&" "&amp;" | replace "<" "&lt;" | replace ">" "&gt;" -}}
 {{- end -}}
 
 {{/*

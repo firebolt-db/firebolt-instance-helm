@@ -54,6 +54,12 @@ spec:
         firebolt/component: engine
         firebolt/engine: {{ $engine.name }}
         firebolt/node: {{ $i | quote }}
+        {{- $reserved := list "firebolt/component" "firebolt/engine" "firebolt/node" "app.kubernetes.io/name" "app.kubernetes.io/instance" "app.kubernetes.io/managed-by" }}
+        {{- range $k, $v := $engine.podLabels }}
+        {{- if not (has $k $reserved) }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+        {{- end }}
     spec:
       # Suppress legacy Docker-link env vars (`<SVC>_SERVICE_HOST`,
       # `<SVC>_PORT=tcp://...`, etc.) the kubelet would otherwise inject
@@ -105,6 +111,10 @@ spec:
                   fieldPath: metadata.uid
             - name: NODES_COUNT
               value: {{ $engine.replicas | quote }}
+            # Enables the engine's AWS-SDK EC2-metadata client, which is how
+            # IRSA credentials are resolved for managed S3 storage.
+            - name: FB_AWS_EC2_METADATA_CLIENT_ENABLED
+              value: "true"
             # Selects the firebolt-core code path inside the unified
             # `firebolt` binary (packdb FB-914): the operator-rendered
             # config (config.yaml under --data-dir) is honored as-is and
@@ -302,7 +312,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.uid
-            - name: FIREBOLT_ALLOW_AWS_IRSA
+            - name: FB_AWS_EC2_METADATA_CLIENT_ENABLED
               value: "true"
           command: ["/bin/bash", "-c"]
           args:

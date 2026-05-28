@@ -11,21 +11,21 @@ data:
     <?xml version="1.0"?>
     <config>
       <pensieve_lite>
-        <default_account_id>{{ .Values.customEngineConfig.instance.id }}</default_account_id>
-        <host>{{ .Values.metadata.server.host }}</host>
+        <default_account_id>{{ include "fbinstance.xmlEscape" .Values.customEngineConfig.instance.id }}</default_account_id>
+        <host>{{ include "fbinstance.xmlEscape" .Values.metadata.server.host }}</host>
         <port>{{ .Values.metadata.server.port }}</port>
         <server_threads>{{ .Values.metadata.server.threads }}</server_threads>
-        <log_level>{{ .Values.metadata.server.log_level }}</log_level>
+        <log_level>{{ include "fbinstance.xmlEscape" .Values.metadata.server.log_level }}</log_level>
         <metadata_storage>
           <postgresql>
             {{- if .Values.postgresql.local_enabled }}
             <host>{{ include "fbinstance.fullname" . }}-metadata-pg</host>
             {{- else }}
-            <host>{{ .Values.postgresql.host }}</host>
+            <host>{{ include "fbinstance.xmlEscape" .Values.postgresql.host }}</host>
             {{- end }}
             <port>{{ .Values.postgresql.port }}</port>
-            <database>{{ .Values.postgresql.database }}</database>
-            <schema>{{ .Values.postgresql.schema }}</schema>
+            <database>{{ include "fbinstance.xmlEscape" .Values.postgresql.database }}</database>
+            <schema>{{ include "fbinstance.xmlEscape" .Values.postgresql.schema }}</schema>
 
             <keepalive>
               <enabled>{{ .Values.postgresql.keepalive.enabled }}</enabled>
