@@ -1,3 +1,7 @@
+# 0.12.0
+
+feat: operator parity iteration 2 — five chart-deliverable gaps (FB-1348) (#67)
+
 # 0.11.0
 
 feat(helm): add values.schema.json for install-time validation (FB-1284) (#66)
