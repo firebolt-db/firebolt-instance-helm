@@ -90,7 +90,6 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | imagePullSecrets | list | `[]` | Registry credentials. Must be a pre-created docker-registry Secret in the deployment namespace. Leave empty if nodes have ambient registry access (e.g. node IAM role). |
 | metadata | object | {} | Metadata service (Pensieve) configuration. |
 | metadata.deployment | object | {} | Deployment-level settings for the metadata service. |
-| metadata.deployment.securityContext | object | `{}` | Pod-level security context. |
 | metadata.deployment.terminationGracePeriodSeconds | int | `30` | Termination grace period in seconds. |
 | metadata.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | metadata.image.repository | string | `"ghcr.io/firebolt-db/metadata"` | Container repository for the Pensieve metadata service image. |

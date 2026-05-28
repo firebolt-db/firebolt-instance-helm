@@ -35,7 +35,15 @@ spec:
       # vars to MicroProfile config keys, so the auto-injected vars are
       # actively dangerous here (cf. floci's FLOCI_PORT collision).
       enableServiceLinks: false
+      # Pensieve never calls the Kubernetes API.
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: {{ .Values.metadata.deployment.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1111
+        runAsGroup: 1111
+        seccompProfile:
+          type: RuntimeDefault
       {{- with .Values.metadata.podTemplate.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -81,12 +89,19 @@ spec:
             - name: postgres-creds
               mountPath: {{ .Values.postgresql.credentials.mountPath }}
               readOnly: true
+            # Scratch space outside the read-only root filesystem.
+            - name: tmp
+              mountPath: /tmp
           resources:
             {{- toYaml .Values.metadata.resources | nindent 12 }}
-          {{- with .Values.metadata.deployment.securityContext }}
           securityContext:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            runAsNonRoot: true
+            runAsUser: 1111
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: POSTGRES_USERNAME_FILE
               value: {{ .Values.postgresql.credentials.mountPath }}/username
@@ -102,3 +117,5 @@ spec:
         - name: postgres-creds
           secret:
             secretName: {{ $pgSecretName }}
+        - name: tmp
+          emptyDir: {}

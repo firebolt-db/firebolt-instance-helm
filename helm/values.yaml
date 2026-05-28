@@ -145,8 +145,6 @@ metadata:
   deployment:
     # -- Termination grace period in seconds.
     terminationGracePeriodSeconds: 30
-    # -- Pod-level security context.
-    securityContext: {}
 
   # -- Pod template overrides for the metadata service (nodeSelector, tolerations, affinity).
   podTemplate: {}
