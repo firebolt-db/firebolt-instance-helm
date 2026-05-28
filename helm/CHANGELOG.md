@@ -1,3 +1,7 @@
+# 0.10.1
+
+fix(metadata): harden pod and container security context (FB-1283) (#64)
+
 # 0.10.0
 
 feat(gateway): per-pod LB, active health checks and retry budget (FB-1279) (#63)
