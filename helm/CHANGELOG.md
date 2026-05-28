@@ -1,3 +1,7 @@
+# 0.11.0
+
+feat(helm): add values.schema.json for install-time validation (FB-1284) (#66)
+
 # 0.10.2
 
 fix(postgres): harden security context and drop subPath mount (FB-1282) (#65)
