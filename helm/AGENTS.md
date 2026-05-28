@@ -41,6 +41,7 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 
 - `Chart.yaml` — chart and app version, name, icon, sources. Both bumped automatically by the release workflow (see project-specific rules in the root `AGENTS.md`).
 - `values.yaml` — configuration surface AND the source for the generated `README.md`. Annotate every value with `# --` for `helm-docs`.
+- `values.schema.json` — JSON Schema validating the value surface at `helm install`/`helm lint` time. Permissive by design (unknown keys pass); constrains only enums, ranges, and patterns. See "Adding a new value".
 - `values.local.yaml` — minimal overlay used by `make install`. Wires the local pull secret and any registry overrides for internal use. Gitignored.
 - `values-dev.yaml` — committed overlay that flips engine and metadata images to the mutable `:dev` tag for inner-loop work. The pinned `appVersion` stays the default for reproducible installs.
 - `README.md` — **generated.** Do not hand-edit. Run `make docs` from the repo root.
@@ -64,7 +65,8 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 2. Reference it from the relevant template(s). For new engine-pod settings, decide whether it belongs under `engineSpec` (shared default, per-engine override) or only on the per-engine entry. For new per-node-config keys, prefer adding them under `customEngineConfig` rather than introducing a new top-level value.
 3. Run `make lint` to catch template errors.
 4. Run `make docs` (or `helm-docs --chart-search-root=helm`) so `README.md` reflects the new value. The pre-commit hook also does this.
-5. If the value enables a new behavior that has runtime effect, add or extend a hook under `templates/tests/` and verify with `make install && make test` against a kind cluster.
+5. If the value has a finite valid set (enum, numeric range, regex), add a matching rule to `values.schema.json` so `helm install`/`helm lint` reject bad input early. The schema validates the merged defaults, so any rule you add MUST pass the shipped `values.yaml`; keep it permissive (no `additionalProperties: false`, no `required` that the defaults don't satisfy). Do not constrain security-context fields — those are hardcoded floors in the templates, not user config.
+6. If the value enables a new behavior that has runtime effect, add or extend a hook under `templates/tests/` and verify with `make install && make test` against a kind cluster.
 
 ## Adding a new helm test
 

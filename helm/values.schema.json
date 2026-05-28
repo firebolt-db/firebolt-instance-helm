@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "firebolt-instance values",
+  "description": "Validates the genuine configuration surface of the chart. Security-context fields are intentionally not constrained here: they are hardcoded in the templates as a security floor, not a user-tunable. The schema is permissive (additionalProperties is left at its default) so unknown keys pass and the chart stays forward-compatible.",
+  "type": "object",
+  "properties": {
+    "createNamespace": {
+      "type": "boolean"
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["name"]
+      }
+    },
+    "engineSpec": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "Never", "IfNotPresent"]
+            }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "Never", "IfNotPresent"]
+            }
+          }
+        },
+        "server": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9.:\\[\\]-]*$"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "threads": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "log_level": {
+              "type": "string",
+              "pattern": "^[A-Za-z]+$"
+            }
+          }
+        }
+      }
+    },
+    "postgresql": {
+      "type": "object",
+      "properties": {
+        "local_enabled": {
+          "type": "boolean"
+        },
+        "host": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9.:\\[\\]-]*$"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "database": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "username": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "Never", "IfNotPresent"]
+            }
+          }
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["ClusterIP", "LoadBalancer", "NodePort"]
+            }
+          }
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["none", "local", "sso"]
+        }
+      }
+    },
+    "engines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "replicas": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": ["name"]
+      }
+    },
+    "customEngineConfig": {
+      "type": "object",
+      "properties": {
+        "instance": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[0-9A-Z]{26}$"
+            }
+          }
+        }
+      }
+    },
+    "podMonitor": {
+      "type": "object",
+      "properties": {
+        "engines": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "gateway": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  }
+}
