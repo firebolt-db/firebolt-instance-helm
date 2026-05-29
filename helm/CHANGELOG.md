@@ -1,3 +1,7 @@
+# 0.12.1
+
+chore(helm): plain/dev install split + floci local-dev manifest (FB-1361) (#68)
+
 # 0.12.0
 
 feat: operator parity iteration 2 — five chart-deliverable gaps (FB-1348) (#67)
