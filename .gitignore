@@ -1,5 +1,4 @@
 /plans
-helm/values.local.yaml
 
 # IDEs
 .vscode/

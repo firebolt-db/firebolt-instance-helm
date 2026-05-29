@@ -29,29 +29,21 @@ Each entry under `engines:` becomes one 1-replica StatefulSet per node plus a sh
 
 ```sh
 make create     # kind create cluster
-make install    # create namespace, refresh ECR pull secret, helm install
+make dev        # deploy floci + refresh ECR pull secret + helm install with helm/values-dev.yaml
 make wait       # block until deployments/statefulsets roll out
 make test       # run `helm test` (engine ready, gateway ready, smoke SQL, ...)
-make cleanup    # uninstall release, delete PVCs, delete namespace
+make cleanup    # uninstall release, delete PVCs, delete namespace (takes floci with it)
 make delete     # kind delete cluster
 ```
 
-`make install` refreshes a `regcred` docker-registry Secret in the target namespace; the token is valid for 12 hours, so re-run `make install` (or `make upgrade`) before it expires. The chart's default image registry is `ghcr.io/firebolt-db`; the local install flow targets the internal Firebolt ECR via `helm/values.local.yaml`.
+`make dev` is the internal-Firebolt local-development path. It (1) applies `local-floci.yaml` to bring up a zero-auth S3 emulator and pre-create the engine's managed-storage bucket (the post-2026-05-13 metadata images refuse local-fs managed storage), (2) refreshes a 12-hour `regcred` Secret against the internal ECR pull-through cache, and (3) installs with `helm/values-dev.yaml` — which points engine + metadata at the ECR cache at the mutable `:dev` tag and wires `customEngineConfig.storage` at floci. Re-run `make dev` (or `make upgrade-dev`) before the ECR token expires.
 
-To install without the local kind / pull-secret glue:
-
-```sh
-helm install firebolt ./helm \
-  --namespace firebolt --create-namespace \
-  -f my-values.yaml
-```
-
-To track current-of-mainline engine and metadata builds rather than the pinned `appVersion`, layer `helm/values-dev.yaml` on top of your values — it flips both image tags to the mutable `:dev` alias:
+For a plain install against the chart defaults (no overlay, no ECR secret, no floci — assumes you can pull `ghcr.io/firebolt-db/*` and have configured managed storage yourself):
 
 ```sh
-helm install firebolt ./helm -f my-values.yaml -f helm/values-dev.yaml
-# or:
-make install VALUES_FILE=helm/values-dev.yaml
+make install     # helm install firebolt ./helm
+# or, fully manual:
+helm install firebolt ./helm --namespace firebolt --create-namespace -f my-values.yaml
 ```
 
 ## How it works

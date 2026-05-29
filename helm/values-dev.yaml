@@ -1,14 +1,34 @@
 ---
-# Overlay that flips engine and metadata images to the mutable `:dev` tags.
-# Use for development against current-of-mainline, not for reproducible installs.
+# Overlay for inner-loop development: pulls engine and metadata through the
+# internal ECR pull-through cache at the mutable `:dev` tag. Pair with
+# `make install`, which provisions the `regcred` ECR pull secret.
+# Not for reproducible installs.
 #
 #   make install VALUES_FILE=helm/values-dev.yaml
 #   helm install firebolt ./helm -f values.yaml -f helm/values-dev.yaml
 
+imagePullSecrets:
+  - name: regcred
+
 engineSpec:
   image:
+    repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/ghcr/firebolt-db/engine
     tag: dev
 
 metadata:
   image:
+    repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/ghcr/firebolt-db/metadata
     tag: dev
+
+# Point the engine's managed_storage at the local floci S3 emulator. The
+# engine refuses to start in dedicated-Pensieve mode without managed storage
+# on object storage. `type: minio` flips its S3 client into MinIO-compat mode
+# and hardcodes the access/secret to firebolt/firebolt, which floci (zero-auth)
+# accepts. Apply local-floci.yaml in the same namespace before `make install`.
+customEngineConfig:
+  storage:
+    type: minio
+    api_scheme: "s3://"
+    bucket_name: firebolt-managed
+    minio:
+      endpoint: http://floci.firebolt.svc.cluster.local:4566

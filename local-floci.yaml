@@ -1,0 +1,103 @@
+# Local-dev only: floci S3-compatible emulator + bucket-create Job.
+# Apply alongside `make install` so the engine can satisfy the dedicated-Pensieve
+# "managed_storage cannot be local fs" check via customEngineConfig.storage
+# in helm/values-dev.yaml.
+#
+# Usage:
+#   kubectl apply -n firebolt -f local-floci.yaml
+#   kubectl -n firebolt rollout status deployment/floci --timeout=120s
+#   make install   # or make upgrade
+#
+# Floci is zero-auth: SigV4 still required but credentials aren't validated.
+# `type: minio` in the engine config hardcodes the access/secret to
+# `firebolt/firebolt`, which floci accepts.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: floci
+  labels:
+    app: floci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: floci
+  template:
+    metadata:
+      labels:
+        app: floci
+    spec:
+      # Kill the kubelet's service-link env injection — Quarkus reads
+      # FLOCI_PORT=tcp://... as a config key for floci.port and CrashLoopBackOffs
+      # trying to coerce it to an int.
+      enableServiceLinks: false
+      containers:
+        - name: floci
+          image: floci/floci:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: api
+              containerPort: 4566
+              protocol: TCP
+          env:
+            - name: FLOCI_DEFAULT_REGION
+              value: us-east-1
+          readinessProbe:
+            tcpSocket: { port: 4566 }
+            initialDelaySeconds: 1
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            tcpSocket: { port: 4566 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: "1",  memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: floci
+  labels:
+    app: floci
+spec:
+  type: ClusterIP
+  ports:
+    - name: api
+      port: 4566
+      targetPort: 4566
+      protocol: TCP
+  selector:
+    app: floci
+---
+# Idempotent bucket creation. BucketAlreadyOwnedByYou returns 254 which the
+# `|| true` swallows; head-bucket then asserts the bucket exists.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: floci-mkbucket
+  labels:
+    app: floci-mkbucket
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: aws
+          image: amazon/aws-cli:2.17.0
+          env:
+            - { name: AWS_ACCESS_KEY_ID,     value: mock }
+            - { name: AWS_SECRET_ACCESS_KEY, value: mock }
+            - { name: AWS_DEFAULT_REGION,    value: us-east-1 }
+            - { name: AWS_ENDPOINT_URL,      value: "http://floci:4566" }
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              aws s3api create-bucket --bucket firebolt-managed || true
+              aws s3api head-bucket   --bucket firebolt-managed

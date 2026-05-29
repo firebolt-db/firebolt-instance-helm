@@ -1,13 +1,13 @@
 RELEASE      ?= firebolt
 NAMESPACE    ?= firebolt
 CHART        := ./helm
-VALUES_FILE  := $(CHART)/values.local.yaml
+VALUES_FILE  := $(CHART)/values-dev.yaml
 ECR_REGISTRY := 000000000000.dkr.ecr.us-east-1.amazonaws.com
 AWS_REGION   := us-east-1
 
 .DEFAULT_GOAL := help
 
-.PHONY: help create install upgrade uninstall cleanup delete wait test test-cleanup check-pre-commit check-helm-docs setup-pre-commit docs lint
+.PHONY: help create install dev upgrade upgrade-dev uninstall cleanup delete wait test test-cleanup check-pre-commit check-helm-docs setup-pre-commit docs lint floci
 
 help: ## Show this help message
 	@printf '\033[33m%s\n' \
@@ -49,8 +49,17 @@ lint: ## Lint and template-render the helm chart
 create: ## Create a local kind cluster
 	kind create cluster
 
-install: ## Install the chart into $(NAMESPACE) (creates namespace and ECR pull secret)
+floci: ## Deploy floci S3 emulator + create the engine's managed_storage bucket in $(NAMESPACE)
 	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -n $(NAMESPACE) -f local-floci.yaml
+	kubectl rollout status deployment/floci -n $(NAMESPACE) --timeout=120s
+	kubectl wait --for=condition=complete job/floci-mkbucket -n $(NAMESPACE) --timeout=120s
+
+install: ## Install the chart into $(NAMESPACE) with chart defaults (no overlay)
+	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	helm install $(RELEASE) $(CHART) --namespace $(NAMESPACE)
+
+dev: floci ## Install with the dev overlay: floci pre-step + ECR pull secret + values-dev.yaml
 	kubectl create secret docker-registry regcred \
 	      --docker-server=$(ECR_REGISTRY) \
 	      --docker-username=AWS \
@@ -60,7 +69,10 @@ install: ## Install the chart into $(NAMESPACE) (creates namespace and ECR pull 
 	helm install $(RELEASE) $(CHART) --namespace $(NAMESPACE) \
 	      -f $(VALUES_FILE)
 
-upgrade: ## Upgrade the installed release with current chart and values
+upgrade: ## Upgrade the release with chart defaults (no overlay)
+	helm upgrade $(RELEASE) $(CHART) --namespace $(NAMESPACE)
+
+upgrade-dev: ## Upgrade the release with the dev values overlay
 	helm upgrade $(RELEASE) $(CHART) --namespace $(NAMESPACE) -f $(VALUES_FILE)
 
 uninstall: ## Uninstall the release and remove the ECR pull secret
