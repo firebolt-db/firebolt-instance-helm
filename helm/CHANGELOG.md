@@ -1,3 +1,7 @@
+# 0.12.2
+
+docs: add Mintlify user-facing docs and drop unused make wait (FB-1385) (#69)
+
 # 0.12.1
 
 chore(helm): plain/dev install split + floci local-dev manifest (FB-1361) (#68)
