@@ -14,7 +14,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| auth | object | {} | Authentication configuration for firebolt-core `auth.json`. Not enforced yet; reserved for future engine-level auth propagation. TODO: wire auth fields into Envoy config or engine auth once supported. |
+| auth | object | {} | Authentication configuration for the Firebolt engine's `auth.json`. Not enforced yet; reserved for future engine-level auth propagation. TODO: wire auth fields into Envoy config or engine auth once supported. |
 | auth.local | object | {} | Local authentication configuration. Used when `mode: local`. |
 | auth.local.credentialsSecretRef | string | `""` | Name of a Secret containing username/password or API keys. |
 | auth.mode | string | `"none"` | Authentication mode. One of `none`, `local`, or `sso`. |
@@ -26,7 +26,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | createNamespace | bool | `false` | When true, a Namespace resource is included in the chart output. Pair with `helm install --create-namespace --set createNamespace=false`. |
 | customEngineConfig | object | {} | Custom engine configuration deep-merged into the rendered engine config.yaml at the root. The rendered document follows the Firebolt Core configuration schema (`schema_version: "1.0"`); user-supplied keys at the top of `customEngineConfig` become siblings of the chart-managed `engine:` and `instance:` blocks (e.g. `auth:`, `logging:`), and keys nested under `instance:` merge into the instance block (e.g. `instance.id`).  Chart-authoritative paths are silently stripped from this input and cannot be overridden: `schema_version`, `engine.id`, `engine.nodes`, `instance.type`, and `instance.multi_engine`. |
 | customEngineConfig.instance | object | {} | Instance identity. `id` propagates internally to `account_id`, `account_name`, `organization_id`, and `organization_name`, so the chart only needs to set the ULID once. |
-| customEngineConfig.instance.id | string | `"01KP98J0000000000000000000"` | ULID for the Firebolt instance. Must match the account reconciled by Dedicated Pensieve at startup (the metadata service template uses this same value for `pensieve_lite.default_account_id`). |
+| customEngineConfig.instance.id | string | `"01KP98J0000000000000000000"` | ULID for the Firebolt instance. Must match the account reconciled by the metadata service at startup. |
 | engineSpec | object | {} | Shared engine pod defaults applied to all engines unless overridden per-engine. |
 | engineSpec.affinity | object | `{}` | Affinity rules for engine pod scheduling. |
 | engineSpec.customInitContainersTemplate | list | `[]` | Custom init containers injected into engine pods (supports templating). |
@@ -36,7 +36,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.defaultStorage.resources.requests.storage | string | `"100Gi"` | Default storage size for engine PVCs. |
 | engineSpec.hostPathStorageEnabled | bool | `false` | When true, uses hostPath instead of PVC for engine data. |
 | engineSpec.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
-| engineSpec.image.repository | string | `"ghcr.io/firebolt-db/engine"` | Container repository for the firebolt-core engine image. |
+| engineSpec.image.repository | string | `"ghcr.io/firebolt-db/engine"` | Container repository for the Firebolt engine image. |
 | engineSpec.image.tag | string | `""` | Image tag. Defaults to `Chart.appVersion` when empty. |
 | engineSpec.memlockSetup | bool | `false` | When true, a memlock-setup init container is added to configure memory locking limits. |
 | engineSpec.nodeHostSuffix | string | `".cluster.local"` | Suffix appended after `.svc` in node FQDNs in `config.yaml`. |
@@ -89,14 +89,14 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.service.port | int | `80` | External service port proxied to `containerPort`. |
 | gateway.service.type | string | `"ClusterIP"` | Service type. One of `ClusterIP`, `LoadBalancer`, or `NodePort`. |
 | imagePullSecrets | list | `[]` | Registry credentials. Must be a pre-created docker-registry Secret in the deployment namespace. Leave empty if nodes have ambient registry access (e.g. node IAM role). |
-| metadata | object | {} | Metadata service (Pensieve) configuration. |
+| metadata | object | {} | Metadata service configuration. |
 | metadata.deployment | object | {} | Deployment-level settings for the metadata service. |
 | metadata.deployment.terminationGracePeriodSeconds | int | `30` | Termination grace period in seconds. |
 | metadata.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
-| metadata.image.repository | string | `"ghcr.io/firebolt-db/metadata"` | Container repository for the Pensieve metadata service image. |
-| metadata.image.tag | string | `""` | Pensieve image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty. Override explicitly only when the metadata service must run a version other than the engine. |
+| metadata.image.repository | string | `"ghcr.io/firebolt-db/metadata"` | Container repository for the metadata service image. |
+| metadata.image.tag | string | `""` | Metadata service image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty. Override explicitly only when the metadata service must run a version other than the engine. |
 | metadata.podTemplate | object | `{}` | Pod template overrides for the metadata service (nodeSelector, tolerations, affinity). |
-| metadata.resources | object | `{"limits":{"memory":"1Gi"},"requests":{"cpu":"100m","memory":"512Mi"}}` | Resource requests and limits for the metadata service container. Pensieve is a lightweight gRPC service; increase memory if you run many engines. |
+| metadata.resources | object | `{"limits":{"memory":"1Gi"},"requests":{"cpu":"100m","memory":"512Mi"}}` | Resource requests and limits for the metadata service container. The metadata service is a lightweight gRPC service; increase memory if you run many engines. |
 | metadata.server | object | {} | gRPC server configuration for the metadata service. |
 | metadata.server.host | string | `"0.0.0.0"` | gRPC server listen address. |
 | metadata.server.log_level | string | `"information"` | Log level for the metadata service. |

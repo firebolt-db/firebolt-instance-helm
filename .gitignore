@@ -3,3 +3,7 @@
 # IDEs
 .vscode/
 .idea/
+
+# Python bytecode (docs check scripts / tests)
+__pycache__/
+*.py[cod]

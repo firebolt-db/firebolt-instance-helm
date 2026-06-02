@@ -1,0 +1,78 @@
+---
+description: Two or more named Firebolt engines under one firebolt-instance Helm release, routed by the X-Firebolt-Engine header.
+sidebarTitle: Multi-engine
+title: Multi-engine
+---
+
+This page shows how to declare multiple engines in one release and route queries between them.
+
+Each entry under `engines:` renders independent StatefulSets, Services, and ConfigMaps. The gateway, Metadata Service, and PostgreSQL are shared.
+
+## Values
+
+```yaml
+# my-values.yaml
+engines:
+  - name: analytics
+    replicas: 2
+    resources:
+      requests: { cpu: "1", memory: "3Gi" }
+      limits:   { memory: "3Gi" }
+    storage:
+      resources:
+        requests: { storage: 50Gi }
+
+  - name: adhoc
+    replicas: 1
+    resources:
+      requests: { cpu: "500m", memory: "3Gi" }
+      limits:   { memory: "3Gi" }
+```
+
+Per-engine entries override the shared `engineSpec` defaults. For the full surface, see [`helm/README.md`](https://github.com/firebolt-db/firebolt-instance-helm/blob/main/helm/README.md).
+
+## Install
+
+Install the chart with the multi-engine values file:
+
+```bash
+helm install firebolt ./helm \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
+## Verify
+
+List the engine StatefulSets the release created:
+
+```bash
+kubectl -n firebolt get statefulset -l firebolt/component=engine
+# firebolt-engine-adhoc-node-0        1/1
+# firebolt-engine-analytics-node-0    1/1
+# firebolt-engine-analytics-node-1    1/1
+```
+
+`replicas: 2` on `analytics` renders two independent 1-replica StatefulSets. The chart does not run multi-replica engines under a single StatefulSet.
+
+## Route queries
+
+Forward the gateway Service to a local port and send one query per engine:
+
+```bash
+# Forward the gateway Service to localhost:8080 in the background.
+kubectl -n firebolt port-forward svc/firebolt-gateway 8080:80 &
+
+# Route a query to the `analytics` engine.
+curl -s http://localhost:8080/ -H "X-Firebolt-Engine: analytics" \
+  -H "Content-Type: text/plain" --data "SELECT 1"
+
+# Route a query to the `adhoc` engine.
+curl -s http://localhost:8080/ -H "X-Firebolt-Engine: adhoc" \
+  -H "Content-Type: text/plain" --data "SELECT 1"
+```
+
+Engine names must match RFC 1123 DNS labels (lowercase alphanumerics and hyphens, max 63 chars). The Envoy Lua filter rejects anything else with `400`.
+
+## Change the engine set
+
+Edit `engines:` and run `helm upgrade`. Removing an engine deletes its StatefulSets but leaves the PVCs (Kubernetes default `Retain`).

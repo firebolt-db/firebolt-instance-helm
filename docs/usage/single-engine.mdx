@@ -1,0 +1,59 @@
+---
+description: Default install of the firebolt-instance Helm chart with one engine, one gateway, the Metadata Service, and bundled PostgreSQL.
+sidebarTitle: Single engine
+title: Single engine
+---
+
+This page walks through a default install with a single engine.
+
+<Note>
+Engines need object storage configured under `customEngineConfig.storage`. Without it, the engine pod never becomes Ready. Configure it first ([Managed storage](./managed-storage)).
+</Note>
+
+The commands below assume a `my-values.yaml` that sets `customEngineConfig.storage`.
+
+## Install
+
+Install the chart into the `firebolt` namespace, creating it if it does not exist:
+
+```bash
+helm install firebolt ./helm \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
+## Verify
+
+List the workloads the release created:
+
+```bash
+kubectl -n firebolt get statefulset,deployment
+```
+
+Expect `firebolt-engine-default-node-0`, `firebolt-metadata-pg`, `firebolt-gateway`, and `firebolt-metadata-service` to reach `READY`.
+
+## Query
+
+Forward the gateway Service to a local port and send a SQL query through it:
+
+```bash
+# Forward the gateway Service to localhost:8080 in the background.
+kubectl -n firebolt port-forward svc/firebolt-gateway 8080:80 &
+
+# Send `SELECT 1` to the gateway. The X-Firebolt-Engine header selects the engine.
+curl -s http://localhost:8080/ \
+  -H "X-Firebolt-Engine: default" \
+  -H "Content-Type: text/plain" \
+  --data "SELECT 1"
+```
+
+The gateway routes by the `X-Firebolt-Engine` header.
+
+## Test and tear down
+
+Run the chart's smoke tests, then uninstall everything:
+
+```bash
+make test       # run helm test against the release (engine ready, gateway ready, smoke SQL)
+make cleanup    # uninstall the release, delete its PVCs, and delete the namespace
+```

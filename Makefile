@@ -7,7 +7,7 @@ AWS_REGION   := us-east-1
 
 .DEFAULT_GOAL := help
 
-.PHONY: help create install dev upgrade upgrade-dev uninstall cleanup delete wait test test-cleanup check-pre-commit check-helm-docs setup-pre-commit docs lint floci
+.PHONY: help create install dev upgrade upgrade-dev uninstall cleanup delete test test-cleanup check-pre-commit check-helm-docs setup-pre-commit docs docs-check lint floci
 
 help: ## Show this help message
 	@printf '\033[33m%s\n' \
@@ -40,6 +40,9 @@ setup-pre-commit: check-pre-commit check-helm-docs ## Install pre-commit hooks f
 
 docs: check-helm-docs ## Regenerate chart documentation with helm-docs
 	helm-docs --chart-search-root=helm
+
+docs-check: ## Validate Mintlify docs navigation (path depth and lost pages)
+	$(MAKE) -C docs check
 
 lint: ## Lint and template-render the helm chart
 	helm lint --strict $(CHART)
@@ -83,10 +86,6 @@ cleanup: ## Uninstall the release, delete PVCs, and remove the namespace
 	-$(MAKE) uninstall
 	kubectl delete pvc --namespace $(NAMESPACE) --all --ignore-not-found
 	kubectl delete namespace $(NAMESPACE) --ignore-not-found
-
-wait: ## Wait for deployments and statefulsets in $(NAMESPACE) to roll out
-	kubectl rollout status deployment --namespace $(NAMESPACE) --timeout=5m || true
-	kubectl rollout status statefulset --namespace $(NAMESPACE) --timeout=5m || true
 
 test: ## Run helm tests against the installed release
 	helm test $(RELEASE) --namespace $(NAMESPACE) --logs

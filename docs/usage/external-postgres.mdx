@@ -1,0 +1,63 @@
+---
+description: Wiring the Metadata Service at an externally managed PostgreSQL instead of the bundled StatefulSet.
+sidebarTitle: External PostgreSQL
+title: External PostgreSQL
+---
+
+This page wires the Metadata Service at an externally managed PostgreSQL.
+
+## Values
+
+```yaml
+# my-values.yaml
+postgresql:
+  local_enabled: false
+  host: postgres.example.com
+  port: 5432
+  database: firebolt_metadata
+  username: firebolt
+  schema: public
+
+  credentials:
+    # Secret with `username` and `password` keys, in the release namespace.
+    existingSecret: metadata-postgres-creds
+```
+
+While inlining `postgresql.password` also works and the chart wraps it in a Secret, it leaks the password into `helm get values` and your value file, if used. We strongly recommend to use the `existingSecret` property.
+
+## Install
+
+Create the PostgreSQL credentials Secret in the release namespace, then install the chart:
+
+```bash
+# Create the Secret that `existingSecret` in my-values.yaml references.
+kubectl create secret generic metadata-postgres-creds -n firebolt \
+  --from-literal=username=firebolt --from-literal=password='…'
+
+# Install the chart with PostgreSQL pointed at the external host.
+helm install firebolt ./helm \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
+## Verify
+
+Confirm that the bundled PostgreSQL StatefulSet is absent:
+
+```bash
+kubectl -n firebolt get statefulset
+# firebolt-metadata-pg is absent (it renders only with local_enabled: true)
+```
+
+Confirm that the Metadata Service connected to the external PostgreSQL:
+
+```bash
+# Inspect the Metadata Service logs for PostgreSQL connection lines.
+kubectl -n firebolt logs deployment/firebolt-metadata-service | grep -i postgres
+```
+
+## Caveats
+
+- TLS to PostgreSQL is not currently exposed. There is no `sslmode` value or CA-bundle mount.
+- `host`, `database`, and `schema` are pattern-restricted by `values.schema.json` and XML-escaped at render time. User input cannot break the rendered Metadata Service config.
+- The Metadata Service creates its schema on first connect and migrates the schema in place when pointed at a database from an older Metadata Service version. No manual migration step is required.

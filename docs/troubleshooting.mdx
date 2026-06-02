@@ -1,0 +1,105 @@
+---
+description: Common failure modes when installing or upgrading the firebolt-instance Helm chart, with diagnostic and recovery steps.
+sidebarTitle: Troubleshooting
+title: Troubleshooting
+---
+
+This page lists common failure modes for the chart with their diagnostic and recovery steps.
+
+## Engine never becomes Ready: "local file system for managed storage"
+
+The engine logs:
+
+```
+Invalid Firebolt configuration: local file system for managed storage
+is not supported when using dedicated Pensieve
+```
+
+`customEngineConfig.storage` is unset. Without an S3 or S3-compatible bucket the engine does not enter the Ready state. Configure object storage and run `helm upgrade`. See [Managed storage](./usage/managed-storage).
+
+Confirm the failure is the managed-storage check:
+
+```bash
+# Search the engine pod's logs for the managed-storage error.
+kubectl -n firebolt logs <engine-pod> | grep -i "managed storage"
+```
+
+## Engine CrashLoopBackOff: metadata RPC failure at startup
+
+Engine logs show a gRPC error connecting to the Metadata Service. The most common cause is an engine-metadata image-version mismatch. The two images are not version-tolerant of each other.
+
+Inspect the rendered tags:
+
+```bash
+# Print the engine pods' image tags.
+kubectl -n firebolt get pods -l firebolt/component=engine \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[*].image}{"\n"}{end}'
+
+# Same for the Metadata Service pods.
+kubectl -n firebolt get pods -l firebolt/component=metadata-service \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[*].image}{"\n"}{end}'
+
+# Print the release's rendered image values to compare engine and metadata tags.
+helm -n firebolt get values firebolt | grep -E 'tag:|repository:'
+```
+
+Keep `engineSpec.image.tag` and `metadata.image.tag` in lockstep. By default both fall back to `Chart.yaml`'s `appVersion`, which is correct. See [Image overrides](./usage/image-overrides#lockstep).
+
+## Gateway returns 404 or "no upstream"
+
+The `X-Firebolt-Engine` header value does not match any name under `engines:`. The Envoy Lua filter also rejects names that are not RFC 1123 DNS labels (lowercase alphanumerics and hyphens, max 63 chars) with a `400`.
+
+Confirm what engines the release knows about:
+
+```bash
+# Print the engines: list from the release's rendered values.
+helm -n firebolt get values firebolt | grep -A1 'engines:'
+```
+
+Use a matching engine name, or add the engine to `engines:` and `helm upgrade`.
+
+## Engine pod stuck Pending
+
+The PVC is unbound. The chart provisions PVCs without `storageClassName` and falls back to the cluster default `StorageClass`.
+
+Inspect the PVCs and the cluster's storage classes:
+
+```bash
+# Show the engine PVCs and the events explaining why they are not bound.
+kubectl -n firebolt describe pvc -l firebolt/component=engine
+
+# List storage classes. Look for one marked (default).
+kubectl get storageclass
+```
+
+Either mark a `StorageClass` as default (`storageclass.kubernetes.io/is-default-class: "true"`), or set an explicit class:
+
+```yaml
+engineSpec:
+  defaultStorage:
+    storageClassName: gp3
+```
+
+## ImagePullBackOff from a private registry
+
+The kubelet cannot authenticate to the registry that hosts the engine or metadata image. The chart does not create pull secrets. Reference one explicitly:
+
+```yaml
+imagePullSecrets:
+  - name: my-registry-creds
+```
+
+Create the Secret in the release namespace:
+
+```bash
+# Create a docker-registry-type Secret matching the imagePullSecrets name.
+kubectl create secret docker-registry my-registry-creds -n firebolt \
+  --docker-server=registry.example.com \
+  --docker-username=… --docker-password=…
+```
+
+See [Image overrides](./usage/image-overrides).
+
+## Pre-commit hook aborts the commit on first run
+
+When editing the chart, the `helm-docs` pre-commit hook regenerates `helm/README.md` and stages the result. If the regeneration changes the file, the commit aborts so you can re-run `git commit` with the now-staged README included. This is intentional. Re-running the same commit succeeds.

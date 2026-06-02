@@ -1,0 +1,24 @@
+---
+description: Kubernetes cluster, local tooling, and object-storage requirements for the firebolt-instance Helm chart.
+sidebarTitle: Prerequisites
+title: Prerequisites
+---
+
+This page lists what you need in place before you install the chart.
+
+## Cluster
+
+- **Kubernetes**. Any reasonably recent version. The chart uses only stable core APIs (`apps/v1`, `policy/v1`, `v1`) and has no CEL, admission webhooks, or version-gated features.
+- **A default `StorageClass`**. The chart provisions engine and PostgreSQL PVCs without `storageClassName` and falls back to the cluster default. To pick a specific class, set `engines[].storage.storageClassName` per engine or `engineSpec.defaultStorage.storageClassName` chart-wide.
+- **Object storage for engine managed data**. Engines run against a dedicated Metadata Service and refuse to start against a local filesystem. You must point `customEngineConfig.storage` at an S3 or S3-compatible bucket before the engine becomes ready. See [Managed storage](./usage/managed-storage).
+
+## Local tooling
+
+- `helm` v3.
+- `kubectl` matching your cluster version.
+- `make` if you intend to use the chart's Makefile targets such as `make install`, `make upgrade`, and `make test`.
+
+## Optional
+
+- **Prometheus Operator CRDs**. Required only if you set `podMonitor.engines.enabled` or `podMonitor.gateway.enabled`. The chart renders `monitoring.coreos.com/v1` `PodMonitor` resources gated on those values.
+- **A private image registry**. The chart pulls engine and metadata images from `ghcr.io/firebolt-db` by default. To mirror through your own registry, see [Image overrides](./usage/image-overrides).

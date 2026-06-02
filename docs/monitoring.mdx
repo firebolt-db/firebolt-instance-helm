@@ -1,0 +1,129 @@
+---
+description: Engine and gateway Prometheus metrics endpoints, the gateway stats listener, and optional PodMonitor resources for the Prometheus Operator.
+sidebarTitle: Monitoring
+title: Monitoring
+---
+
+This page documents the chart's Prometheus metrics surface.
+
+## Metrics endpoints
+
+| Component | Port | Port name | Path | What it exposes |
+| --- | --- | --- | --- | --- |
+| Engine pods | 9090 | `metrics` | `/metrics` | Firebolt engine gauges, including `firebolt_running_queries` and `firebolt_suspended_queries`. |
+| Gateway pods (Envoy) | 9090 (configurable) | `metrics` | `/stats/prometheus` | Envoy connection, request, and cluster stats, proxied from the admin interface by a read-only stats listener. |
+| Metadata Service | n/a | n/a | n/a | The Metadata Service does not currently expose a Prometheus endpoint. |
+
+The gateway metrics port defaults to 9090 and is configurable through `gateway.metricsPort` in `values.yaml`.
+
+## Scrape with the Prometheus Operator
+
+The chart ships two optional `PodMonitor` resources gated on `values.yaml`. Both are disabled by default. The Prometheus Operator CRDs must already be installed in the cluster, otherwise `helm install` fails with an unknown-kind error.
+
+Enable either or both:
+
+```yaml
+# my-values.yaml
+podMonitor:
+  engines:
+    enabled: true
+    interval: 15s
+  gateway:
+    enabled: true
+    interval: 15s
+```
+
+Apply with `helm upgrade` (or `helm install` for a new release):
+
+```bash
+# Roll the change out to an existing release.
+helm upgrade firebolt ./helm -n firebolt -f my-values.yaml
+```
+
+After Prometheus picks up the PodMonitors, the engine pods appear as targets at `:9090/metrics` and the gateway pods at `:9090/stats/prometheus`.
+
+## Selectors and labels
+
+Each `PodMonitor` selects pods by the chart's `firebolt/component` label.
+
+<Note>
+The Firebolt Kubernetes Operator stamps its workloads with a different label namespace (`firebolt.io/...`). Selectors written for that convention do not match chart-deployed pods.
+</Note>
+
+| `PodMonitor` | Selector | Pod target labels propagated to series |
+| --- | --- | --- |
+| `<release>-engines` | `firebolt/component: engine` | `app.kubernetes.io/name`, `firebolt/engine` |
+| `<release>-gateway` | `firebolt/component: gateway` | `app.kubernetes.io/name` |
+
+The `firebolt/engine` label carries the engine name from `engines[].name`, so engine series are partitionable per engine in PromQL:
+
+```promql
+sum by (firebolt_engine) (firebolt_running_queries)
+```
+
+### Per-engine PodMonitors
+
+The chart-level engine `PodMonitor` applies the same scrape configuration to every engine in the release. If you need per-engine control (different intervals, selective enablement, custom relabelings), disable the chart-level one and deploy your own keyed on the engine name:
+
+```yaml
+podMonitor:
+  engines:
+    enabled: false  # disable the chart's blanket PodMonitor
+```
+
+Then create a per-engine `PodMonitor`:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: firebolt-engine-analytics
+  namespace: firebolt
+spec:
+  selector:
+    matchLabels:
+      firebolt/component: engine
+      firebolt/engine: analytics
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+```
+
+## Gateway stats listener
+
+The Envoy admin interface is bound to `127.0.0.1:9901` inside the gateway pod and is not reachable from the cluster. Binding it elsewhere would expose mutation endpoints (`POST /healthcheck/fail`, `POST /quitquitquit`).
+
+Instead, the chart renders a dedicated read-only `stats_listener` on `gateway.metricsPort` (default 9090) that proxies only `/stats/prometheus` from the admin interface through an internal static cluster. The `PodMonitor` for the gateway scrapes that listener.
+
+To pick a different metrics port (for example to avoid a conflict with another sidecar), set:
+
+```yaml
+gateway:
+  metricsPort: 9095
+```
+
+The container port name stays `metrics`, so the `PodMonitor` does not need to change.
+
+## Cross-namespace scraping
+
+The chart's `PodMonitor` resources are namespace-scoped and select only pods in the release namespace. To scrape engines and gateways in other namespaces, deploy a hand-rolled `PodMonitor` with a broader `namespaceSelector`:
+
+```yaml
+spec:
+  namespaceSelector:
+    any: true
+  selector:
+    matchLabels:
+      firebolt/component: engine
+```
+
+## What this chart does not expose
+
+- **Controller and CR-status metrics.** The chart has no controller loop, so there are no per-CR status gauges.
+- **Metadata Service metrics.** The Metadata Service runs as a gRPC server only. It exposes no `/metrics` endpoint.
+- **PostgreSQL metrics.** The bundled PostgreSQL StatefulSet does not include `postgres_exporter`. Run your own exporter sidecar or scrape an external PostgreSQL through its existing observability stack.
+
+<Note>
+The Firebolt Kubernetes Operator exposes continuous-reconciliation and per-CR status metrics (engine phase, replica counts, drain check errors, last-reconciled timestamps) that this chart cannot provide. If that observability surface matters to you, see the [operator upgrade path](./operator-upgrade-path).
+</Note>

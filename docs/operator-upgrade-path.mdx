@@ -1,0 +1,31 @@
+---
+description: Capabilities that warrant graduating from the firebolt-instance Helm chart to the Firebolt Kubernetes Operator, and the migration shape.
+sidebarTitle: Operator upgrade path
+title: Operator upgrade path
+---
+
+This page explains when to graduate to the [Firebolt Kubernetes Operator](https://github.com/firebolt-db/firebolt-kubernetes-operator) and what the migration looks like.
+
+## When to use the operator
+
+Reach for the operator when you need any of the following:
+
+- **Zero-downtime engine rollouts** through blue-green generations.
+- **Engine autoscaling** with scale-to-zero, schedule windows, and wake-on-traffic.
+- **Continuous reconciliation**. Drift is corrected automatically, and controller restarts resume mid-flight transitions.
+- **`EngineClass`**. A namespace-scoped pod template shared across engines for image, service account, sidecars, and scheduling.
+- **Multi-replica engines under one StatefulSet**, with operator-managed blue-green transitions.
+- **Status surfaces**. `kubectl get fire` and `kubectl get fireng` show phases, conditions, and events.
+
+If none of those apply, the chart on its own is sufficient.
+
+## Migration shape
+
+The migration is staged so you can validate each step before the next.
+
+1. **Install the operator and its CRDs** alongside the chart, in a separate namespace. See the operator's [installation guide](https://github.com/firebolt-db/firebolt-kubernetes-operator/blob/main/docs/installation.mdx).
+2. **Create a `FireboltInstance` and one or more `FireboltEngine` resources** that mirror the engines in your `values.yaml`. The operator's [quickstart](https://github.com/firebolt-db/firebolt-kubernetes-operator/blob/main/docs/quickstart.mdx) shows a minimal example.
+3. **Cut over traffic** by switching the gateway routing to the operator-managed engines, then uninstall the chart-managed engines once queries are flowing through the operator.
+4. **Decommission the chart release** with `helm uninstall`.
+
+Engine PVCs are retained by default (Kubernetes default `Retain` policy), so a `helm uninstall` does not lose engine state. Move or reattach the PVCs to the operator-managed StatefulSets as part of the cutover.

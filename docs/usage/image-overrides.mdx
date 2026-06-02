@@ -1,0 +1,37 @@
+---
+description: Engine and metadata image tag overrides for the firebolt-instance Helm chart, including pinning a specific build.
+sidebarTitle: Image overrides
+title: Image overrides
+---
+
+This page shows how to override the default engine and metadata image tags.
+
+The defaults pull engine and metadata from `ghcr.io/firebolt-db/{engine,metadata}` at `Chart.yaml`'s `appVersion`.
+
+## Track `:dev`
+
+To follow current-of-mainline builds against the default GHCR repos:
+
+```yaml
+engineSpec: { image: { tag: dev } }
+metadata:   { image: { tag: dev } }
+```
+
+`:dev` is mutable. Two installs minutes apart can pull different content. Pin the tag to a specific version for reproducible installs.
+
+## Pin a specific build
+
+Override per component, keeping the `release-` or `debug-` prefix in lockstep.
+
+```yaml
+engineSpec:
+  image:
+    tag: debug-4.32.0-pre.0.20260518071541.b02639bf849c
+metadata:
+  image:
+    tag: debug-4.32.0-pre.0.20260518071541.b02639bf849c
+```
+
+## Lockstep
+
+Engine and metadata ship from the same build pipeline and are not version-tolerant of each other. The chart does not enforce lockstep. Mismatched tags surface as a metadata-RPC failure at engine startup.

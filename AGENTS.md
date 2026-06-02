@@ -21,6 +21,8 @@ Helm chart that runs a Firebolt instance on Kubernetes: an Envoy gateway that ro
 │   ├── scripts/              # validate-chart.sh — used by CI and runnable locally
 │   └── charts/               # subchart cache; populated by `helm dependency build`
 ├── local-floci.yaml          # zero-auth S3 emulator manifest applied by `make floci` (dev only)
+├── docs/                     # user-facing docs, Mintlify MDX (docs.json drives nav; see docs/AGENTS.md for style)
+├── docs-internal/            # Firebolt-internal docs (e.g. the make dev / ECR / floci flow), plain Markdown
 ├── .github/
 │   ├── workflows/            # helm-validate, helm-release-cd, gha-lint
 │   └── ISSUE_TEMPLATE/
@@ -47,7 +49,6 @@ All targets honour `RELEASE` (default `firebolt`), `NAMESPACE` (default `firebol
 - `make dev` — internal-Firebolt local-development install: runs `make floci`, refreshes the 12-hour `regcred` ECR pull secret against `000000000000.dkr.ecr.us-east-1.amazonaws.com`, then `helm install` with `helm/values-dev.yaml` (ECR pull-through-cache repos at `:dev`, plus `customEngineConfig.storage` pointing at floci so the engine clears its dedicated-Pensieve managed-storage check).
 - `make upgrade` / `make upgrade-dev` — paired upgrade paths: plain `helm upgrade` for the `make install` flow, `helm upgrade -f $(VALUES_FILE)` for the `make dev` flow.
 - `make uninstall` / `make cleanup` — uninstall, optionally delete PVCs and the namespace (which takes floci with it).
-- `make wait` — `kubectl rollout status` for deployments and statefulsets.
 - `make test` — `helm test $(RELEASE) --logs`. Runs the hooks under `helm/templates/tests/`.
 - `make test-cleanup` — delete leftover `$(RELEASE)-test-*` pods.
 - `make setup-pre-commit` — install pre-commit hooks (requires `pre-commit` and `helm-docs` on PATH).

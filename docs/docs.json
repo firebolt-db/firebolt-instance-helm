@@ -1,0 +1,28 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Helm Chart",
+        "pages": [
+          "overview",
+          "prerequisites",
+          {
+            "group": "Usage",
+            "pages": [
+              "usage/single-engine",
+              "usage/multi-engine",
+              "usage/managed-storage",
+              "usage/external-postgres",
+              "usage/image-overrides"
+            ]
+          },
+          "operator-upgrade-path",
+          "monitoring",
+          "security",
+          "troubleshooting"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,157 @@
+---
+description: Amazon S3 and S3-compatible object storage for engine managed data, with IRSA and Pod Identity for AWS credentials.
+sidebarTitle: Managed storage
+title: Managed storage
+---
+
+This page configures engine object storage on Amazon S3 or any S3-compatible endpoint.
+
+With S3 as the backing store for managed table data, durability does not depend on the per-pod data volumes mounted to each engine. Even a complete loss of those volumes does not cause data loss, because the authoritative copy of managed table data lives in the bucket.
+
+You configure object storage on the engine through `customEngineConfig.storage`, which the chart passes through unchanged into the engine's `config.yaml`. The `type`, `api_scheme`, and `bucket_name` keys match the Firebolt Core configuration schema. The engine reads AWS credentials and region from the pod's AWS identity, which you provide with [AWS IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) or [AWS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html).
+
+<Warning>
+Local-filesystem storage is not supported. Without `customEngineConfig.storage` pointing at an object store, the engine pod never becomes Ready.
+</Warning>
+
+## Amazon S3 with IRSA
+
+### Create the bucket
+
+Create an S3 bucket, block all public access, and turn on default server-side encryption:
+
+```bash
+# Region and bucket name used by the AWS CLI calls below.
+export AWS_DEFAULT_REGION=us-east-1
+export BUCKET_NAME=firebolt-managed
+
+# Create the bucket in the configured region.
+aws s3api create-bucket --bucket "${BUCKET_NAME}"
+
+# Block all forms of public access at the bucket level.
+aws s3api put-public-access-block \
+  --bucket "${BUCKET_NAME}" \
+  --public-access-block-configuration \
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+# Enable default SSE-S3 (AES-256) encryption on every object written.
+aws s3api put-bucket-encryption \
+  --bucket "${BUCKET_NAME}" \
+  --server-side-encryption-configuration \
+  '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+```
+
+### Create an IAM role
+
+The role needs `ListBucket` on the bucket and `GetObject*` and `PutObject*` on its contents:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StorageBuckets",
+      "Effect": "Allow",
+      "Action": ["s3:GetBucketLocation", "s3:ListBucket"],
+      "Resource": ["arn:aws:s3:::firebolt-managed"]
+    },
+    {
+      "Sid": "ObjectAccess",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject*", "s3:PutObject*"],
+      "Resource": ["arn:aws:s3:::firebolt-managed/*"]
+    }
+  ]
+}
+```
+
+Bind the role to a ServiceAccount in the release namespace through the IRSA annotation:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: firebolt-engine
+  namespace: firebolt
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/<engine-s3-role>
+```
+
+### Point the chart at both
+
+```yaml
+# my-values.yaml
+engineSpec:
+  serviceAccount: firebolt-engine
+
+customEngineConfig:
+  storage:
+    type: s3
+    api_scheme: "s3://"
+    bucket_name: firebolt-managed
+```
+
+Create the ServiceAccount, then install the chart with the matching values:
+
+```bash
+# Create the IRSA-annotated ServiceAccount in the release namespace.
+kubectl apply -f engine-serviceaccount.yaml
+
+# Install the chart against the bucket and the ServiceAccount.
+helm install firebolt ./helm \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
+To set the AWS region explicitly (the EKS identity webhook usually injects it):
+
+```yaml
+customEngineConfig:
+  storage:
+    type: s3
+    api_scheme: "s3://"
+    bucket_name: firebolt-managed
+    region: us-east-1
+```
+
+### Confirm that object storage works
+
+Create a table, insert a row, and list the bucket to confirm the engine wrote data through to S3:
+
+```bash
+# Forward the gateway Service to localhost:8080 in the background.
+kubectl -n firebolt port-forward svc/firebolt-gateway 8080:80 &
+
+# Create a table on the engine.
+curl -s http://localhost:8080/ -H "X-Firebolt-Engine: default" \
+  -H "Content-Type: text/plain" --data "create table t (val int)"
+
+# Insert one row, which forces the engine to write a tablet.
+curl -s http://localhost:8080/ -H "X-Firebolt-Engine: default" \
+  -H "Content-Type: text/plain" --data "insert into t values (1)"
+
+# List the bucket. New object-storage prefixes appear as the engine writes data.
+aws s3 ls s3://firebolt-managed/
+```
+
+New prefixes appear under the bucket as the engine writes data.
+
+## S3-compatible (MinIO and friends)
+
+For any S3-compatible endpoint reachable from the engine pods (self-hosted MinIO, Ceph RGW, an in-cluster S3 emulator), use `type: minio`. The engine hardcodes the access and secret to `firebolt`/`firebolt` in this mode, so the endpoint must accept those credentials.
+
+```yaml
+customEngineConfig:
+  storage:
+    type: minio
+    api_scheme: "s3://"
+    bucket_name: firebolt-managed
+    minio:
+      endpoint: http://minio.minio.svc.cluster.local:9000
+```
+
+`endpoint` must be a URL the engine pod can resolve and reach. Create the bucket out-of-band before the engine starts.
+
+## Per-engine storage
+
+`customEngineConfig` is global to the release. Multiple engines under the same `engines:` list share the same `customEngineConfig.storage` block, and therefore the same bucket. To run engines against different buckets, install the chart twice in separate releases, each with its own `customEngineConfig.storage`.

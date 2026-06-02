@@ -19,7 +19,7 @@ createNamespace: false
 # @default -- {}
 engineSpec:
   image:
-    # -- Container repository for the firebolt-core engine image.
+    # -- Container repository for the Firebolt engine image.
     repository: ghcr.io/firebolt-db/engine
     # -- Image tag. Defaults to `Chart.appVersion` when empty.
     tag: ""
@@ -105,20 +105,20 @@ engineSpec:
 
 # @section -- Metadata Service
 
-# -- Metadata service (Pensieve) configuration.
+# -- Metadata service configuration.
 # @default -- {}
 metadata:
   image:
-    # -- Container repository for the Pensieve metadata service image.
+    # -- Container repository for the metadata service image.
     repository: ghcr.io/firebolt-db/metadata
-    # -- Pensieve image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty.
+    # -- Metadata service image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty.
     # Override explicitly only when the metadata service must run a version other than the engine.
     tag: ""
     # -- Image pull policy.
     pullPolicy: IfNotPresent
 
   # -- Resource requests and limits for the metadata service container.
-  # Pensieve is a lightweight gRPC service; increase memory if you run many engines.
+  # The metadata service is a lightweight gRPC service; increase memory if you run many engines.
   resources:
     requests:
       cpu: "100m"
@@ -282,7 +282,7 @@ gateway:
 
 # @section -- Authentication
 
-# -- Authentication configuration for firebolt-core `auth.json`.
+# -- Authentication configuration for the Firebolt engine's `auth.json`.
 # Not enforced yet; reserved for future engine-level auth propagation.
 # TODO: wire auth fields into Envoy config or engine auth once supported.
 # @default -- {}
@@ -381,9 +381,7 @@ customEngineConfig:
   # @default -- {}
   instance:
     # -- ULID for the Firebolt instance. Must match the account
-    # reconciled by Dedicated Pensieve at startup (the metadata
-    # service template uses this same value for
-    # `pensieve_lite.default_account_id`).
+    # reconciled by the metadata service at startup.
     id: "01KP98J0000000000000000000"
 
 # -- PodMonitor configuration for Prometheus metrics scraping.

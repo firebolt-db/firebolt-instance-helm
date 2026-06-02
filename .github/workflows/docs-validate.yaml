@@ -1,0 +1,22 @@
+---
+name: Docs Validation
+
+on:
+  pull_request:
+    paths: ["docs/**"]
+
+permissions: {}
+
+jobs:
+  validate-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Validate docs navigation
+        run: make docs-check

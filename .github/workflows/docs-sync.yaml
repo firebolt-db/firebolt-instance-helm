@@ -1,0 +1,143 @@
+name: Sync docs to packdb
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - closed
+
+permissions:
+  pull-requests: read
+
+jobs:
+  trigger-packdb-docs:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-slim
+    steps:
+      - name: Classify pull request
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_ACTION: ${{ github.event.action }}
+        run: |
+          set -euo pipefail
+
+          aggregate_branch="aggregate/helm-docs-pr-${PR_NUMBER}"
+          echo "aggregate_branch=${aggregate_branch}" >> "$GITHUB_OUTPUT"
+
+          # On `closed` the final PR file list is not a reliable signal for what
+          # to do: a docs PR that previously ran `sync` may no longer match
+          # `docs/*` in its merged diff, yet it still owns a packdb aggregate
+          # branch + draft PR that must be marked ready (merge) or torn down
+          # (abandon). The authoritative signal is whether that aggregate branch
+          # exists in packdb, resolved in the next step with the packdb app
+          # token, so always mint a token for closed PRs.
+          if [ "$PR_ACTION" = "closed" ]; then
+            echo "is_closed=true" >> "$GITHUB_OUTPUT"
+            echo "need_token=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "is_closed=false" >> "$GITHUB_OUTPUT"
+
+          # For opened/reopened/synchronize, the current diff is a reliable
+          # signal: a docs change should (re)sync the aggregate branch.
+          relevant_changed=false
+          changed_files="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename')"
+          while IFS= read -r file; do
+            case "$file" in
+              docs/*|.github/workflows/docs-sync.yaml)
+                relevant_changed=true
+                break
+                ;;
+            esac
+          done <<< "$changed_files"
+          echo "relevant=${relevant_changed}" >> "$GITHUB_OUTPUT"
+          echo "need_token=${relevant_changed}" >> "$GITHUB_OUTPUT"
+
+      - name: Create firebolt-analytics GitHub App token
+        if: steps.classify.outputs.need_token == 'true'
+        id: analytics-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_FBA_DOCS_INTEGRATION_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_FBA_DOCS_INTEGRATION_APP_KEY_PEM }}
+          owner: firebolt-analytics
+          repositories: packdb
+          # Defense-in-depth: narrow the minted token to exactly what this
+          # workflow needs -- read the aggregate branch state (contents:read)
+          # and trigger the packdb aggregation via workflow_dispatch
+          # (actions:write). The cross-repo dispatcher App is itself installed
+          # on packdb with only these two permissions.
+          permission-actions: write
+          permission-contents: read
+
+      - name: Resolve dispatch action
+        id: dispatch
+        env:
+          GH_TOKEN: ${{ steps.analytics-token.outputs.token }}
+          PACKDB_REPO: firebolt-analytics/packdb
+          IS_CLOSED: ${{ steps.classify.outputs.is_closed }}
+          RELEVANT: ${{ steps.classify.outputs.relevant }}
+          AGGREGATE_BRANCH: ${{ steps.classify.outputs.aggregate_branch }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+        run: |
+          set -euo pipefail
+
+          if [ "$IS_CLOSED" = "true" ]; then
+            # Resolve ready vs cleanup from packdb state, not from the PR's final
+            # file list. The aggregate branch exists only if a `sync` ran for
+            # this PR, so its presence is what tells us there is something to act
+            # on. A merged docs PR is therefore always marked ready, and an
+            # abandoned one is always cleaned up, regardless of whether the
+            # merged diff still matches docs/*.
+            if err="$(gh api "repos/${PACKDB_REPO}/branches/${AGGREGATE_BRANCH}" 2>&1 >/dev/null)"; then
+              branch_exists=true
+            elif printf '%s' "$err" | grep -q 'HTTP 404'; then
+              branch_exists=false
+            else
+              echo "Failed to query packdb branch ${AGGREGATE_BRANCH}: ${err}" >&2
+              exit 1
+            fi
+
+            if [ "$branch_exists" != "true" ]; then
+              echo "No aggregate branch ${AGGREGATE_BRANCH} in packdb; nothing to dispatch"
+              echo "should_dispatch=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            echo "should_dispatch=true" >> "$GITHUB_OUTPUT"
+            if [ "$PR_MERGED" = "true" ]; then
+              echo "action=ready" >> "$GITHUB_OUTPUT"
+            else
+              echo "action=cleanup" >> "$GITHUB_OUTPUT"
+            fi
+          elif [ "$RELEVANT" = "true" ]; then
+            echo "should_dispatch=true" >> "$GITHUB_OUTPUT"
+            echo "action=sync" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_dispatch=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger packdb docs aggregation workflow
+        if: steps.dispatch.outputs.should_dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ steps.analytics-token.outputs.token }}
+          DISPATCH_ACTION: ${{ steps.dispatch.outputs.action }}
+          HELM_PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # workflow_dispatch (not repository_dispatch): it only needs
+          # actions:write on packdb instead of contents:write, so the
+          # cross-repo dispatcher App stays least-privilege. The workflow file
+          # is resolved on packdb's default branch, so the renamed
+          # docs-multirepo-aggregate.yaml must already be on master.
+          gh workflow run docs-multirepo-aggregate.yaml \
+            --repo firebolt-analytics/packdb \
+            --ref master \
+            -f action="$DISPATCH_ACTION" \
+            -f source=helm \
+            -f source_pr_number="$HELM_PR"

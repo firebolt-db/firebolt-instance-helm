@@ -1,0 +1,194 @@
+---
+description: Pod-hardening defaults the chart applies, plus network policy, resource ceilings, image provenance, and admission controls left to the platform team.
+sidebarTitle: Security
+title: Security model
+---
+
+This page records the chart's pod-hardening baseline and the platform-team responsibilities it does not cover.
+
+## What the chart enforces
+
+Pod-level hardening is rendered into every workload the chart installs. The defaults come from the chart's templates and `values.yaml`. Pod security context that would weaken these defaults is silently dropped from per-engine `podLabels` and similar user surfaces. Other fields can still be overridden by editing `values.yaml`. Treat the table below as the install-time baseline, not as an immutable contract.
+
+| Pod | `firebolt/component` | UID / GID | `runAsNonRoot` | Capabilities | Seccomp | Read-only root FS |
+| --- | --- | --- | --- | --- | --- | --- |
+| Engine | `engine` | 3473 / 3473 | true | drop `ALL` | not set (defer to platform default) | false on the engine container |
+| Metadata Service | `metadata-service` | 1111 / 1111 | true | drop `ALL` | `RuntimeDefault` | true (`emptyDir` for tmp) |
+| Bundled PostgreSQL | `metadata-pg` | 70 / 70 | true | drop `ALL` | `RuntimeDefault` | true (`PGDATA` lives on the PVC) |
+| Gateway (Envoy) | `gateway` | 101 / unset | true | drop `ALL` | not set (defer to platform default) | true |
+
+The engine pod additionally sets `fsGroup: 3473` (with `fsGroupChangePolicy: OnRootMismatch`) so the data PVC's group ownership matches the engine UID.
+
+### Memlock-setup sidecar
+
+When `engineSpec.memlockSetup: true` and `podSecurityContext.runAsNonRoot: true`, the chart injects a `memlock-setup` sidecar container that raises the engine pod's memlock limit. The sidecar runs as UID 0 because it issues a `prlimit(2)` against the engine container. The pod enables `shareProcessNamespace: true` so the sidecar can see the engine's PID. It drops all capabilities except `SYS_RESOURCE`. When your node hosts already provide a memlock limit of at least 8 GiB, disable it with `memlockSetup: false`.
+
+### Install-time validation
+
+The chart ships `helm/values.schema.json`. `helm install` and `helm upgrade` reject typoed value paths, wrong types, and pattern violations on `postgresql.host`, `postgresql.database`, `postgresql.schema`, and the engine name. This is install-time validation, not an admission webhook. It runs only when the chart is being applied, not on subsequent edits to the rendered objects.
+
+## What the chart does not enforce
+
+### Network isolation between pods
+
+**The chart emits no `NetworkPolicy` resources.** All pod-to-pod and pod-to-external traffic is governed by whatever the cluster's CNI and `NetworkPolicy` controller already enforce. In a default Kubernetes install with no `NetworkPolicy` controller, every pod can reach every other pod on every port.
+
+This is a deliberate scoping decision. `NetworkPolicy` semantics depend on the CNI plugin (Calico, Cilium, Antrea), the cluster's default-allow vs. default-deny posture, and the chart-vs-platform ownership split. Encoding any of those assumptions in chart-emitted `NetworkPolicy` resources would either be a no-op or actively wrong for the deployment target.
+
+Platform teams should apply `NetworkPolicy` resources covering at least the flows below. Selector candidates:
+
+| Pod kind | Selector |
+| --- | --- |
+| Engine pods | `firebolt/component=engine`, optionally with `firebolt/engine=<name>` to scope to one engine |
+| Gateway pods | `firebolt/component=gateway` |
+| Metadata Service pods | `firebolt/component=metadata-service` |
+| Bundled PostgreSQL pods | `firebolt/component=metadata-pg` |
+
+#### Allowed flows
+
+| From | To | Port | Purpose |
+| --- | --- | --- | --- |
+| External clients | Gateway | 8080 (container) / 80 (Service) | Query traffic over HTTP |
+| Gateway | Engine pods | 3473 | Query forwarding |
+| Engine replicas of the same engine | Each other | 5678, 16000, 1717, 3434 | Distributed query execution and internal coordination between replicas of the same engine. The chart's engine config lists per-replica FQDNs on the headless Service. |
+| Engine pods | Metadata Service | 7000 | Metadata gRPC |
+| Metadata Service | PostgreSQL (bundled or external) | 5432 | Metadata catalog reads and writes |
+| Engine pods | External object store | 443 / 80 | Managed-storage reads and writes |
+| Prometheus | Engine and gateway pods | 9090 | Metrics scraping |
+
+Cross-engine traffic (replicas of *different* engines), gateway-to-metadata, and gateway-to-PostgreSQL are not required by any chart-emitted control flow and should be denied.
+
+#### Example baseline NetworkPolicy
+
+The snippet below denies all ingress by default in the release namespace, then re-allows the flows above. It assumes the gateway's external clients live in a `firebolt-clients` namespace. Adjust the selector for your client topology.
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-ingress
+spec:
+  podSelector:
+    matchLabels:
+      firebolt/component: gateway
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: firebolt-clients
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: engine-from-gateway
+spec:
+  podSelector:
+    matchLabels:
+      firebolt/component: engine
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              firebolt/component: gateway
+      ports:
+        - port: 3473
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: metadata-from-engine
+spec:
+  podSelector:
+    matchLabels:
+      firebolt/component: metadata-service
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              firebolt/component: engine
+      ports:
+        - port: 7000
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-from-metadata
+spec:
+  podSelector:
+    matchLabels:
+      firebolt/component: metadata-pg
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              firebolt/component: metadata-service
+      ports:
+        - port: 5432
+          protocol: TCP
+```
+
+Add egress allow-rules in the same shape. The chart does not generate them.
+
+### Namespace-level resource ceilings
+
+A `ResourceQuota` capping the aggregate of `requests.cpu`, `requests.memory`, pod count, and PVC size across all engines in a namespace is a platform concern. The chart applies per-engine `resources.requests` and `resources.limits` from your values, but does not emit a `ResourceQuota` and does not validate the per-engine `resources` block against a Helm-side maximum. The per-namespace budget is a deployment-target decision (test cluster vs. multi-tenant production).
+
+### Image provenance and supply-chain attestation
+
+The chart pulls whatever image you supply via `engineSpec.image.repository`, `metadata.image.repository`, and the equivalent `tag` values. The chart does not validate signatures, attestations, or SBOMs. If image-policy enforcement is required, use a cluster-level admission controller such as Kyverno or Sigstore Policy Controller.
+
+### Admission-time enforcement
+
+The chart has no controller and no admission webhook. Once `helm install` has rendered the manifests, subsequent edits to the resulting objects (engine StatefulSet pod template, metadata Deployment, gateway Deployment) are not reconciled back to the chart-rendered state. Platform teams that need drift correction should treat the `firebolt-instance` install as input to GitOps (Argo CD, Flux) and rely on the GitOps controller for drift.
+
+<Note>
+The Firebolt Kubernetes Operator provides continuous reconciliation and admission-time validation natively. When drift correction or admission-time guardrails are a primary requirement, see the [operator upgrade path](./operator-upgrade-path).
+</Note>
+
+## Secrets handling
+
+### Bundled PostgreSQL
+
+When `postgresql.credentials.existingSecret` is empty, the chart generates a Secret named `<release>-metadata-postgres-creds` on first `helm install`:
+
+- The Secret holds three base64-encoded keys: `username`, `password`, and `database`.
+- The password is sourced (in order): an explicit `postgresql.password` value, the existing Secret's `password` key on a `helm upgrade`, or a freshly generated 24-character alphanumeric value (`randAlphaNum 24`) on a clean install.
+- The chart never rotates the password.
+- The Metadata Service Deployment loads the credentials by mounting the Secret at `postgresql.credentials.mountPath`.
+
+To take ownership of the credentials yourself, set `postgresql.credentials.existingSecret` to a Secret you create. The chart then skips generation entirely.
+
+### External PostgreSQL
+
+For external databases, use `postgresql.credentials.existingSecret`. See [External PostgreSQL](./usage/external-postgres). Inline `postgresql.password` also works but leaks the password into `helm get values`.
+
+### External object store
+
+Object-storage credentials for engines on EKS are not represented as Helm values at all. They are resolved from the engine pod's AWS identity via [IRSA](./usage/managed-storage#amazon-s3-with-irsa). The chart never sees the credentials.
+
+### TLS to PostgreSQL is not exposed
+
+The chart does not currently expose `sslmode` or a CA-bundle mount for the Metadata Service's PostgreSQL connection. Encrypt the PostgreSQL connection at the network layer (VPC peering, sidecar TLS proxy, or service-mesh mTLS) until the chart grows native support.
+
+## See also
+
+- [Monitoring](./monitoring): metrics surface and Prometheus Operator integration.
+- [Operator upgrade path](./operator-upgrade-path): when continuous admission, drift correction, and CR-status surfaces are required.
+- [`SECURITY.md`](https://github.com/firebolt-db/firebolt-instance-helm/blob/main/SECURITY.md): vulnerability reporting policy for this repository.
