@@ -52,7 +52,7 @@ The role needs `ListBucket` on the bucket and `GetObject*` and `PutObject*` on i
     {
       "Sid": "StorageBuckets",
       "Effect": "Allow",
-      "Action": ["s3:GetBucketLocation", "s3:ListBucket"],
+      "Action": ["s3:ListBucket"],
       "Resource": ["arn:aws:s3:::firebolt-managed"]
     },
     {
