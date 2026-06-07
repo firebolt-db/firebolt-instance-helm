@@ -4,6 +4,12 @@ name: Helm Chart Validation
 on:
   pull_request:
 
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate-chart:
     runs-on: ubuntu-latest
@@ -11,7 +17,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -33,7 +39,7 @@ jobs:
 
       - name: Set up Helm
         if: steps.helm-changes.outputs.helm_changed == 'true'
-        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
         with:
           # Pin to a specific helm v3 patch. `azure/setup-helm`'s version
           # input is matched verbatim against the upstream tarball name

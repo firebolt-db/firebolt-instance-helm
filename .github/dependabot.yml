@@ -1,0 +1,28 @@
+---
+version: 2
+updates:
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "08:17"
+      timezone: "Etc/UTC"
+    commit-message:
+      prefix: "chore(deps):"
+    open-pull-requests-limit: 20  # default is 5
+    cooldown:
+      default-days: 7
+      exclude:
+        - "firebolt-analytics/*"
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "08:20"
+      timezone: "Etc/UTC"
+    commit-message:
+      prefix: "chore(deps):"
+    open-pull-requests-limit: 20  # default is 5
+    cooldown:
+      default-days: 7
