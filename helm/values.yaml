@@ -73,6 +73,11 @@ engineSpec:
   affinity: {}
   # -- Node selector for engine pod scheduling.
   nodeSelector: {}
+  # -- Topology spread constraints for engine pod scheduling. Set this to
+  # force zone or node spread across an engine's nodes so a single zone or
+  # node failure cannot take down the whole engine. Overridable per-engine
+  # via `engines[].topologySpreadConstraints`.
+  topologySpreadConstraints: []
 
   # -- Deploy a Core UI sidecar for each engine pod.
   uiSidecar: false
@@ -371,6 +376,9 @@ engines:
     affinity: {}
     # -- Node selector for engine pod scheduling.
     nodeSelector: {}
+    # -- Topology spread constraints for engine pod scheduling. Overrides
+    # `engineSpec.topologySpreadConstraints` for this engine when set.
+    topologySpreadConstraints: []
     # -- Annotations applied to engine pods.
     podAnnotations: {}
     # -- Extra labels applied to this engine's pod template. Chart-reserved

@@ -52,6 +52,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.storageHostPath.type | string | `"DirectoryOrCreate"` | Host path type. |
 | engineSpec.terminationGracePeriodSeconds | int | `60` | Termination grace period in seconds for engine pods. Sized to give in-flight queries time to drain before SIGKILL during rolling updates and node drains. Also rendered into the engine `config.yaml` as `engine.termination_grace_period` with a 5s safety margin (floored at 1s), so the engine's own in-flight-query wait stays below this value. |
 | engineSpec.tolerations | list | `[]` | Tolerations for engine pod scheduling. |
+| engineSpec.topologySpreadConstraints | list | `[]` | Topology spread constraints for engine pod scheduling. Set this to force zone or node spread across an engine's nodes so a single zone or node failure cannot take down the whole engine. Overridable per-engine via `engines[].topologySpreadConstraints`. |
 | engineSpec.uiSidecar | bool | `false` | Deploy a Core UI sidecar for each engine pod. |
 | engines | list | [] | Engine definitions. Each entry produces one StatefulSet per node (`replicas` controls node count), plus a shared headless Service, ClusterIP Service, and ConfigMap. Per-engine values override the shared `engineSpec` defaults. |
 | engines[0].affinity | object | `{}` | Affinity rules for engine pod scheduling. |
@@ -64,6 +65,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engines[0].resources | object | `{"limits":{"memory":"4Gi"},"requests":{"cpu":"1","memory":"4Gi"}}` | Resource requests and limits for engine containers. Firebolt Core is memory-bound: more RAM directly improves cache hit rates and query throughput. CPU governs parallel query execution threads.  Typical sizing guidance:   Development / functional testing:  2 vCPU  /  8 Gi  (request)   Small production workload:         4 vCPU  / 32 Gi   Medium production workload:        8 vCPU  / 64 Gi   Large production workload:        16 vCPU  / 128 Gi  Storage I/O is also significant — use an SSD-backed StorageClass and size the PVC to hold your working dataset plus ~30 % headroom. |
 | engines[0].storage | object | `{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"100Gi"}}}` | PVC storage configuration for this engine. Falls back to `engineSpec.defaultStorage` if omitted. |
 | engines[0].tolerations | list | `[]` | Tolerations for engine pod scheduling. |
+| engines[0].topologySpreadConstraints | list | `[]` | Topology spread constraints for engine pod scheduling. Overrides `engineSpec.topologySpreadConstraints` for this engine when set. |
 | extraLabels | object | `{"firebolt/product":"core"}` | Extra labels applied to all resources and pods. |
 | gateway | object | {} | Envoy gateway proxy configuration. Routes queries to engine Services based on the `X-Firebolt-Engine` HTTP header. A Lua filter extracts the engine name and rewrites the upstream to `{engine}-service:3473` via dynamic forward proxy. |
 | gateway.adminPort | int | `9901` | Envoy admin interface port (used for health checks). |
