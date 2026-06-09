@@ -1,3 +1,7 @@
+# 0.13.1
+
+chore: bump appVersion to release-4.32.0-pre.0.20260609145613.22a1ea4abadb (FB-1574) (#83)
+
 # 0.13.0
 
 feat(engine): add topologySpreadConstraints support for engines (FB-1551) (#77)
