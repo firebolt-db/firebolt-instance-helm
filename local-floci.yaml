@@ -88,7 +88,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: aws
-          image: amazon/aws-cli:2.34.63
+          image: amazon/aws-cli:2.34.64
           env:
             - { name: AWS_ACCESS_KEY_ID,     value: mock }
             - { name: AWS_SECRET_ACCESS_KEY, value: mock }
