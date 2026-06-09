@@ -21,7 +21,7 @@ The engine pod additionally sets `fsGroup: 3473` (with `fsGroupChangePolicy: OnR
 
 ### Memlock-setup sidecar
 
-When `engineSpec.memlockSetup: true` and `podSecurityContext.runAsNonRoot: true`, the chart injects a `memlock-setup` sidecar container that raises the engine pod's memlock limit. The sidecar runs as UID 0 because it issues a `prlimit(2)` against the engine container. The pod enables `shareProcessNamespace: true` so the sidecar can see the engine's PID. It drops all capabilities except `SYS_RESOURCE`. When your node hosts already provide a memlock limit of at least 8 GiB, disable it with `memlockSetup: false`.
+When `engineSpec.memlockSetup: true` and `podSecurityContext.runAsNonRoot: true`, the chart injects a `memlock-setup` sidecar container that raises the engine pod's memlock limit. The sidecar runs as UID 0 because it issues a `prlimit(2)` against the engine container. The pod enables `shareProcessNamespace: true` so the sidecar can see the engine's PID. It drops all capabilities except `SYS_RESOURCE`. When your node hosts already provide a memlock limit of at least 8 GiB, disable it with `memlockSetup: false` and configure the nodes yourself. See [Engine node requirements](./prerequisites#engine-node-requirements).
 
 ### Install-time validation
 

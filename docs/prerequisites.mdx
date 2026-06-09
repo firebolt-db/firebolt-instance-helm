@@ -12,6 +12,98 @@ This page lists what you need in place before you install the chart.
 - **A default `StorageClass`**. The chart provisions engine and PostgreSQL PVCs without `storageClassName` and falls back to the cluster default. To pick a specific class, set `engines[].storage.storageClassName` per engine or `engineSpec.defaultStorage.storageClassName` chart-wide.
 - **Object storage for engine managed data**. Engines run against a dedicated Metadata Service and refuse to start against a local filesystem. You must point `customEngineConfig.storage` at an S3 or S3-compatible bucket before the engine becomes ready. See [Managed storage](./usage/managed-storage).
 
+## Engine node requirements
+
+Engine pods inherit their locked-memory (`memlock`) limit from the node's container runtime, and engines need at least **8 GiB**. Engines lock memory for `io_uring` at startup. The default on many managed node images, around 8 MiB, is far too low. When the limit is too low, the engine crashes during startup with an error like this:
+
+```text
+io_uring_register_buffers ... Cannot allocate memory
+```
+
+By default the chart provides this limit for you. With `engineSpec.memlockSetup: true` (the default), the chart injects a `memlock-setup` sidecar that raises the engine pod's `memlock` limit at runtime, so no node configuration is required. See [Memlock-setup sidecar](./security#memlock-setup-sidecar).
+
+When you set `engineSpec.memlockSetup: false`, the sidecar is gone and every node that runs an engine must provide the limit itself. The rest of this section covers that path. Raise `memlock` on the container runtime (`containerd`) with a systemd drop-in:
+
+```ini
+# /etc/systemd/system/containerd.service.d/memlock.conf
+[Service]
+LimitMEMLOCK=infinity
+```
+
+`infinity` is simplest. A bounded value such as `LimitMEMLOCK=8G` also works, as long as it is at least 8 GiB. After you write the drop-in, reload systemd, restart `containerd`, and confirm the limit:
+
+```bash
+# Reload unit files so systemd picks up the drop-in.
+systemctl daemon-reload
+# Restart containerd so the raised limit takes effect.
+systemctl restart containerd
+# Confirm the runtime now reports the raised limit.
+systemctl show containerd --property=LimitMEMLOCK
+```
+
+Bake this into your node configuration so that upgraded, rotated, and autoscaled nodes get it automatically. How you deliver it depends on your platform.
+
+### Amazon EKS and Karpenter
+
+Add the drop-in through your managed node group's launch template user data, so each node configures itself before it registers. Include the following as a shell-script part of the launch template's MIME multipart user data:
+
+```bash
+#!/bin/bash
+mkdir -p /etc/systemd/system/containerd.service.d
+printf '[Service]\nLimitMEMLOCK=infinity\n' \
+  > /etc/systemd/system/containerd.service.d/memlock.conf
+systemctl daemon-reload
+systemctl restart containerd
+```
+
+If you provision nodes with Karpenter, put the same script in the `spec.userData` of your `EC2NodeClass`.
+
+### Google GKE
+
+GKE node system configuration does not expose `memlock`, so apply the drop-in with a privileged DaemonSet that writes it to each node and restarts `containerd`. The DaemonSet reapplies it to new nodes as they join, which covers upgrades and autoscaling:
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: engine-memlock
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: engine-memlock
+  template:
+    metadata:
+      labels:
+        app: engine-memlock
+    spec:
+      hostPID: true
+      # Restrict this to your engine node pool with a matching nodeSelector.
+      containers:
+        - name: set-memlock
+          image: debian:stable-slim
+          securityContext:
+            privileged: true
+          command: ["nsenter", "--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid", "--", "sh", "-c"]
+          args:
+            - |
+              mkdir -p /etc/systemd/system/containerd.service.d
+              printf '[Service]\nLimitMEMLOCK=infinity\n' \
+                > /etc/systemd/system/containerd.service.d/memlock.conf
+              if ! systemctl show containerd --property=LimitMEMLOCK | grep -q infinity; then
+                systemctl daemon-reload && systemctl restart containerd
+              fi
+              sleep infinity
+```
+
+The guard around the restart matters. Restarting `containerd` also restarts this pod, and the check lets the replacement pod skip a second restart once the limit is already in place.
+
+GKE Autopilot blocks privileged DaemonSets, so you cannot use this approach there directly. Either request a privileged-workload allowlist (`--autopilot-privileged-admission`), or run your engine node pool on GKE Standard.
+
+### Microsoft Azure (AKS)
+
+AKS does not expose `LimitMEMLOCK` through its supported node configuration, so apply the same privileged DaemonSet shown for [Google GKE](#google-gke), or bake the drop-in into a custom node image. Either way, it reapplies automatically to nodes added by node image upgrades and cluster autoscaling, so you do not have to configure nodes by hand.
+
 ## Local tooling
 
 - `helm` v3.
