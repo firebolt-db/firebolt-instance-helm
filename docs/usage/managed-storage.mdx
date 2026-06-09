@@ -1,14 +1,18 @@
 ---
-description: Amazon S3 and S3-compatible object storage for engine managed data, with IRSA and Pod Identity for AWS credentials.
+description: Amazon S3, S3-compatible, Google Cloud Storage, and Azure Blob Storage backends for engine managed data, with workload identity and intermediary roles for external access.
 sidebarTitle: Managed storage
 title: Managed storage
 ---
 
-This page configures engine object storage on Amazon S3 or any S3-compatible endpoint.
+This page configures engine object storage on Amazon S3, an S3-compatible endpoint, Google Cloud Storage, or Azure Blob Storage.
 
-With S3 as the backing store for managed table data, durability does not depend on the per-pod data volumes mounted to each engine. Even a complete loss of those volumes does not cause data loss, because the authoritative copy of managed table data lives in the bucket.
+With object storage as the backing store for managed table data, durability does not depend on the per-pod data volumes mounted to each engine. Even a complete loss of those volumes does not cause data loss, because the authoritative copy of managed table data lives in the object store.
 
-You configure object storage on the engine through `customEngineConfig.storage`, which the chart passes through unchanged into the engine's `config.yaml`. The `type`, `api_scheme`, and `bucket_name` keys match the Firebolt Core configuration schema. The engine reads AWS credentials and region from the pod's AWS identity, which you provide with [AWS IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) or [AWS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html).
+You configure object storage on the engine through `customEngineConfig.storage`, which the chart passes through unchanged into the engine's `config.yaml`. The `type`, `api_scheme`, and `bucket_name` keys match the Firebolt Core configuration schema, and the chart does not validate them. The engine reads cloud credentials from the pod's workload identity, which you configure per platform: [AWS IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) or [AWS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) for Amazon S3, [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity) for Google Cloud Storage, and [Microsoft Entra Workload ID](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) for Azure Blob Storage.
+
+<Note>
+The chart passes `customEngineConfig.storage` through unchanged and does not validate the `type`. Whether a given backend works depends on the engine image you run, so the `gcs` and `abs` backends require an engine image that supports them. An unsupported `type` is written verbatim into the engine `config.yaml`, so the engine fails at startup rather than at install time. Confirm your engine image version before you rely on a backend.
+</Note>
 
 <Warning>
 Local-filesystem storage is not supported. Without `customEngineConfig.storage` pointing at an object store, the engine pod never becomes Ready.
@@ -136,6 +140,30 @@ aws s3 ls s3://firebolt-managed/
 
 New prefixes appear under the bucket as the engine writes data.
 
+### Restrict external access with an intermediary role
+
+The bucket you set under `customEngineConfig.storage` holds the engine's managed tablet data, and the engine reaches it with the engine pod's own AWS identity. Queries that read from or write to external locations, such as external tables or `COPY` statements that point at a different bucket, follow a separate credential path.
+
+By default, external access also uses the engine pod's own AWS identity. That identity belongs to this chart release, so it is not a convenient identity for the owner of an external bucket to reference when they grant access.
+
+An intermediary role gives external access a stable identity instead. When you set one, the engine assumes the intermediary role first, and then assumes the external role from there, rather than using its own pod identity. Because the intermediary role ARN is stable and known ahead of time, you can share it with third parties and reference it in S3 bucket policies, IAM role trust policies, and AWS accounts outside your own organization. Access to the managed `storage` bucket always uses the engine pod's own identity, so the intermediary role applies only to external locations.
+
+Create the intermediary IAM role and grant the engine's identity permission to assume it. The intermediary role's trust policy must allow the engine ServiceAccount identity to assume it, and the role needs only `sts:AssumeRole` on the external roles it is allowed to reach.
+
+Set the intermediary role ARN under `customEngineConfig.storage.aws.intermediary_access_role`:
+
+```yaml
+customEngineConfig:
+  storage:
+    type: s3
+    api_scheme: "s3://"
+    bucket_name: firebolt-managed
+    aws:
+      intermediary_access_role: arn:aws:iam::<account-id>:role/firebolt-intermediary
+```
+
+The chart passes the `storage.aws` block through unchanged. The block is valid only when `type` is `s3`.
+
 ## S3-compatible (MinIO and friends)
 
 For any S3-compatible endpoint reachable from the engine pods (self-hosted MinIO, Ceph RGW, an in-cluster S3 emulator), use `type: minio`. The engine hardcodes the access and secret to `firebolt`/`firebolt` in this mode, so the endpoint must accept those credentials.
@@ -151,6 +179,210 @@ customEngineConfig:
 ```
 
 `endpoint` must be a URL the engine pod can resolve and reach. Create the bucket out-of-band before the engine starts.
+
+## Google Cloud Storage
+
+On GKE, set `type: gcs` to back managed table data with a Google Cloud Storage bucket. The chart's default engine ServiceAccount sets `automountServiceAccountToken: false` and carries no cloud identity, so you bring your own ServiceAccount, federate it with a Google service account through [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity), and point `engineSpec.serviceAccount` at it.
+
+### Grant the engine a Google identity
+
+Create a Google service account, grant it object access on the bucket, and allow the engine's Kubernetes ServiceAccount to impersonate it:
+
+```bash
+# Project, bucket, and identity names used by the gcloud calls below.
+export GCP_PROJECT=my-project
+export BUCKET_NAME=firebolt-managed
+export GSA_NAME=firebolt-engine
+export GSA_EMAIL="${GSA_NAME}@${GCP_PROJECT}.iam.gserviceaccount.com"
+export K8S_NAMESPACE=firebolt
+export K8S_SA=firebolt-engine
+
+# Create the Google service account for the engine.
+gcloud iam service-accounts create "${GSA_NAME}" --project="${GCP_PROJECT}"
+
+# Grant the service account object read and write access on the bucket.
+gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
+  --member="serviceAccount:${GSA_EMAIL}" \
+  --role="roles/storage.objectAdmin"
+
+# Allow the Kubernetes ServiceAccount to impersonate the Google service account.
+gcloud iam service-accounts add-iam-policy-binding "${GSA_EMAIL}" \
+  --project="${GCP_PROJECT}" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="serviceAccount:${GCP_PROJECT}.svc.id.goog[${K8S_NAMESPACE}/${K8S_SA}]"
+```
+
+Annotate the Kubernetes ServiceAccount with the Google service account so GKE injects credentials into engine pods that run under it:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: firebolt-engine
+  namespace: firebolt
+  annotations:
+    iam.gke.io/gcp-service-account: firebolt-engine@my-project.iam.gserviceaccount.com
+```
+
+### Point the chart at the bucket
+
+Run the engine pods under the annotated ServiceAccount and set the storage block to the GCS bucket. The default scheme for `gcs` is `gs://`.
+
+```yaml
+# my-values.yaml
+engineSpec:
+  serviceAccount: firebolt-engine
+
+customEngineConfig:
+  storage:
+    type: gcs
+    api_scheme: "gs://"
+    bucket_name: firebolt-managed
+```
+
+Create the ServiceAccount, then install the chart with the matching values:
+
+```bash
+# Create the Workload-Identity-annotated ServiceAccount in the release namespace.
+kubectl apply -f engine-serviceaccount.yaml
+
+# Install the chart against the bucket and the ServiceAccount.
+helm install firebolt ./helm \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
+### Restrict external access with an intermediary service account
+
+External access on GCS follows the same pattern as on AWS. By default the engine uses its own pod identity for external locations, and that identity belongs to this chart release. An intermediary service account gives external access a stable identity that you can grant access to buckets in other Google Cloud projects. Access to the managed `storage` bucket always uses the engine pod's own identity, so the intermediary service account applies only to external locations.
+
+Create the intermediary Google service account, grant the engine's identity `roles/iam.serviceAccountTokenCreator` on it, and grant the intermediary the permissions it needs to reach the external data. Set its ID under `customEngineConfig.storage.gcp.intermediary_service_account_id`:
+
+```yaml
+customEngineConfig:
+  storage:
+    type: gcs
+    api_scheme: "gs://"
+    bucket_name: firebolt-managed
+    gcp:
+      intermediary_service_account_id: projects/my-project/serviceAccounts/firebolt-intermediary@my-project.iam.gserviceaccount.com
+```
+
+The chart passes the `storage.gcp` block through unchanged. The block is valid only when `type` is `gcs`.
+
+## Azure Blob Storage
+
+On AKS, set `type: abs` to back managed table data with an Azure Blob Storage container. As with GCS, the chart's default engine ServiceAccount carries no cloud identity, so you bring your own ServiceAccount and federate it with a managed identity through [Microsoft Entra Workload ID](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview). Workload ID also requires the `azure.workload.identity/use: "true"` label on the engine pods, which you set through the engine's `podLabels`.
+
+### Grant the engine an Azure identity
+
+Create a user-assigned managed identity, grant it blob access on the storage account, and federate it with the engine's Kubernetes ServiceAccount:
+
+```bash
+# Resource group, storage account, container, and identity names used below.
+export RESOURCE_GROUP=firebolt-demo
+export STORAGE_ACCOUNT=fireboltenginedemo
+export CONTAINER_NAME=firebolt-managed
+export IDENTITY_NAME=firebolt-engine
+export AKS_CLUSTER=my-aks-cluster
+export K8S_NAMESPACE=firebolt
+export K8S_SA=firebolt-engine
+
+# Create the user-assigned managed identity for the engine.
+az identity create --name "${IDENTITY_NAME}" --resource-group "${RESOURCE_GROUP}"
+
+# Read the identity's client ID and the storage account's resource ID.
+export IDENTITY_CLIENT_ID=$(az identity show \
+  --name "${IDENTITY_NAME}" --resource-group "${RESOURCE_GROUP}" \
+  --query clientId -o tsv)
+export STORAGE_ACCOUNT_ID=$(az storage account show \
+  --name "${STORAGE_ACCOUNT}" --resource-group "${RESOURCE_GROUP}" \
+  --query id -o tsv)
+
+# Grant the identity blob read and write access on the storage account.
+az role assignment create \
+  --assignee "${IDENTITY_CLIENT_ID}" \
+  --role "Storage Blob Data Contributor" \
+  --scope "${STORAGE_ACCOUNT_ID}"
+
+# Federate the managed identity with the Kubernetes ServiceAccount.
+export OIDC_ISSUER=$(az aks show \
+  --name "${AKS_CLUSTER}" --resource-group "${RESOURCE_GROUP}" \
+  --query oidcIssuerProfile.issuerUrl -o tsv)
+az identity federated-credential create \
+  --name firebolt-engine \
+  --identity-name "${IDENTITY_NAME}" \
+  --resource-group "${RESOURCE_GROUP}" \
+  --issuer "${OIDC_ISSUER}" \
+  --subject "system:serviceaccount:${K8S_NAMESPACE}:${K8S_SA}"
+```
+
+Annotate the Kubernetes ServiceAccount with the managed identity's client ID so AKS injects credentials into engine pods that carry the Workload ID label:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: firebolt-engine
+  namespace: firebolt
+  annotations:
+    azure.workload.identity/client-id: <managed-identity-client-id>
+```
+
+### Point the chart at the container
+
+Run the engine pods under the annotated ServiceAccount, label them so Workload ID injects credentials, and set the storage block to the container. The default scheme for `abs` is `azure://`, `bucket_name` is the container name, and `azure.storage_account_name` is the storage account that holds it.
+
+```yaml
+# my-values.yaml
+engineSpec:
+  serviceAccount: firebolt-engine
+
+engines:
+  - name: default
+    # Required for Microsoft Entra Workload ID to inject credentials.
+    podLabels:
+      azure.workload.identity/use: "true"
+
+customEngineConfig:
+  storage:
+    type: abs
+    api_scheme: "azure://"
+    bucket_name: firebolt-managed
+    azure:
+      storage_account_name: fireboltenginedemo
+```
+
+Create the ServiceAccount, then install the chart with the matching values:
+
+```bash
+# Create the Workload-ID-annotated ServiceAccount in the release namespace.
+kubectl apply -f engine-serviceaccount.yaml
+
+# Install the chart against the container and the ServiceAccount.
+helm install firebolt ./helm \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
+### Restrict external access with an intermediary service principal
+
+External access on Azure Blob Storage follows the same pattern as on AWS and GCS. By default the engine uses its own pod identity for external locations, and that identity belongs to this chart release. An intermediary service principal gives external access a stable identity that you can grant access to containers in other Azure subscriptions. Access to the managed `storage` container always uses the engine pod's own identity, so the intermediary service principal applies only to external locations.
+
+Create the intermediary service principal and grant it the permissions it needs to reach the external data. Set its application (client) ID under `customEngineConfig.storage.azure.intermediary_service_principal_client_id`:
+
+```yaml
+customEngineConfig:
+  storage:
+    type: abs
+    api_scheme: "azure://"
+    bucket_name: firebolt-managed
+    azure:
+      storage_account_name: fireboltenginedemo
+      intermediary_service_principal_client_id: 35f11db5-082b-46e8-9f2f-5466d8630003
+```
+
+The chart passes the `storage.azure` block through unchanged. The block is valid when `type` is `abs` or `azurite`.
 
 ## Per-engine storage
 
