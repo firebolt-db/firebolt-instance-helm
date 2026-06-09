@@ -50,8 +50,23 @@ engineSpec:
   # `engine.termination_grace_period` with a 5s safety margin (floored at
   # 1s), so the engine's own in-flight-query wait stays below this value.
   terminationGracePeriodSeconds: 60
-  # -- Service account name for engine pods.
-  serviceAccount: default
+  # -- ServiceAccount used by engine pods.
+  #
+  # Empty (the default): the chart creates `<release>-engine` with
+  # `automountServiceAccountToken: false`, so a code-execution exploit
+  # in the engine container has no SA token to talk to the apiserver
+  # with. Engines do not call the Kubernetes API; the dedicated SA
+  # replaces the namespace `default` SA, which automounts a token and
+  # inherits any RoleBindings accumulated on `default` from unrelated
+  # installs.
+  #
+  # Non-empty: the chart references the named SA verbatim and does NOT
+  # create one — bring your own (the documented IRSA / Pod Identity
+  # flow at docs/usage/managed-storage.mdx works this way). The chart
+  # cannot influence `automountServiceAccountToken` on a SA it does
+  # not own; set it explicitly in your SA manifest if you want the
+  # same hardening.
+  serviceAccount: ""
   # -- Tolerations for engine pod scheduling.
   tolerations: []
   # -- Affinity rules for engine pod scheduling.
@@ -156,8 +171,12 @@ metadata:
 postgresql:
   # -- When true, deploys a bundled PostgreSQL StatefulSet. Set to false to use an external database.
   local_enabled: true
-  # -- PostgreSQL image used for the bundled StatefulSet.
-  image: "postgres:16-alpine"
+  # -- PostgreSQL image used for the bundled StatefulSet. Pinned to an
+  # immutable digest so a registry-side tag override cannot silently
+  # change what runs in production. The `postgres:16-alpine` tag prefix
+  # is retained for readability only; resolution happens on the digest.
+  # Bump both the tag and the digest together when upgrading.
+  image: "postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
   # -- PostgreSQL host. Auto-derived when `local_enabled` is true; must be set explicitly for external databases.
   host: ""
   # -- PostgreSQL port.
@@ -398,4 +417,7 @@ podMonitor:
     interval: 15s
 
 # -- Image used for utility init/sidecar containers (e.g. the memlock-setup sidecar).
-utilitiesImage: debian:stable-slim
+# Pinned to an immutable digest so a registry-side tag override cannot
+# silently change what runs in production. Bump the digest together with
+# the tag when upgrading.
+utilitiesImage: "debian:stable-slim@sha256:5012d0517aa0075a7150a45aae67586641e898913b7af3b08228108565b5f90c"

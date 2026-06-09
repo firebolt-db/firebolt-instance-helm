@@ -71,8 +71,7 @@ spec:
       {{- if $engine.priorityClassName }}
       priorityClassName: {{ $engine.priorityClassName }}
       {{- end }}
-      serviceAccount: {{ $.Values.engineSpec.serviceAccount }}
-      serviceAccountName: {{ $.Values.engineSpec.serviceAccount }}
+      serviceAccountName: {{ include "fbinstance.engineServiceAccountName" $ }}
       terminationGracePeriodSeconds: {{ $.Values.engineSpec.terminationGracePeriodSeconds }}
       {{- with $.Values.engineSpec.podSecurityContext }}
       securityContext:
@@ -245,8 +244,25 @@ spec:
               mountPath: /firebolt-core/auth.json
               subPath: auth.json
               readOnly: true
+            # Scratch space outside the read-only root filesystem.
+            # `/tmp` is used by bash (heredocs / command substitution
+            # in the entrypoint script) and by the engine for any
+            # disk-spill of query intermediates.
+            # `/var/run/firebolt` holds the engine's per-port unix
+            # domain socket (`.s.firebolt.<port>`); the directory
+            # exists in the image but is on the root layer, so it
+            # needs an overlay to be writable.
+            - name: tmp
+              mountPath: /tmp
+            - name: runtime
+              mountPath: /var/run/firebolt
           securityContext:
-            readOnlyRootFilesystem: false
+            # Engine processes untrusted SQL; a code-execution exploit
+            # under a writable root could persist binaries or rewrite
+            # configs on the image layer. The chart's gateway, metadata,
+            # and postgres containers all already enforce this — the
+            # engine matching them closes the last writable-root gap.
+            readOnlyRootFilesystem: true
             {{- if $.Values.engineSpec.podSecurityContext.runAsNonRoot }}
             runAsNonRoot: true
             runAsUser: 3473
@@ -360,6 +376,10 @@ spec:
         - name: nginx-writable-dir
           emptyDir: {}
         {{- end }}
+        - name: tmp
+          emptyDir: {}
+        - name: runtime
+          emptyDir: {}
         - name: engine-config
           configMap:
             name: {{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-config

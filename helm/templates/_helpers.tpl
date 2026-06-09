@@ -60,6 +60,18 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
+Engine ServiceAccount name. Empty `engineSpec.serviceAccount` ->
+`<fullname>-engine` (chart-managed; the SA template renders it).
+Non-empty `engineSpec.serviceAccount` -> verbatim, and the chart does
+not render a SA manifest (bring your own — IRSA / Pod Identity flow).
+Both the SA template and the engine StatefulSet podSpec MUST resolve
+the name through this helper so a single value drives both sides.
+*/}}
+{{- define "fbinstance.engineServiceAccountName" -}}
+{{- default (printf "%s-engine" (include "fbinstance.fullname" .)) .Values.engineSpec.serviceAccount -}}
+{{- end -}}
+
+{{/*
 Engine Service ports. Only externally-meaningful endpoints are declared:
 http-query (SQL), health (probe / Envoy active health check), metrics
 (Prometheus scrape), and optionally web-ui (sidecar). The intra-engine
