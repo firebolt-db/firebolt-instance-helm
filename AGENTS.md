@@ -110,7 +110,7 @@ Branch and commit convention:
 
 ## Known issues
 
-_Empty. Populate as agents fix non-obvious problems._
+- Symptom: GitHub Actions workflows that use `azure/setup-helm` with `version: "latest"` can start failing or changing behavior unexpectedly. Cause: the action matches upstream Helm tarball names verbatim and `latest` can silently advance across major versions, including to Helm v4. Resolution: pin an explicit Helm v3 patch in both validation and release workflows until the v4 behavioral differences have been audited and adopted intentionally.
 
 ## Project-specific rules
 
