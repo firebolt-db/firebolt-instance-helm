@@ -3,10 +3,12 @@
 [![CI](https://img.shields.io/github/checks-status/firebolt-db/firebolt-instance-helm/main?label=CI)](https://github.com/firebolt-db/firebolt-instance-helm/actions?query=branch%3Amain)
 [![Chart Version](https://img.shields.io/github/v/tag/firebolt-db/firebolt-instance-helm?label=chart&sort=semver)](https://github.com/firebolt-db/firebolt-instance-helm/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
+[![Downloads](https://scarf.sh/installs-badge/firebolt-db/firebolt-instance?package-type=docker)](https://scarf.sh/)
+[![Companies](https://scarf.sh/company-badge/firebolt-db/firebolt-instance?package-type=docker)](https://scarf.sh/)
 
 Helm chart for running a Firebolt instance on Kubernetes: Envoy gateway, Metadata Service, PostgreSQL, and one or more Firebolt query engine StatefulSets.
 
-The chart is published as `firebolt-instance` to `oci://ghcr.io/firebolt-db/helm-charts` on every change to `helm/` merged to `main`.
+The chart is published as `firebolt-instance` on every change to `helm/` merged to `main`. Pull it through `oci://oci.firebolt.io/firebolt-db/helm-charts` — Firebolt's [Scarf](https://scarf.sh) gateway, which records anonymous download analytics and redirects to GHCR (`oci://ghcr.io/firebolt-db/helm-charts`). See [Telemetry](#telemetry).
 
 ## Scope
 
@@ -71,11 +73,28 @@ make cleanup                               # uninstall release, delete PVCs, del
 make delete                                # kind delete cluster
 ```
 
+To install the published chart (instead of the local `./helm` path), pull it through the Scarf gateway:
+
+```sh
+helm install firebolt oci://oci.firebolt.io/firebolt-db/helm-charts/firebolt-instance \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
 See [`docs/usage/single-engine.mdx`](docs/usage/single-engine.mdx) for the full walkthrough, [`docs/prerequisites.mdx`](docs/prerequisites.mdx) for cluster requirements, and [`docs/`](docs/) for additional patterns (multi-engine, external PostgreSQL, image overrides).
 
 ## How it works
 
 The Envoy gateway extracts the `X-Firebolt-Engine` header via a Lua filter and rewrites the upstream to the matching engine Service. The metadata service serves table-and-engine metadata to engines over gRPC, scoped to the `customEngineConfig.instance.id` ULID. PostgreSQL is bundled by default for development; production deployments should set `postgresql.local_enabled: false` and provide an external database.
+
+## Telemetry
+
+This chart routes its published-chart pulls through Firebolt's [Scarf](https://scarf.sh) gateway to collect anonymous download statistics so we can better understand how the community uses Firebolt and prioritize improvements. The statistics are limited to the chart version and platform; the gateway does not collect any user data or metadata, and your IP address is used only to infer the company and is never stored.
+
+We understand that not everyone wants to share usage statistics. You can opt out in either of these ways:
+
+- Pull the chart directly from GitHub Container Registry instead of the gateway: `oci://ghcr.io/firebolt-db/helm-charts/firebolt-instance`.
+- The Scarf gateway honors the `DNT` and `Sec-GPC` HTTP headers.
 
 ## Where to go next
 
@@ -84,3 +103,5 @@ The Envoy gateway extracts the `X-Firebolt-Engine` header via a Lua filter and r
 - For **contributor** detail, conventions, and rules for making changes to this repo, see [`AGENTS.md`](AGENTS.md). Module-specific rules for the chart itself live in [`helm/AGENTS.md`](helm/AGENTS.md).
 - Changelog: [`helm/CHANGELOG.md`](./helm/CHANGELOG.md).
 - Security policy: [`SECURITY.md`](./SECURITY.md).
+
+<img referrerpolicy="no-referrer-when-downgrade" src="https://px.firebolt.io/a.png?x-pxid=44d8e5cd-a225-4212-8705-a7639ab30398&page=instance-helm-README" alt="" width="1" height="1" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;" />
