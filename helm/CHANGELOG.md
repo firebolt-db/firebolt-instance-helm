@@ -1,3 +1,7 @@
+# 0.12.3
+
+helm: harden engine + pin postgres/utilities by digest (FIR-1454) (#71)
+
 # 0.12.2
 
 docs: add Mintlify user-facing docs and drop unused make wait (FB-1385) (#69)
