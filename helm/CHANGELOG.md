@@ -1,3 +1,7 @@
+# 1.2.0
+
+feat(gateway,metadata): support custom pod labels and annotations (FB-1553) (#88)
+
 # 1.1.0
 
 feat(gateway,metadata): broaden pod customization surface (FB-1552) (#85)
