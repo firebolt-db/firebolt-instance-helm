@@ -1,3 +1,7 @@
+# 1.2.1
+
+revert: rename engine data-dir to /firebolt-data/data (FB-1571) (#90)
+
 # 1.2.0
 
 feat(gateway,metadata): support custom pod labels and annotations (FB-1553) (#88)

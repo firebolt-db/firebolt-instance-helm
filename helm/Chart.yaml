@@ -6,6 +6,6 @@ type: application
 icon: https://raw.githubusercontent.com/firebolt-db/firebolt-instance-helm/refs/heads/main/static/firebolt.png
 home: "https://github.com/firebolt-db/firebolt-instance-helm"
 sources: ["https://github.com/firebolt-db/firebolt-instance-helm"]
-version: 1.2.0
+version: 1.2.1
 # Bumped by upstream image-release automation.
 appVersion: "release-4.32.0-pre.0.20260609145613.22a1ea4abadb"
