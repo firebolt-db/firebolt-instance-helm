@@ -4,10 +4,31 @@ CHART        := ./helm
 VALUES_FILE  := $(CHART)/values-dev.yaml
 ECR_REGISTRY := 000000000000.dkr.ecr.us-east-1.amazonaws.com
 AWS_REGION   := us-east-1
+KIND_CLUSTER ?= firebolt-instance-helm
+
+# Kubernetes version for the e2e kind cluster, pinned by digest as kind requires.
+# Single source of truth: override on the CLI (`make prepare-test-e2e NODE_IMAGE=...`)
+# or via the NODE_IMAGE env (the CI matrix sets it). Bump in one place here.
+NODE_IMAGE ?= kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
+
+# Local Docker registry the kind node mirrors through (serves the private
+# engine/metadata images locally so the node never anonymously pulls ghcr.io,
+# and keeps a layer cache across cluster recreations). Override REGISTRY_PORT /
+# REGISTRY_NAME if 5001 / kind-registry collide. Same defaults are baked into
+# scripts/ci/setup-local-registry.sh.
+REGISTRY_NAME ?= kind-registry
+REGISTRY_PORT ?= 5001
+
+# Set to "true" once the ghcr.io/firebolt-db engine + metadata packages are
+# public. While "false" (private) the kind node mirrors the images through the
+# local registry above (pulled once on the authenticated host). When "true" the
+# kind nodes pull the images directly from upstream, so the local registry, the
+# containerd mirror wiring, and the image-publishing step are all skipped.
+GHCR_PACKAGES_PUBLIC ?= false
 
 .DEFAULT_GOAL := help
 
-.PHONY: help create install dev upgrade upgrade-dev uninstall cleanup delete test test-cleanup check-pre-commit check-helm-docs setup-pre-commit docs docs-check lint floci
+.PHONY: help create install dev upgrade upgrade-dev uninstall cleanup delete test test-cleanup check-pre-commit check-helm-docs setup-pre-commit docs docs-check lint floci setup-local-registry cleanup-local-registry flush-local-registry setup-kind load-test-images prepare-test-e2e helm-test cleanup-test-e2e
 
 help: ## Show this help message
 	@printf '\033[33m%s\n' \
@@ -89,6 +110,37 @@ cleanup: ## Uninstall the release, delete PVCs, and remove the namespace
 
 test: ## Run helm tests against the installed release
 	helm test $(RELEASE) --namespace $(NAMESPACE) --logs
+
+setup-local-registry: ## Start the local Docker registry the kind node mirrors through (idempotent)
+	@if [ "$(GHCR_PACKAGES_PUBLIC)" = "true" ]; then \
+	  echo "GHCR_PACKAGES_PUBLIC=true: skipping local registry (kind nodes pull images directly)."; \
+	else \
+	  REGISTRY_NAME=$(REGISTRY_NAME) REGISTRY_PORT=$(REGISTRY_PORT) ./scripts/ci/setup-local-registry.sh; \
+	fi
+
+cleanup-local-registry: ## Stop and remove the local Docker registry container (cached images are lost)
+	@docker rm -f $(REGISTRY_NAME) >/dev/null 2>&1 || true
+	@echo "Removed local registry '$(REGISTRY_NAME)' (if it existed). Re-run 'make setup-local-registry' to recreate."
+
+flush-local-registry: cleanup-local-registry setup-local-registry ## Recreate the local registry from scratch (drops cached images)
+
+setup-kind: setup-local-registry ## Create (or reuse) the e2e kind cluster and wire it to the local registry
+	@NODE_IMAGE='$(NODE_IMAGE)' REGISTRY_NAME=$(REGISTRY_NAME) REGISTRY_PORT=$(REGISTRY_PORT) GHCR_PACKAGES_PUBLIC=$(GHCR_PACKAGES_PUBLIC) ./scripts/ci/setup-kind-cluster.sh $(KIND_CLUSTER)
+
+load-test-images: ## Pull the chart + floci images and push them into the local registry
+	@if [ "$(GHCR_PACKAGES_PUBLIC)" = "true" ]; then \
+	  echo "GHCR_PACKAGES_PUBLIC=true: skipping image publishing (kind nodes pull images directly)."; \
+	else \
+	  REGISTRY_NAME=$(REGISTRY_NAME) REGISTRY_PORT=$(REGISTRY_PORT) ./scripts/ci/load-e2e-images.sh $(KIND_CLUSTER); \
+	fi
+
+prepare-test-e2e: setup-kind load-test-images ## Full e2e setup: start the registry, create the kind cluster, publish images
+
+helm-test: ## Run the quickstart end-to-end check against the current cluster (run prepare-test-e2e first)
+	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CHART_DIR=$(CHART) ./scripts/ci/helm-test.sh
+
+cleanup-test-e2e: ## Tear down the e2e kind cluster (the local registry is left running; use flush-local-registry to drop it)
+	kind delete cluster --name $(KIND_CLUSTER)
 
 test-cleanup: ## Delete leftover helm test pods from previous runs
 	@pods=$$(kubectl get pods -n $(NAMESPACE) -o name 2>/dev/null | grep "^pod/$(RELEASE)-test-" || true); \

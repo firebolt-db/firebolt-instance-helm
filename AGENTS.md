@@ -21,10 +21,12 @@ Helm chart that runs a Firebolt instance on Kubernetes: an Envoy gateway that ro
 │   ├── scripts/              # validate-chart.sh — used by CI and runnable locally
 │   └── charts/               # subchart cache; populated by `helm dependency build`
 ├── local-floci.yaml          # zero-auth S3 emulator manifest applied by `make floci` (dev only)
+├── scripts/
+│   └── ci/                   # e2e quickstart check: helm-test.sh + lib/, kind setup (setup-kind-cluster.sh + kind-config.yaml), local registry (setup-local-registry.sh), load-e2e-images.sh, ci-values.yaml overlay
 ├── docs/                     # user-facing docs, Mintlify MDX (docs.json drives nav; see docs/AGENTS.md for style)
 ├── docs-internal/            # Firebolt-internal docs (e.g. the make dev / ECR / floci flow), plain Markdown
 ├── .github/
-│   ├── workflows/            # helm-validate, helm-release-cd, gha-lint
+│   ├── workflows/            # helm-validate, helm-release-cd, gha-lint, helm-test
 │   └── ISSUE_TEMPLATE/
 ├── static/                   # chart icon
 ├── .pre-commit-config.yaml   # helm-docs, helm lint --strict, helm template dry-run
@@ -52,6 +54,11 @@ All targets honour `RELEASE` (default `firebolt`), `NAMESPACE` (default `firebol
 - `make test` — `helm test $(RELEASE) --logs`. Runs the hooks under `helm/templates/tests/`.
 - `make test-cleanup` — delete leftover `$(RELEASE)-test-*` pods.
 - `make setup-pre-commit` — install pre-commit hooks (requires `pre-commit` and `helm-docs` on PATH).
+- `make setup-local-registry` — start the local Docker registry (`kind-registry` on `127.0.0.1:5001`, idempotent) that the kind node mirrors through. `setup-kind` runs it transitively.
+- `make flush-local-registry` — drop and recreate the registry (`cleanup-local-registry` + `setup-local-registry`); clears the cached layers. Use after a kind upgrade changes the Docker network or when a bad push is masking a real image bump.
+- `make prepare-test-e2e` — full e2e setup (`setup-kind` + `load-test-images`): start the registry, create (or reuse) the `firebolt-instance-helm` kind cluster (override with `KIND_CLUSTER`) from `scripts/ci/kind-config.yaml` wired to mirror `ghcr.io`/`docker.io` through the registry, then publish the chart + floci images into it. The cluster runs Kubernetes 1.35 via a digest-pinned `kindest/node` image; needs kind >= v0.31. The image is set in one place — the `NODE_IMAGE` variable in the `Makefile` — and overridable via the `NODE_IMAGE` env. The `Helm Test` workflow drives it from a `strategy.matrix` (one Kubernetes version per line), so adding a version to test is a one-line matrix change. A reused cluster that predates the `containerdConfigPatches` (no `config_path` in containerd) or runs a different K8s minor can't be retrofitted — both are create-time only — so `setup-kind-cluster.sh` detects either mismatch and auto-recreates the cluster. **No `kind load`** — the host pulls each image and pushes it into the registry; the node pulls from the registry on demand. This serves the **private** `ghcr.io/firebolt-db` engine/metadata images locally so the node never anonymously pulls (which would 401). **The host's `docker pull` still needs GHCR access**: locally run `docker login ghcr.io` first; in CI the `Helm Test` workflow grants the job `packages: read` and runs an explicit `docker login ghcr.io` step (the default `GITHUB_TOKEN` does not get `packages` scope under explicit job permissions). Override the cluster name with `KIND_CLUSTER` and the registry with `REGISTRY_NAME`/`REGISTRY_PORT`. Raise the Docker `memlock` limit first or the engine's io_uring fails (see `.github/workflows/helm-test.yaml`). **`GHCR_PACKAGES_PUBLIC`** (default `false`, single switch in the `Makefile` and the workflow's top-level `env`): set to `true` once the engine/metadata packages are public — the workflow then skips the GHCR login, and `setup-local-registry`, the containerd mirror wiring in `setup-kind-cluster.sh`, and `load-test-images` are all no-ops so the kind nodes pull every image directly from upstream.
+- `make helm-test` — run `scripts/ci/helm-test.sh` against the current kube context. Walks `docs/quickstart.mdx` end to end (floci → `helm install` → wait for rollout → query through the gateway). Run `make prepare-test-e2e` first (it publishes the images; running `helm-test` against a cluster that never had `load-test-images` run causes `ImagePullBackOff`). This is the same check the `Helm Test` workflow runs on every PR.
+- `make cleanup-test-e2e` — delete the e2e kind cluster (`KIND_CLUSTER`). The local registry is left running (its layer cache speeds up the next run); use `make flush-local-registry` to drop it.
 - `./helm/scripts/validate-chart.sh` — the full validation pipeline CI runs (helm dep build, yamllint, helm lint, helm template + yamllint of rendered output). Use this when reproducing a CI failure.
 
 ## Proactive Collaboration

@@ -1,0 +1,151 @@
+---
+# Installs the chart on a throwaway kind cluster and walks docs/quickstart.mdx
+# end to end: deploy the floci S3 emulator, install the branch's chart pointed
+# at it, wait for every workload to roll out, and run a query through the
+# gateway. Guards the documented quickstart against chart regressions (the
+# helm-validate workflow only lints and templates — it never installs).
+name: Helm Test
+
+on:
+  pull_request:
+
+permissions: {}
+
+env:
+  # Flip to "true" once the ghcr.io/firebolt-db engine + metadata packages are
+  # public. While "false" (private), the host logs in to GHCR and pulls the
+  # images through the local registry the kind nodes mirror. When "true", no
+  # GHCR login is needed and the kind nodes pull the images directly from
+  # upstream, so the local registry and image-publishing steps are skipped.
+  GHCR_PACKAGES_PUBLIC: "false"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    name: Detect docs-only change
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+    steps:
+      - name: Determine whether the PR changed only docs
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # List the PR's changed files via the compare API (no checkout
+          # needed). "docs" = markdown anywhere, plus docs/ and docs-internal/.
+          # Fail-safe: any uncertainty leaves docs_only=false so the check
+          # still runs.
+          files="$(gh api --paginate \
+            "repos/${REPO}/compare/${BASE_SHA}...${HEAD_SHA}" \
+            --jq '.files[].filename' 2>/dev/null || true)"
+          echo "Changed files:"
+          printf '%s\n' "${files:-<none>}"
+          non_docs="$(printf '%s\n' "${files}" \
+            | grep -vE '\.mdx?$|^docs/|^docs-internal/' || true)"
+          if [ -n "${files}" ] && [ -z "${non_docs}" ]; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  helm-test:
+    name: helm-test (k8s ${{ matrix.k8s-version }})
+    needs: detect
+    if: needs.detect.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      # Needed to pull the PRIVATE ghcr.io/firebolt-db engine + metadata images
+      # during the GHCR login below. Harmless once GHCR_PACKAGES_PUBLIC=true.
+      packages: read
+    strategy:
+      fail-fast: false
+      # Kind node images, digest-pinned as kind requires. Add a line to test
+      # another Kubernetes version; `k8s-version` is for the job label only.
+      matrix:
+        include:
+          - k8s-version: "1.35"
+            node-image: "kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f"
+    steps:
+      - name: Free up disk space on the runner
+        run: |
+          df -h /
+          sudo rm -rf /usr/lib/jvm /usr/local/.ghcup /opt/ghc \
+            /usr/local/lib/android /usr/share/dotnet /usr/share/swift \
+            /opt/hostedtoolcache/CodeQL
+          docker image prune -af || true
+          df -h /
+
+      - name: Raise memlock limit for kind nodes (engine io_uring)
+        run: |
+          # The engine maps io_uring buffers and needs a high memlock limit.
+          # Containers inherit it from the Docker daemon, so raise it there
+          # before kind starts its node container.
+          sudo mkdir -p /etc/systemd/system/docker.service.d
+          sudo tee /etc/systemd/system/docker.service.d/memlock.conf > /dev/null <<'EOF'
+          [Service]
+          LimitMEMLOCK=infinity
+          EOF
+          sudo mkdir -p /etc/docker
+          sudo tee /etc/docker/daemon.json > /dev/null <<'EOF'
+          {
+            "default-ulimits": {
+              "memlock": { "Name": "memlock", "Hard": -1, "Soft": -1 }
+            }
+          }
+          EOF
+          sudo systemctl daemon-reload
+          sudo systemctl restart docker
+
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install kind
+        env:
+          KIND_VERSION: v0.32.0
+        run: |
+          curl -fsSLo ./kind \
+            "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+          kind version
+
+      - name: Set up Helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          # Stay on Helm v3 (see helm-validate.yaml for the rationale).
+          version: "v3.16.3"
+
+      - name: Log in to GitHub Container Registry
+        # While the engine/metadata packages are private, the host's docker pull
+        # in load-e2e-images.sh needs GHCR auth or it 401s. Skipped once the
+        # packages are public (GHCR_PACKAGES_PUBLIC=true) — anonymous pulls work.
+        if: env.GHCR_PACKAGES_PUBLIC != 'true'
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+        run: echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+
+      - name: Prepare kind cluster and load images
+        env:
+          NODE_IMAGE: ${{ matrix.node-image }}
+        run: make prepare-test-e2e
+
+      - name: Run quickstart end-to-end check
+        run: make helm-test
+
+      - name: Delete kind cluster
+        if: always()
+        run: make cleanup-test-e2e || true

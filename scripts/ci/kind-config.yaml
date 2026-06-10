@@ -1,0 +1,27 @@
+---
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+# Single untainted control-plane node is enough for the quickstart: one engine
+# node plus the gateway, metadata service, PostgreSQL, and floci all schedule
+# on it. maxPods is bumped to leave headroom for the short-lived query and
+# helm-test pods.
+#
+# `containerdConfigPatches` switches the node's containerd to look up per-host
+# pull configuration under /etc/containerd/certs.d/<host>/hosts.toml.
+# scripts/setup-kind-cluster.sh writes those files post-create to alias
+# ghcr.io / docker.io to the local OCI registry started by
+# scripts/setup-local-registry.sh. The node then pulls every image (including
+# the private engine / metadata images) from the local registry instead of
+# doing an anonymous upstream pull.
+#
+# https://kind.sigs.k8s.io/docs/user/local-registry/
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: KubeletConfiguration
+        maxPods: 250
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"

@@ -1,0 +1,32 @@
+---
+# CI-only sizing overlay for the quickstart end-to-end check.
+#
+# docs/quickstart.mdx installs the chart with its shipped defaults plus a
+# storage block (my-values.yaml). Those defaults size the engine for a real
+# workload (1 vCPU / 4Gi) and run two gateway replicas, which does not fit a
+# 2-vCPU GitHub runner. This overlay is layered on top of the doc's
+# my-values.yaml (it does not replace it) and only trims resources so the
+# install schedules in CI. It changes nothing a user follows in the quickstart.
+#
+# Applied via: helm install ... -f my-values.yaml -f scripts/ci/ci-values.yaml
+
+# One gateway replica is enough to route queries; two does not fit the runner.
+gateway:
+  replicas: 1
+
+# Shrink the single default engine. `name` must stay `default` so the gateway
+# route and the X-Firebolt-Engine header in the query step keep matching.
+engines:
+  - name: default
+    replicas: 1
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "2Gi"
+      limits:
+        memory: "2Gi"
+    storage:
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 1Gi
