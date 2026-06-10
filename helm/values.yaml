@@ -185,6 +185,9 @@ metadata:
     priorityClassName: ""
     # -- Extra labels applied to the metadata pod template.
     extraPodLabels: {}
+    # -- Extra annotations applied to the metadata pod template.
+    # Merged with the chart-managed checksum annotations.
+    podAnnotations: {}
     # -- Extra environment variables appended to the metadata container.
     extraEnv: []
     # -- Extra sidecar containers appended to the metadata pod's `containers`.
@@ -361,6 +364,12 @@ gateway:
     # preempt lower-priority workloads when the cluster is under resource
     # pressure — useful when query routing must stay up during incidents.
     priorityClassName: ""
+    # -- Extra labels applied to the gateway pod template. Chart-managed
+    # selector / component labels cannot be overridden.
+    extraPodLabels: {}
+    # -- Extra annotations applied to the gateway pod template.
+    # Merged with the chart-managed checksum annotation.
+    podAnnotations: {}
     # -- Extra sidecar containers appended to the gateway pod's `containers`.
     sidecars: []
     # -- Init containers injected into the gateway pod.

@@ -82,10 +82,12 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.podTemplate | object | {} | Pod template overrides for gateway pods. Only the keys listed below are read by the chart; arbitrary [PodSpec](https://pkg.go.dev/k8s.io/api/core/v1#PodSpec) fields supplied here are silently ignored. Overrides are additive and do not lower the chart's security floor: the gateway container keeps its non-root, drop-ALL-capabilities default `securityContext` unless you explicitly replace it via `securityContext` below. |
 | gateway.podTemplate.affinity | object | `{}` | Affinity rules for gateway pod scheduling. |
 | gateway.podTemplate.envFrom | list | `[]` | `envFrom` sources (ConfigMap/Secret) for the Envoy container. |
+| gateway.podTemplate.extraPodLabels | object | `{}` | Extra labels applied to the gateway pod template. Chart-managed selector / component labels cannot be overridden. |
 | gateway.podTemplate.imagePullSecrets | list | `[]` | Per-component image pull secrets, concatenated with the top-level `imagePullSecrets`. |
 | gateway.podTemplate.initContainers | list | `[]` | Init containers injected into the gateway pod. |
 | gateway.podTemplate.lifecycle | object | {} | Lifecycle hooks for the Envoy container. When empty, the chart keeps its default `preStop` drain hook; setting this replaces that hook, so preserve an equivalent drain step if you override it. |
 | gateway.podTemplate.nodeSelector | object | `{}` | Node selector for gateway pod scheduling. |
+| gateway.podTemplate.podAnnotations | object | `{}` | Extra annotations applied to the gateway pod template. Merged with the chart-managed checksum annotation. |
 | gateway.podTemplate.podSecurityContext | object | {} | Pod-level security context override for the gateway pod. When empty, no pod-level securityContext is set. Setting this does not relax the container-level hardening unless you also override `securityContext`. |
 | gateway.podTemplate.priorityClassName | string | `""` | Pod priority class. Reference a `PriorityClass` to let the gateway preempt lower-priority workloads when the cluster is under resource pressure — useful when query routing must stay up during incidents. |
 | gateway.podTemplate.securityContext | object | {} | Container-level security context override for the Envoy container. When empty, the chart keeps its secure default (runAsNonRoot, runAsUser 101, readOnlyRootFilesystem, no privilege escalation, all capabilities dropped). Override only when you understand the security trade-off. |
@@ -116,6 +118,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | metadata.podTemplate.initContainers | list | `[]` | Init containers injected into the metadata pod. |
 | metadata.podTemplate.lifecycle | object | {} | Lifecycle hooks for the metadata container. When empty, no lifecycle hooks are set. |
 | metadata.podTemplate.nodeSelector | object | `{}` | Node selector for metadata pod scheduling. |
+| metadata.podTemplate.podAnnotations | object | `{}` | Extra annotations applied to the metadata pod template. Merged with the chart-managed checksum annotations. |
 | metadata.podTemplate.podSecurityContext | object | {} | Pod-level security context override for the metadata pod. When empty, the chart keeps its secure default (runAsNonRoot, runAsUser/Group 1111, RuntimeDefault seccomp profile). Override only when you understand the security trade-off. |
 | metadata.podTemplate.priorityClassName | string | `""` | Pod priority class. Reference a `PriorityClass` to let the metadata service preempt lower-priority workloads under resource pressure. |
 | metadata.podTemplate.securityContext | object | {} | Container-level security context override for the metadata container. When empty, the chart keeps its secure default (runAsNonRoot, runAsUser 1111, readOnlyRootFilesystem, no privilege escalation, all capabilities dropped). Override only when you understand the security trade-off. |

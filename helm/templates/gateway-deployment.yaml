@@ -22,9 +22,18 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/gateway-configmap.yaml") . | sha256sum }}
+        {{- with .Values.gateway.podTemplate.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         {{- include "fbinstance.podLabels" . | nindent 8 }}
         firebolt/component: gateway
+        {{- $reserved := list "firebolt/component" "app.kubernetes.io/name" "app.kubernetes.io/instance" "app.kubernetes.io/managed-by" }}
+        {{- range $k, $v := .Values.gateway.podTemplate.extraPodLabels }}
+        {{- if not (has $k $reserved) }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+        {{- end }}
     spec:
       # See the equivalent comment in engine-statefulset.yaml: kill legacy
       # service-link env injection, DNS is the only service-discovery

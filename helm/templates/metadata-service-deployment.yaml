@@ -23,6 +23,9 @@ spec:
       annotations:
         checksum/config: {{ toYaml .Values.metadata.server | sha256sum }}
         checksum/secret: {{ toYaml .Values.postgresql | sha256sum }}
+        {{- with .Values.metadata.podTemplate.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         {{- include "fbinstance.podLabels" . | nindent 8 }}
         firebolt/component: metadata-service
