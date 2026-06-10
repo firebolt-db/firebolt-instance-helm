@@ -79,12 +79,22 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.pdb.enabled | bool | `true` | Emit a PodDisruptionBudget for the gateway. Set to `false` when an external policy controller (Kyverno, OPA Gatekeeper, etc.) or a cluster-wide PDB tool already manages disruption budgets, so the chart's PDB does not conflict with theirs. |
 | gateway.pdb.maxUnavailable | int | `1` | Maximum gateway pods that may be unavailable simultaneously during voluntary disruption. Mutually exclusive with `minAvailable` — set one and leave the other `null`. |
 | gateway.pdb.minAvailable | string | `nil` | Minimum gateway pods that must remain available during voluntary disruption. Mutually exclusive with `maxUnavailable`. |
-| gateway.podTemplate | object | {} | Pod template overrides for gateway pods. Only the keys listed below are read by the chart; arbitrary [PodSpec](https://pkg.go.dev/k8s.io/api/core/v1#PodSpec) fields supplied here are silently ignored. |
+| gateway.podTemplate | object | {} | Pod template overrides for gateway pods. Only the keys listed below are read by the chart; arbitrary [PodSpec](https://pkg.go.dev/k8s.io/api/core/v1#PodSpec) fields supplied here are silently ignored. Overrides are additive and do not lower the chart's security floor: the gateway container keeps its non-root, drop-ALL-capabilities default `securityContext` unless you explicitly replace it via `securityContext` below. |
 | gateway.podTemplate.affinity | object | `{}` | Affinity rules for gateway pod scheduling. |
+| gateway.podTemplate.envFrom | list | `[]` | `envFrom` sources (ConfigMap/Secret) for the Envoy container. |
+| gateway.podTemplate.imagePullSecrets | list | `[]` | Per-component image pull secrets, concatenated with the top-level `imagePullSecrets`. |
+| gateway.podTemplate.initContainers | list | `[]` | Init containers injected into the gateway pod. |
+| gateway.podTemplate.lifecycle | object | {} | Lifecycle hooks for the Envoy container. When empty, the chart keeps its default `preStop` drain hook; setting this replaces that hook, so preserve an equivalent drain step if you override it. |
 | gateway.podTemplate.nodeSelector | object | `{}` | Node selector for gateway pod scheduling. |
+| gateway.podTemplate.podSecurityContext | object | {} | Pod-level security context override for the gateway pod. When empty, no pod-level securityContext is set. Setting this does not relax the container-level hardening unless you also override `securityContext`. |
 | gateway.podTemplate.priorityClassName | string | `""` | Pod priority class. Reference a `PriorityClass` to let the gateway preempt lower-priority workloads when the cluster is under resource pressure — useful when query routing must stay up during incidents. |
+| gateway.podTemplate.securityContext | object | {} | Container-level security context override for the Envoy container. When empty, the chart keeps its secure default (runAsNonRoot, runAsUser 101, readOnlyRootFilesystem, no privilege escalation, all capabilities dropped). Override only when you understand the security trade-off. |
+| gateway.podTemplate.serviceAccountName | string | `""` | ServiceAccount used by gateway pods. When empty, the namespace `default` ServiceAccount is used (the chart does not create one). |
+| gateway.podTemplate.sidecars | list | `[]` | Extra sidecar containers appended to the gateway pod's `containers`. |
 | gateway.podTemplate.tolerations | list | `[]` | Tolerations for gateway pod scheduling. |
 | gateway.podTemplate.topologySpreadConstraints | list | `[]` | Topology spread constraints. With 2 default replicas, set this to force zone or node spread so a single failure cannot take down both gateway pods at once. |
+| gateway.podTemplate.volumeMounts | list | `[]` | Extra volume mounts added to the Envoy container, merged with the chart-managed mounts. |
+| gateway.podTemplate.volumes | list | `[]` | Extra volumes added to the gateway pod, merged with the chart-managed volumes. Mount them on the Envoy container via `volumeMounts` below. |
 | gateway.replicas | int | `2` | Number of gateway replicas. |
 | gateway.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the Envoy container. |
 | gateway.service | object | {} | Gateway Service configuration. |
@@ -97,7 +107,24 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | metadata.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | metadata.image.repository | string | `"ghcr.io/firebolt-db/metadata"` | Container repository for the metadata service image. |
 | metadata.image.tag | string | `""` | Metadata service image tag. Defaults to `Chart.appVersion` (kept in lockstep with the engine) when empty. Override explicitly only when the metadata service must run a version other than the engine. |
-| metadata.podTemplate | object | `{}` | Pod template overrides for the metadata service (nodeSelector, tolerations, affinity). |
+| metadata.podTemplate | object | {} | Pod template overrides for the metadata service. Only the keys listed below are read by the chart; arbitrary [PodSpec](https://pkg.go.dev/k8s.io/api/core/v1#PodSpec) fields supplied here are silently ignored. Overrides are additive and do not lower the chart's security floor: the metadata pod keeps its non-root pod- and container-level defaults (drop-ALL capabilities) unless you explicitly replace them via `podSecurityContext` / `securityContext` below. |
+| metadata.podTemplate.affinity | object | `{}` | Affinity rules for metadata pod scheduling. |
+| metadata.podTemplate.envFrom | list | `[]` | `envFrom` sources (ConfigMap/Secret) for the metadata container. |
+| metadata.podTemplate.extraEnv | list | `[]` | Extra environment variables appended to the metadata container. |
+| metadata.podTemplate.extraPodLabels | object | `{}` | Extra labels applied to the metadata pod template. |
+| metadata.podTemplate.imagePullSecrets | list | `[]` | Per-component image pull secrets, concatenated with the top-level `imagePullSecrets`. |
+| metadata.podTemplate.initContainers | list | `[]` | Init containers injected into the metadata pod. |
+| metadata.podTemplate.lifecycle | object | {} | Lifecycle hooks for the metadata container. When empty, no lifecycle hooks are set. |
+| metadata.podTemplate.nodeSelector | object | `{}` | Node selector for metadata pod scheduling. |
+| metadata.podTemplate.podSecurityContext | object | {} | Pod-level security context override for the metadata pod. When empty, the chart keeps its secure default (runAsNonRoot, runAsUser/Group 1111, RuntimeDefault seccomp profile). Override only when you understand the security trade-off. |
+| metadata.podTemplate.priorityClassName | string | `""` | Pod priority class. Reference a `PriorityClass` to let the metadata service preempt lower-priority workloads under resource pressure. |
+| metadata.podTemplate.securityContext | object | {} | Container-level security context override for the metadata container. When empty, the chart keeps its secure default (runAsNonRoot, runAsUser 1111, readOnlyRootFilesystem, no privilege escalation, all capabilities dropped). Override only when you understand the security trade-off. |
+| metadata.podTemplate.serviceAccountName | string | `""` | ServiceAccount used by metadata pods. When empty, the namespace `default` ServiceAccount is used (the chart does not create one). |
+| metadata.podTemplate.sidecars | list | `[]` | Extra sidecar containers appended to the metadata pod's `containers`. |
+| metadata.podTemplate.tolerations | list | `[]` | Tolerations for metadata pod scheduling. |
+| metadata.podTemplate.topologySpreadConstraints | list | `[]` | Topology spread constraints for metadata pod scheduling. |
+| metadata.podTemplate.volumeMounts | list | `[]` | Extra volume mounts added to the metadata container, merged with the chart-managed mounts. |
+| metadata.podTemplate.volumes | list | `[]` | Extra volumes added to the metadata pod, merged with the chart-managed volumes. Mount them on the metadata container via `volumeMounts` below. |
 | metadata.resources | object | `{"limits":{"memory":"1Gi"},"requests":{"cpu":"100m","memory":"512Mi"}}` | Resource requests and limits for the metadata service container. The metadata service is a lightweight gRPC service; increase memory if you run many engines. |
 | metadata.server | object | {} | gRPC server configuration for the metadata service. |
 | metadata.server.host | string | `"0.0.0.0"` | gRPC server listen address. |

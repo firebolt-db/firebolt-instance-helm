@@ -39,11 +39,18 @@ spec:
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: {{ .Values.metadata.deployment.terminationGracePeriodSeconds }}
       securityContext:
+        {{- if .Values.metadata.podTemplate.podSecurityContext }}
+        {{- toYaml .Values.metadata.podTemplate.podSecurityContext | nindent 8 }}
+        {{- else }}
         runAsNonRoot: true
         runAsUser: 1111
         runAsGroup: 1111
         seccompProfile:
           type: RuntimeDefault
+        {{- end }}
+      {{- with .Values.metadata.podTemplate.serviceAccountName }}
+      serviceAccountName: {{ . }}
+      {{- end }}
       {{- with .Values.metadata.podTemplate.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -56,8 +63,19 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.imagePullSecrets }}
+      {{- with .Values.metadata.podTemplate.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.metadata.podTemplate.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      {{- with (concat .Values.imagePullSecrets .Values.metadata.podTemplate.imagePullSecrets) }}
       imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.metadata.podTemplate.initContainers }}
+      initContainers:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
@@ -92,9 +110,15 @@ spec:
             # Scratch space outside the read-only root filesystem.
             - name: tmp
               mountPath: /tmp
+          {{- with .Values.metadata.podTemplate.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.metadata.resources | nindent 12 }}
           securityContext:
+            {{- if .Values.metadata.podTemplate.securityContext }}
+            {{- toYaml .Values.metadata.podTemplate.securityContext | nindent 12 }}
+            {{- else }}
             runAsNonRoot: true
             runAsUser: 1111
             readOnlyRootFilesystem: true
@@ -102,6 +126,11 @@ spec:
             capabilities:
               drop:
                 - ALL
+            {{- end }}
+          {{- with .Values.metadata.podTemplate.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             - name: POSTGRES_USERNAME_FILE
               value: {{ .Values.postgresql.credentials.mountPath }}/username
@@ -110,6 +139,13 @@ spec:
           {{- with .Values.metadata.podTemplate.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- with .Values.metadata.podTemplate.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- with .Values.metadata.podTemplate.sidecars }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       volumes:
         - name: config
           configMap:
@@ -119,3 +155,6 @@ spec:
             secretName: {{ $pgSecretName }}
         - name: tmp
           emptyDir: {}
+        {{- with .Values.metadata.podTemplate.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
