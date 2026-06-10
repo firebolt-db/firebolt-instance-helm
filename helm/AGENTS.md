@@ -8,7 +8,7 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 
 - **Chart name:** `firebolt-instance` (`Chart.yaml` `name`).
 - **Chart version:** `Chart.yaml` `version`. Bumped automatically by the release workflow based on conventional-commit subject.
-- **App version:** `Chart.yaml` `appVersion`. Default tag for both the engine and metadata images. Engine uses it verbatim; the metadata template strips a leading `release-` / `debug-` prefix before applying it.
+- **App version:** `Chart.yaml` `appVersion`. Default tag for both the engine and metadata images. Both registries publish matching `debug-` / `release-` prefixed tags, so the chart applies the same default tag to both components unless `metadata.image.tag` is overridden explicitly.
 - **Configuration surface:** every key in `values.yaml`. The annotated comments are the source of truth — `helm-docs` reads them and rewrites `README.md` from them.
 - **Cluster surface produced by the chart:**
   - Envoy gateway: `Deployment` + `Service` (configurable type) + `ConfigMap` + optional `PodDisruptionBudget` (`gateway-pdb.yaml`). Routes by `X-Firebolt-Engine` header.
@@ -76,4 +76,5 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 
 ## Known issues
 
-_Empty. Populate as agents fix non-obvious problems within this module._
+- Symptom: engine pods start, print startup logs, then fail readiness with `Cannot open file /firebolt-core/status, errno: 30, strerror: Read-only file system`. Cause: the chart passed `--data-dir /firebolt-core` while also enforcing `readOnlyRootFilesystem: true`, so the engine tried to write status and sibling runtime files onto the image layer instead of the PVC-backed data directory. Resolution: point `--data-dir` at `/firebolt-data/data` and mount `config.yaml` and `auth.json` under that same writable data directory.
+- Symptom: with `engineSpec.memlockSetup` + `runAsNonRoot` enabled, engine startup stalls — the core entrypoint loops in `while needs_memlock_setup` and the memlock sidecar logs `waiting for Core entrypoint PID` forever. Cause: the data-dir move to `/firebolt-data/data` updated the core entrypoint's `PID_FILE` path but `files/memlock-setup.sh` still watched the old `/firebolt-core/volume` path (no longer mounted in the sidecar), so the sidecar never found the PID and never raised memlock. Resolution: the entrypoint `PID_FILE` (`engine-statefulset.yaml`) and the sidecar `PID_FILE` (`files/memlock-setup.sh`) must point at the same path under the shared `data` mount — keep both on `/firebolt-data/data/entrypoint-$POD_UID.pid`.

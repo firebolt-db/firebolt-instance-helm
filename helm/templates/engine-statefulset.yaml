@@ -160,8 +160,8 @@ spec:
 
               {{- if $.Values.engineSpec.memlockSetup }}
               echo "[Setup] Core entrypoint PID: $BASHPID"
-              rm -f /firebolt-core/volume/entrypoint-*.pid
-              PID_FILE="/firebolt-core/volume/entrypoint-$POD_UID.pid"
+              rm -f /firebolt-data/data/entrypoint-*.pid
+              PID_FILE="/firebolt-data/data/entrypoint-$POD_UID.pid"
               echo "$BASHPID" > "$PID_FILE"
               trap "rm -f $PID_FILE" EXIT
 
@@ -189,7 +189,7 @@ spec:
 
               rm -f "$PID_FILE"
 
-              exec /firebolt-core/firebolt server --node "$FIREBOLT_CORE_NODE" --data-dir /firebolt-core
+              exec /firebolt-core/firebolt server --node "$FIREBOLT_CORE_NODE" --data-dir /firebolt-data/data
           # Intra-engine peer ports (aragog/shufflepuff/storage-manager/
           # storage-agent) are intentionally omitted. ContainerPort entries
           # are informational only — the engine binary opens those
@@ -239,19 +239,16 @@ spec:
           terminationMessagePolicy: File
           volumeMounts:
             - name: data
-              mountPath: /firebolt-core/volume
+              mountPath: /firebolt-data/data
             - name: engine-config
-              mountPath: /firebolt-core/config.yaml
+              mountPath: /firebolt-data/data/config.yaml
               subPath: config.yaml
               readOnly: true
             - name: auth-config
-              mountPath: /firebolt-core/auth.json
+              mountPath: /firebolt-data/data/auth.json
               subPath: auth.json
               readOnly: true
             # Scratch space outside the read-only root filesystem.
-            # `/tmp` is used by bash (heredocs / command substitution
-            # in the entrypoint script) and by the engine for any
-            # disk-spill of query intermediates.
             # `/var/run/firebolt` holds the engine's per-port unix
             # domain socket (`.s.firebolt.<port>`); the directory
             # exists in the image but is on the root layer, so it
@@ -340,7 +337,7 @@ spec:
               {{- include "fbinstance.memlockSetupScript" $ | nindent 14 }}
           volumeMounts:
             - name: data
-              mountPath: /firebolt-core/volume
+              mountPath: /firebolt-data/data
         {{- end }}
 {{- $hpEnabled := $.Values.engineSpec.hostPathStorageEnabled }}
 {{- if or $.Values.engineSpec.customInitContainersTemplate $hpEnabled }}
@@ -355,8 +352,8 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |
-              echo "[Setup] changing ownership of /firebolt-core/volume to UID 3473"
-              chown -R 3473:3473 /firebolt-core/volume
+              echo "[Setup] changing ownership of /firebolt-data/data to UID 3473"
+              chown -R 3473:3473 /firebolt-data/data
           resources:
             limits:
               memory: 24Mi
@@ -372,7 +369,7 @@ spec:
                 - CHOWN
           volumeMounts:
             - name: data
-              mountPath: /firebolt-core/volume
+              mountPath: /firebolt-data/data
         {{- end }}
 {{- end }}
       volumes:
