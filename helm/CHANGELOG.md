@@ -1,3 +1,7 @@
+# 1.1.0
+
+feat(gateway,metadata): broaden pod customization surface (FB-1552) (#85)
+
 # 1.0.0
 
 feat: rename engine data-dir to /firebolt-data/data (#82)
