@@ -1,0 +1,137 @@
+---
+description: Install the firebolt-instance Helm chart on a local kind cluster with an in-cluster S3 emulator and run your first query through the gateway.
+sidebarTitle: Quickstart
+title: Quickstart
+---
+
+This page walks through a complete local install of the `firebolt-instance` Helm chart on kind, from an empty machine to your first query.
+
+The walkthrough uses kind for the cluster and an in-cluster S3 emulator for engine storage, so it needs no cloud resources. For the full cluster, tooling, and storage requirements, see [Prerequisites](./prerequisites).
+
+## Before you get started
+
+Install the following tools:
+
+- [kind](https://kind.sigs.k8s.io/) to create a local Kubernetes cluster.
+- [Docker](https://docs.docker.com/get-docker/) to run the containers that back kind.
+- [kubectl](https://kubernetes.io/docs/tasks/tools/) to interact with the cluster.
+- [Helm](https://helm.sh/docs/intro/install/) v3 to install the chart.
+
+## Create a local cluster
+
+Create a kind cluster on your machine:
+
+```bash
+kind create cluster --name firebolt
+```
+
+Confirm the node is ready:
+
+```bash
+kubectl get nodes
+```
+
+The node reports `Ready`:
+
+```text
+NAME                     STATUS   ROLES           AGE   VERSION
+firebolt-control-plane   Ready    control-plane   30s   v1.35.0
+```
+
+## Create a namespace
+
+Create the namespace that holds the storage emulator and the release:
+
+```bash
+kubectl create namespace firebolt
+```
+
+## Deploy object storage
+
+Engines store managed table data in object storage and refuse to start against a local filesystem. On a real cluster, point the engine at an S3 or S3-compatible bucket and grant access through your platform's workload identity, as described in [Managed storage](./usage/managed-storage). For this local cluster, deploy the [floci](https://github.com/floci-io/floci) S3 emulator, which also creates the bucket the engine uses:
+
+```bash
+kubectl apply -n firebolt -f https://raw.githubusercontent.com/firebolt-db/firebolt-instance-helm/main/local-floci.yaml
+```
+
+Wait for floci and its bucket-creation job to finish:
+
+```bash
+# Wait for the floci deployment to roll out.
+kubectl -n firebolt rollout status deployment/floci --timeout=120s
+
+# Wait for the one-shot job that creates the firebolt-managed bucket.
+kubectl -n firebolt wait --for=condition=complete job/floci-mkbucket --timeout=120s
+```
+
+<Note>
+floci stores data in the pod's ephemeral filesystem and validates no credentials, so it is for local development only. Production deployments use a real object store. See [Managed storage](./usage/managed-storage).
+</Note>
+
+## Configure the engine
+
+Create a values file that points the engine's storage at the floci endpoint. The `type: minio` mode signs requests for an S3-compatible endpoint, and `bucket_name` matches the bucket floci created.
+
+```yaml
+# my-values.yaml
+customEngineConfig:
+  storage:
+    type: minio
+    api_scheme: "s3://"
+    bucket_name: firebolt-managed
+    minio:
+      endpoint: http://floci.firebolt.svc.cluster.local:4566
+```
+
+This is the only value the local install needs. The chart's defaults provide one engine named `default`, the Envoy gateway, the Metadata Service, and a bundled PostgreSQL.
+
+## Install the chart
+
+Install the chart into the `firebolt` namespace from its published location:
+
+```bash
+helm install firebolt oci://oci.firebolt.io/firebolt-db/helm-charts/firebolt-instance \
+  --namespace firebolt \
+  -f my-values.yaml
+```
+
+The `oci.firebolt.io` host is Firebolt's [Scarf](https://scarf.sh) gateway, which records anonymous download analytics and redirects to GHCR. To install without it, pull from `oci://ghcr.io/firebolt-db/helm-charts/firebolt-instance` instead.
+
+## Verify the install
+
+List the workloads the release created:
+
+```bash
+kubectl -n firebolt get statefulset,deployment
+```
+
+Wait until `firebolt-engine-default-node-0`, `firebolt-metadata-pg`, `firebolt-gateway`, and `firebolt-metadata-service` all report `READY`. The engine pod stays `NotReady` until it can reach the bucket, so if it does not become ready, confirm the object-storage step finished.
+
+## Run a query
+
+Run a query through the gateway from a temporary in-cluster pod. The `X-Firebolt-Engine` header selects the engine:
+
+```bash
+kubectl run query --rm -i --image=curlimages/curl --restart=Never -n firebolt -- \
+  curl --silent "http://firebolt-gateway/" \
+    -H "X-Firebolt-Engine: default" \
+    -H "Content-Type: text/plain" \
+    --data-binary "SELECT 1"
+```
+
+You should see the query result in the output.
+
+## Clean up
+
+Delete the kind cluster to free all resources:
+
+```bash
+kind delete cluster --name firebolt
+```
+
+## Next steps
+
+- [Single engine](./usage/single-engine) covers the default install in more detail.
+- [Multi-engine](./usage/multi-engine) runs more than one engine in a release.
+- [Managed storage](./usage/managed-storage) configures a real S3 or S3-compatible bucket.
+- [Operator upgrade path](./operator-upgrade-path) explains when to move to the Firebolt Kubernetes Operator for day-2 automation.

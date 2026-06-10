@@ -59,19 +59,35 @@ This is the fast path if you want the agent to drive the install for you. If you
 
 ## Quick start
 
-Engines require object storage to start — see [`docs/usage/managed-storage.mdx`](docs/usage/managed-storage.mdx). With a values file that configures it:
+Engines need object storage to become ready. This flow uses the bundled [floci](https://github.com/floci-io/floci) S3 emulator (`local-floci.yaml`) for a self-contained local install. For a real bucket, see [`docs/usage/managed-storage.mdx`](docs/usage/managed-storage.mdx).
+
+Point the engine at floci with a values file:
+
+```yaml
+# my-values.yaml
+customEngineConfig:
+  storage:
+    type: minio
+    api_scheme: "s3://"
+    bucket_name: firebolt-managed
+    minio:
+      endpoint: http://floci.firebolt.svc.cluster.local:4566
+```
+
+Then create the cluster, deploy storage, and install the chart:
 
 ```sh
 make create                                # kind create cluster
+make floci                                 # deploy the floci S3 emulator + create the bucket
 helm install firebolt ./helm \
   --namespace firebolt --create-namespace \
-  -f my-values.yaml                        # must set customEngineConfig.storage
-make test                                  # run `helm test` (engine ready, gateway ready, smoke SQL, ...)
+  -f my-values.yaml
+make test                                  # helm test (engine ready, gateway ready, smoke SQL)
 make cleanup                               # uninstall release, delete PVCs, delete namespace
 make delete                                # kind delete cluster
 ```
 
-See [`docs/usage/single-engine.mdx`](docs/usage/single-engine.mdx) for the full walkthrough, [`docs/prerequisites.mdx`](docs/prerequisites.mdx) for cluster requirements, and [`docs/`](docs/) for additional patterns (multi-engine, external PostgreSQL, image overrides).
+See [`docs/quickstart.mdx`](docs/quickstart.mdx) for a step-by-step walkthrough, [`docs/usage/single-engine.mdx`](docs/usage/single-engine.mdx) for install details, [`docs/prerequisites.mdx`](docs/prerequisites.mdx) for cluster requirements, and [`docs/`](docs/) for additional patterns (multi-engine, external PostgreSQL, image overrides).
 
 ## How it works
 
@@ -79,7 +95,7 @@ The Envoy gateway extracts the `X-Firebolt-Engine` header via a Lua filter and r
 
 ## Where to go next
 
-- **User-facing docs** are under [`docs/`](docs/), authored as Mintlify MDX with navigation in [`docs/docs.json`](docs/docs.json): [overview](docs/overview.mdx), [prerequisites](docs/prerequisites.mdx), usage patterns ([single engine](docs/usage/single-engine.mdx), [multi-engine](docs/usage/multi-engine.mdx), [managed storage](docs/usage/managed-storage.mdx), [external PostgreSQL](docs/usage/external-postgres.mdx), [image overrides](docs/usage/image-overrides.mdx)), the [operator upgrade path](docs/operator-upgrade-path.mdx), and [troubleshooting](docs/troubleshooting.mdx).
+- **User-facing docs** are under [`docs/`](docs/), authored as Mintlify MDX with navigation in [`docs/docs.json`](docs/docs.json): [overview](docs/overview.mdx), [prerequisites](docs/prerequisites.mdx), [quickstart](docs/quickstart.mdx), usage patterns ([single engine](docs/usage/single-engine.mdx), [multi-engine](docs/usage/multi-engine.mdx), [managed storage](docs/usage/managed-storage.mdx), [external PostgreSQL](docs/usage/external-postgres.mdx), [image overrides](docs/usage/image-overrides.mdx)), the [operator upgrade path](docs/operator-upgrade-path.mdx), and [troubleshooting](docs/troubleshooting.mdx).
 - The full **configuration reference** is generated from `helm/values.yaml` and lives at [`helm/README.md`](./helm/README.md).
 - For **contributor** detail, conventions, and rules for making changes to this repo, see [`AGENTS.md`](AGENTS.md). Module-specific rules for the chart itself live in [`helm/AGENTS.md`](helm/AGENTS.md).
 - Changelog: [`helm/CHANGELOG.md`](./helm/CHANGELOG.md).
