@@ -1,8 +1,5 @@
 # firebolt-instance-helm
 
-[![CI](https://img.shields.io/github/checks-status/firebolt-db/firebolt-instance-helm/main?label=CI)](https://github.com/firebolt-db/firebolt-instance-helm/actions?query=branch%3Amain)
-[![Chart Version](https://img.shields.io/github/v/tag/firebolt-db/firebolt-instance-helm?label=chart&sort=semver)](https://github.com/firebolt-db/firebolt-instance-helm/releases)
-
 Helm chart for running a Firebolt instance on Kubernetes: Envoy gateway, Metadata Service, PostgreSQL, and one or more Firebolt query engine StatefulSets.
 
 The chart is published as `firebolt-instance` to `oci://ghcr.io/firebolt-db/helm-charts` on every change to `helm/` merged to `main`.
