@@ -117,9 +117,11 @@ jobs:
           version: "v3.16.3"
 
       - name: Login to GitHub Container Registry (Helm)
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" \
-            | helm registry login "${{ env.GHCR_REGISTRY }}" --username "${GITHUB_ACTOR}" --password-stdin
+          echo "${GHCR_TOKEN}" \
+            | helm registry login "${GHCR_REGISTRY}" --username "${GITHUB_ACTOR}" --password-stdin
 
       - name: Package Helm chart
         run: |
