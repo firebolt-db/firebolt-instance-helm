@@ -42,18 +42,21 @@ To help us effectively triage and resolve the issue, your report must include:
 
 ## Our Response Process
 
-1.  **Acknowledgement:** We will acknowledge receipt of your report within 3 business days.
+1.  **Acknowledgement:** We will acknowledge receipt of your report within 5 business days.
 2.  **Triage:** We will assess the report's validity and severity.
 3.  **Communication:** We will communicate our findings. This may include requesting further information, confirming the bug, or explaining if it is out of scope.
 4.  **Resolution:** We will work to patch the vulnerability and provide a timeline for remediation.
-5.  **Disclosure & Credit:** Once a fix is released, we will publish a security advisory (e.g., GitHub Security Advisory, CVE) and, with your permission, credit you for the discovery.
+5.  **Disclosure & Credit:** Once a fix is released, we may publicly disclose the vulnerability after a fix has been released. If we do, we will credit you for the finding, if you wish.
 
 ## Legal & Licensing
 
 By submitting a vulnerability report (including any code, patches, proof-of-concept code, or other materials), you acknowledge that your submission is provided under the same license terms that govern this project.
+
+We reserve the right to reject any report that does not comply with this policy.
 
 Personal data submitted as part of a vulnerability report will be processed solely for the purpose of communicating with you and addressing the vulnerability.
 
 ## Safe Harbor for Security Research
 
 We consider security research and vulnerability disclosure conducted in accordance with this policy to be authorized conduct. We will not initiate legal action or law enforcement investigation against you for activities reasonably necessary to identify and report vulnerabilities in this project, provided you act in good faith and adhere to these guidelines.
+
