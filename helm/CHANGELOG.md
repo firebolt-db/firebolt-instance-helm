@@ -1,3 +1,7 @@
+# 1.2.3
+
+chore: remove internal AWS account and Linear references (FB-1605) (#94)
+
 # 1.2.2
 
 docs: update Helm chart documentation (FB-1598) (#92)
