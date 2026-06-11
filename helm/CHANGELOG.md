@@ -1,3 +1,7 @@
+# 1.2.4
+
+docs: polish AGENTS.md and add helm/CLAUDE.md (FB-1608) (#97)
+
 # 1.2.3
 
 chore: remove internal AWS account and Linear references (FB-1605) (#94)
