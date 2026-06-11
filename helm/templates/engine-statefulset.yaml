@@ -119,9 +119,9 @@ spec:
             - name: FB_AWS_EC2_METADATA_CLIENT_ENABLED
               value: "true"
             # Selects the firebolt-core code path inside the unified
-            # `firebolt` binary (packdb FB-914): the operator-rendered
-            # config (config.yaml under --data-dir) is honored as-is and
-            # not rewritten at startup.
+            # `firebolt` binary: the operator-rendered config (config.yaml
+            # under --data-dir) is honored as-is and not rewritten at
+            # startup.
             - name: FIREBOLT_CORE_MODE
               value: "1"
           command: ["/bin/bash", "-c"]
