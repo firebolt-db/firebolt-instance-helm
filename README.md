@@ -64,44 +64,10 @@ This is the fast path if you want the agent to drive the install for you. If you
 
 ## Quick start
 
-Engines need object storage to become ready. This flow uses the bundled [floci](https://github.com/floci-io/floci) S3 emulator (`local-floci.yaml`) for a self-contained local install. For a real bucket, see [`docs/usage/object-storage/amazon-s3.mdx`](docs/usage/object-storage/amazon-s3.mdx).
-
-Point the engine at floci with a values file:
-
-```yaml
-# my-values.yaml
-customEngineConfig:
-  storage:
-    type: minio
-    api_scheme: "s3://"
-    bucket_name: firebolt-managed
-    minio:
-      endpoint: http://floci.firebolt.svc.cluster.local:4566
-```
-
-Then create the cluster, deploy storage, and install the chart:
-
-```sh
-make create                                # kind create cluster
-make floci                                 # deploy the floci S3 emulator + create the bucket
-helm install firebolt ./helm \
-  --namespace firebolt --create-namespace \
-  -f my-values.yaml
-make test                                  # helm test (engine ready, gateway ready, smoke SQL)
-make cleanup                               # uninstall release, delete PVCs, delete namespace
-make delete                                # kind delete cluster
-```
-
-See [`docs/quickstart.mdx`](docs/quickstart.mdx) for a step-by-step walkthrough, [`docs/usage/single-engine.mdx`](docs/usage/single-engine.mdx) for install details, [`docs/prerequisites.mdx`](docs/prerequisites.mdx) for cluster requirements, and [`docs/`](docs/) for additional patterns (multi-engine, external PostgreSQL, image overrides).
-
-## How it works
-
-The Envoy gateway extracts the `X-Firebolt-Engine` header via a Lua filter and rewrites the upstream to the matching engine Service. The metadata service serves table-and-engine metadata to engines over gRPC, scoped to the `customEngineConfig.instance.id` ULID. PostgreSQL is bundled by default for development; production deployments should set `postgresql.local_enabled: false` and provide an external database.
+For a step-by-step walkthrough, follow the quickstart guide in our [official documentation](https://docs.firebolt.io/self-managed/helm-chart/quickstart) or using the documentation source file at [`docs/quickstart.mdx`](docs/quickstart.mdx).
 
 ## Where to go next
-
-- **User-facing docs** are under [`docs/`](docs/), authored as Mintlify MDX with navigation in [`docs/docs.json`](docs/docs.json): [overview](docs/overview.mdx), [prerequisites](docs/prerequisites.mdx), [quickstart](docs/quickstart.mdx), usage patterns ([single engine](docs/usage/single-engine.mdx), [multi-engine](docs/usage/multi-engine.mdx), Object Storage ([Amazon S3](docs/usage/object-storage/amazon-s3.mdx), [Google Cloud Storage](docs/usage/object-storage/google-cloud-storage.mdx), [Azure Blob Storage](docs/usage/object-storage/azure-blob-storage.mdx)), [external PostgreSQL](docs/usage/external-postgres.mdx), [image overrides](docs/usage/image-overrides.mdx)), the [operator upgrade path](docs/operator-upgrade-path.mdx), and [troubleshooting](docs/troubleshooting.mdx).
 - The full **configuration reference** is generated from `helm/values.yaml` and lives at [`helm/README.md`](./helm/README.md).
-- For **contributor** detail, conventions, and rules for making changes to this repo, see [`AGENTS.md`](AGENTS.md). Module-specific rules for the chart itself live in [`helm/AGENTS.md`](helm/AGENTS.md).
 - Changelog: [`helm/CHANGELOG.md`](./helm/CHANGELOG.md).
+- For **contributor** detail, conventions, and rules for making changes to this repo, see [`AGENTS.md`](AGENTS.md). Module-specific rules for the chart itself live in [`helm/AGENTS.md`](helm/AGENTS.md).
 - Security policy: [`SECURITY.md`](./SECURITY.md).
