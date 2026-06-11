@@ -4,6 +4,9 @@ Helm chart for running a Firebolt instance on Kubernetes: Envoy gateway, Metadat
 
 The chart is published as `firebolt-instance` to `oci://ghcr.io/firebolt-db/helm-charts` on every change to `helm/` merged to `main`.
 
+## Documentation
+For more detailed information checkout our [official documentation](https://docs.firebolt.io/self-managed/helm-chart/overview)
+
 ## Scope
 
 The chart deploys a complete Firebolt instance — gateway, metadata, PostgreSQL, engines — into any Kubernetes cluster. For day-2 operational capabilities (zero-downtime engine rollouts, autoscaling, drift correction, reusable per-engine templates), use the [Firebolt Kubernetes Operator](docs/operator-upgrade-path.mdx). See [`docs/`](docs/) for usage patterns.
