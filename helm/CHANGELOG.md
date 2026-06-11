@@ -1,3 +1,7 @@
+# 1.2.2
+
+docs: update Helm chart documentation (FB-1598) (#92)
+
 # 1.2.1
 
 revert: rename engine data-dir to /firebolt-data/data (FB-1571) (#90)
