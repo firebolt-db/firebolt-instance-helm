@@ -15,7 +15,7 @@ Invalid Firebolt configuration: local file system for managed storage
 is not supported when using dedicated Pensieve
 ```
 
-`customEngineConfig.storage` is unset. Without an S3 or S3-compatible bucket the engine does not enter the Ready state. Configure object storage and run `helm upgrade`. See [Managed storage](./usage/managed-storage).
+`customEngineConfig.storage` is unset. Without object storage the engine does not enter the Ready state. Configure object storage and run `helm upgrade`. See [Object Storage](./usage/object-storage/amazon-s3).
 
 Confirm the failure is the managed-storage check:
 

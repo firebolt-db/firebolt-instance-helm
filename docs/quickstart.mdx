@@ -48,7 +48,7 @@ kubectl create namespace firebolt
 
 ## Deploy object storage
 
-Engines store managed table data in object storage and refuse to start against a local filesystem. On a real cluster, point the engine at an S3 or S3-compatible bucket and grant access through your platform's workload identity, as described in [Managed storage](./usage/managed-storage). For this local cluster, deploy the [floci](https://github.com/floci-io/floci) S3 emulator, which also creates the bucket the engine uses:
+Engines store managed table data in object storage and refuse to start against a local filesystem. On a real cluster, point the engine at an S3 or S3-compatible bucket and grant access through your platform's workload identity, as described in [Amazon S3 object storage](./usage/object-storage/amazon-s3). For this local cluster, deploy the [floci](https://github.com/floci-io/floci) S3 emulator, which also creates the bucket the engine uses:
 
 ```bash
 kubectl apply -n firebolt -f https://raw.githubusercontent.com/firebolt-db/firebolt-instance-helm/main/local-floci.yaml
@@ -65,7 +65,7 @@ kubectl -n firebolt wait --for=condition=complete job/floci-mkbucket --timeout=1
 ```
 
 <Note>
-floci stores data in the pod's ephemeral filesystem and validates no credentials, so it is for local development only. Production deployments use a real object store. See [Managed storage](./usage/managed-storage).
+floci stores data in the pod's ephemeral filesystem and validates no credentials, so it is for local development only. Production deployments use a real object store. See [Object Storage](./usage/object-storage/amazon-s3).
 </Note>
 
 ## Configure the engine
@@ -133,5 +133,5 @@ kind delete cluster --name firebolt
 
 - [Single engine](./usage/single-engine) covers the default install in more detail.
 - [Multi-engine](./usage/multi-engine) runs more than one engine in a release.
-- [Managed storage](./usage/managed-storage) configures a real S3 or S3-compatible bucket.
+- [Object Storage](./usage/object-storage/amazon-s3) configures a real S3 or S3-compatible bucket.
 - [Operator upgrade path](./operator-upgrade-path) explains when to move to the Firebolt Kubernetes Operator for day-2 automation.

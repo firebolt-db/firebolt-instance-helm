@@ -16,17 +16,24 @@ engines:
   - name: analytics
     replicas: 2
     resources:
-      requests: { cpu: "1", memory: "3Gi" }
-      limits:   { memory: "3Gi" }
+      requests:
+        cpu: "1"
+        memory: "3Gi"
+      limits:
+        memory: "3Gi"
     storage:
       resources:
-        requests: { storage: 50Gi }
+        requests:
+          storage: 50Gi
 
   - name: adhoc
     replicas: 1
     resources:
-      requests: { cpu: "500m", memory: "3Gi" }
-      limits:   { memory: "3Gi" }
+      requests:
+        cpu: "500m"
+        memory: "3Gi"
+      limits:
+        memory: "3Gi"
 ```
 
 Per-engine entries override the shared `engineSpec` defaults. For the full surface, see [`helm/README.md`](https://github.com/firebolt-db/firebolt-instance-helm/blob/main/helm/README.md).

@@ -6,22 +6,27 @@ title: Image overrides
 
 This page shows how to override the default engine and metadata image tags.
 
-The defaults pull engine and metadata from `ghcr.io/firebolt-db/{engine,metadata}` at `Chart.yaml`'s `appVersion`.
+By default, the chart pulls engine and metadata from `ghcr.io/firebolt-db/{engine,metadata}` based on the `appVersion` in `Chart.yaml`.
 
-## Track `:dev`
+## Track 'dev' images
 
-To follow current-of-mainline builds against the default GHCR repos:
+To follow current-of-mainline builds, you can use the `dev` tag.
 
 ```yaml
-engineSpec: { image: { tag: dev } }
-metadata:   { image: { tag: dev } }
+engineSpec:
+  image:
+    tag: dev
+metadata:
+  image:
+    tag: dev
 ```
 
-`:dev` is mutable. Two installs minutes apart can pull different content. Pin the tag to a specific version for reproducible installs.
+The `dev` tag is mutable. Two installs minutes apart can pull different content. Pin the tag to a specific version for reproducible installs.
 
-## Pin a specific build
+## Use a specific build
 
-Override per component, keeping the `release-` or `debug-` prefix in lockstep.
+You can override the tag per component, but you must keep the version used for the Engine and used for the Metadata Service in [lockstep](##Lockstep).
+You can choose the smaller `release-` versions or use the `debug-` prefix which contains debug symbols.
 
 ```yaml
 engineSpec:

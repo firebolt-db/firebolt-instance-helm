@@ -62,7 +62,7 @@ engineSpec:
   #
   # Non-empty: the chart references the named SA verbatim and does NOT
   # create one — bring your own (the documented IRSA / Pod Identity
-  # flow at docs/usage/managed-storage.mdx works this way). The chart
+  # flow at docs/usage/object-storage/amazon-s3.mdx works this way). The chart
   # cannot influence `automountServiceAccountToken` on a SA it does
   # not own; set it explicitly in your SA manifest if you want the
   # same hardening.

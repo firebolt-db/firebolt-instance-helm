@@ -1,5 +1,5 @@
 ---
-description: Default install of the firebolt-instance Helm chart with one engine, one gateway, the Metadata Service, and bundled PostgreSQL.
+description: Default install of the firebolt-instance Helm chart with one Engine, Gateway, the Metadata Service, and bundled PostgreSQL.
 sidebarTitle: Single engine
 title: Single engine
 ---
@@ -7,7 +7,7 @@ title: Single engine
 This page walks through a default install with a single engine.
 
 <Note>
-Engines need object storage configured under `customEngineConfig.storage`. Without it, the engine pod never becomes Ready. Configure it first ([Managed storage](./managed-storage)).
+Engines need object storage configured under `customEngineConfig.storage`. Without it, the engine pod never becomes Ready. Configure it first ([Object Storage](./object-storage/amazon-s3)).
 </Note>
 
 The commands below assume a `my-values.yaml` that sets `customEngineConfig.storage`.

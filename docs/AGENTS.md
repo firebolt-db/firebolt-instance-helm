@@ -7,6 +7,7 @@ Follow this guidance when writing or editing documentation in this folder, espec
 - Use **"the chart"** or **"the `firebolt-instance` Helm chart"** when referring to this project. Avoid bare "the Helm chart" (ambiguous since multiple Firebolt charts exist) and any vendor-style label like "the Firebolt Helm chart".
 - Use **"the Firebolt Kubernetes Operator"** when introducing the sibling project. On second mention in the same section, "the operator" is acceptable; never use bare "the operator" without first establishing which one.
 - Do not use internal codenames for services or subsystems in user-facing docs. This covers the Metadata Service (use **"Metadata Service"** Title Case as a brand name) and every engine subsystem name (no Pensieve, no aragog, no shufflepuff, no storage-manager, no storage-agent, no Diagon, no Ollivanders, no Fawkes, and so on). Describe the function instead: "metadata service", "internal coordination between engine replicas", "distributed query execution". The literal codename may appear inside fenced code blocks that quote runtime output (engine error messages, config schema keys) so users can grep their logs for the exact string.
+- Capitalize Firebolt Instance, Instance (when referring to Firebolt Instance) Engine, Firebolt Engine, Metadata Service, Gateway, Postgres
 
 ## Source of truth
 
@@ -48,7 +49,7 @@ The body opens with one KISS sentence stating what the page documents (for examp
 
 - Navigation lives in `docs/docs.json`. Every page registered in `docs.json` must exist as `.mdx` on disk. Every `.mdx` on disk must be registered in `docs.json` (packdb enforces this with `make check-lost-pages`).
 - When you **rename or remove** a page, add a redirect to the `docs.json` `redirects` array (old slug → new slug, leading slash, no prefix) and run `make -C docs check-lost-redirects-regenerate` to refresh `docs/known_pages.json`. packdb prefixes and propagates these redirects into the published site so old URLs keep working; skipping it fails `make docs-check`.
-- Internal links use the page slug without an extension. Prefix same-folder and subfolder targets with `./` (for example, `./prerequisites`, `./usage/managed-storage`). Use `../` for parent-folder targets from inside `docs/usage/`. At packdb-integration time those links convert to absolute paths under the eventual subtree (for example, `/firebolt-core/firebolt-instance-helm/prerequisites`).
+- Internal links use the page slug without an extension. Prefix same-folder and subfolder targets with `./` (for example, `./prerequisites`, `./usage/object-storage/amazon-s3`). Use `../` for parent-folder targets from inside `docs/usage/`. At packdb-integration time those links convert to absolute paths under the eventual subtree (for example, `/firebolt-core/firebolt-instance-helm/prerequisites`).
 - Links to files outside `docs/` (`helm/README.md`, `helm/CHANGELOG.md`, `docs-internal/`) use a full `https://github.com/firebolt-db/firebolt-instance-helm/blob/main/...` URL, because Mintlify does not serve files outside `docs/`.
 - `docs-internal/` is Firebolt-internal and stays as plain `.md`. Do not move anything from `docs-internal/` into `docs/` without confirming it is suitable for external readers.
 
@@ -77,6 +78,7 @@ The body opens with one KISS sentence stating what the page documents (for examp
 - Put UI elements in bold.
 - Do not use em-dashes. Prefer two short sentences over one long one joined by a semicolon.
 - Use periods over semicolons.
+- Use block-style YAML instead of inline braces.
 
 ## Commands and code blocks
 

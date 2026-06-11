@@ -10,7 +10,7 @@ This page lists what you need in place before you install the chart.
 
 - **Kubernetes**. Any reasonably recent version. The chart uses only stable core APIs (`apps/v1`, `policy/v1`, `v1`) and has no CEL, admission webhooks, or version-gated features.
 - **A default `StorageClass`**. The chart provisions engine and PostgreSQL PVCs without `storageClassName` and falls back to the cluster default. To pick a specific class, set `engines[].storage.storageClassName` per engine or `engineSpec.defaultStorage.storageClassName` chart-wide.
-- **Object storage for engine managed data**. Engines run against a dedicated Metadata Service and refuse to start against a local filesystem. You must point `customEngineConfig.storage` at an S3 or S3-compatible bucket before the engine becomes ready. See [Managed storage](./usage/managed-storage).
+- **Object storage for engine managed data**. Engines run against a dedicated Metadata Service and refuse to start against a local filesystem. You must point `customEngineConfig.storage` at object storage before the engine becomes ready. See [Object Storage](./usage/object-storage/amazon-s3).
 
 ## Engine node requirements
 

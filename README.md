@@ -2,7 +2,6 @@
 
 [![CI](https://img.shields.io/github/checks-status/firebolt-db/firebolt-instance-helm/main?label=CI)](https://github.com/firebolt-db/firebolt-instance-helm/actions?query=branch%3Amain)
 [![Chart Version](https://img.shields.io/github/v/tag/firebolt-db/firebolt-instance-helm?label=chart&sort=semver)](https://github.com/firebolt-db/firebolt-instance-helm/releases)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 
 Helm chart for running a Firebolt instance on Kubernetes: Envoy gateway, Metadata Service, PostgreSQL, and one or more Firebolt query engine StatefulSets.
 
@@ -14,17 +13,23 @@ The chart deploys a complete Firebolt instance — gateway, metadata, PostgreSQL
 
 ## Architecture
 
-```
-        client ── HTTP ──▶ Envoy gateway ──┐
-                                            │  routes by X-Firebolt-Engine
-                                            ▼
-                                  ┌──────── engines ────────┐
-                                  │ default StatefulSet(s)  │
-                                  │ analytics StatefulSet(s)│
-                                  │ ...                     │
-                                  └────────────┬────────────┘
-                                               │
-                              metadata service ◀── PostgreSQL
+```text
+        client ── HTTP ──▶  ┌────────────────────┐
+                            │       Gateway      │
+                            └─────────┬──────────┘
+                                      │ routes by X-Firebolt-Engine
+                                      ▼
+                            ┌────────────────────┐      ┌────────────────┐
+                            │      Engine        │ ───▶ │ Object Storage │
+                            │  StatefulSet(s)    │      └────────────────┘
+                            └─────────┬──────────┘
+                                      ▼
+                            ┌────────────────────┐
+                            │  Metadata Service  │
+                            └─────────┬──────────┘
+                                      │
+                                      ▼
+                                  PostgreSQL
 ```
 
 Each entry under `engines:` becomes one 1-replica StatefulSet per node plus a shared headless Service, ClusterIP Service, and ConfigMap.
@@ -38,7 +43,7 @@ Bring up a working Firebolt instance from this Helm chart on a local Kind cluste
 
 If I only gave you the GitHub repo URL, clone the repo first. If I already opened the repo locally, work from the existing checkout.
 
-Follow the "Quick start" section of README.md and the docs under docs/ (especially docs/prerequisites.mdx, docs/usage/single-engine.mdx, and docs/usage/managed-storage.mdx). Treat this as a request to actually deploy and verify the chart, not just inspect it. Don't assume my prerequisites are done; if a required tool is missing or a step is ambiguous, tell me and stop rather than guessing.
+Follow the "Quick start" section of README.md and the docs under docs/ (especially docs/prerequisites.mdx, docs/usage/single-engine.mdx, and docs/usage/object-storage/amazon-s3.mdx). Treat this as a request to actually deploy and verify the chart, not just inspect it. Don't assume my prerequisites are done; if a required tool is missing or a step is ambiguous, tell me and stop rather than guessing.
 
 Key facts about this chart:
 - Engines do NOT start without object storage. Every engine needs customEngineConfig.storage configured. Locally this is provided by the bundled floci S3 emulator via `make floci`, which also creates the managed_storage bucket.
@@ -59,7 +64,7 @@ This is the fast path if you want the agent to drive the install for you. If you
 
 ## Quick start
 
-Engines need object storage to become ready. This flow uses the bundled [floci](https://github.com/floci-io/floci) S3 emulator (`local-floci.yaml`) for a self-contained local install. For a real bucket, see [`docs/usage/managed-storage.mdx`](docs/usage/managed-storage.mdx).
+Engines need object storage to become ready. This flow uses the bundled [floci](https://github.com/floci-io/floci) S3 emulator (`local-floci.yaml`) for a self-contained local install. For a real bucket, see [`docs/usage/object-storage/amazon-s3.mdx`](docs/usage/object-storage/amazon-s3.mdx).
 
 Point the engine at floci with a values file:
 
@@ -95,7 +100,7 @@ The Envoy gateway extracts the `X-Firebolt-Engine` header via a Lua filter and r
 
 ## Where to go next
 
-- **User-facing docs** are under [`docs/`](docs/), authored as Mintlify MDX with navigation in [`docs/docs.json`](docs/docs.json): [overview](docs/overview.mdx), [prerequisites](docs/prerequisites.mdx), [quickstart](docs/quickstart.mdx), usage patterns ([single engine](docs/usage/single-engine.mdx), [multi-engine](docs/usage/multi-engine.mdx), [managed storage](docs/usage/managed-storage.mdx), [external PostgreSQL](docs/usage/external-postgres.mdx), [image overrides](docs/usage/image-overrides.mdx)), the [operator upgrade path](docs/operator-upgrade-path.mdx), and [troubleshooting](docs/troubleshooting.mdx).
+- **User-facing docs** are under [`docs/`](docs/), authored as Mintlify MDX with navigation in [`docs/docs.json`](docs/docs.json): [overview](docs/overview.mdx), [prerequisites](docs/prerequisites.mdx), [quickstart](docs/quickstart.mdx), usage patterns ([single engine](docs/usage/single-engine.mdx), [multi-engine](docs/usage/multi-engine.mdx), Object Storage ([Amazon S3](docs/usage/object-storage/amazon-s3.mdx), [Google Cloud Storage](docs/usage/object-storage/google-cloud-storage.mdx), [Azure Blob Storage](docs/usage/object-storage/azure-blob-storage.mdx)), [external PostgreSQL](docs/usage/external-postgres.mdx), [image overrides](docs/usage/image-overrides.mdx)), the [operator upgrade path](docs/operator-upgrade-path.mdx), and [troubleshooting](docs/troubleshooting.mdx).
 - The full **configuration reference** is generated from `helm/values.yaml` and lives at [`helm/README.md`](./helm/README.md).
 - For **contributor** detail, conventions, and rules for making changes to this repo, see [`AGENTS.md`](AGENTS.md). Module-specific rules for the chart itself live in [`helm/AGENTS.md`](helm/AGENTS.md).
 - Changelog: [`helm/CHANGELOG.md`](./helm/CHANGELOG.md).

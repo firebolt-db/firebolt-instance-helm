@@ -13,7 +13,14 @@
             "pages": [
               "usage/single-engine",
               "usage/multi-engine",
-              "usage/managed-storage",
+              {
+                "group": "Object Storage",
+                "pages": [
+                  "usage/object-storage/amazon-s3",
+                  "usage/object-storage/google-cloud-storage",
+                  "usage/object-storage/azure-blob-storage"
+                ]
+              },
               "usage/external-postgres",
               "usage/image-overrides"
             ]

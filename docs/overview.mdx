@@ -9,16 +9,22 @@ This page introduces the `firebolt-instance` Helm chart and the components it de
 ## Architecture
 
 ```text
-        client ── HTTP ──▶ Envoy gateway ──┐
-                                            │  routes by X-Firebolt-Engine
-                                            ▼
-                                  ┌──────── engines ────────┐
-                                  │ default StatefulSet(s)  │
-                                  │ analytics StatefulSet(s)│
-                                  │ ...                     │
-                                  └────────────┬────────────┘
-                                               │
-                              Metadata Service ◀── PostgreSQL
+        client ── HTTP ──▶  ┌────────────────────┐
+                            │       Gateway      │
+                            └─────────┬──────────┘
+                                      │ routes by X-Firebolt-Engine
+                                      ▼
+                            ┌────────────────────┐      ┌────────────────┐
+                            │      Engine        │ ───▶ │ Object Storage │
+                            │  StatefulSet(s)    │      └────────────────┘
+                            └─────────┬──────────┘
+                                      ▼
+                            ┌────────────────────┐
+                            │  Metadata Service  │
+                            └─────────┬──────────┘
+                                      │
+                                      ▼
+                                  PostgreSQL
 ```
 
 Each entry under `engines:` renders one 1-replica StatefulSet per node, plus a shared headless Service, ClusterIP Service, and ConfigMap.
@@ -31,9 +37,9 @@ For day-2 operational capabilities such as zero-downtime engine rollouts, autosc
 
 ## Where to start
 
-- [Quickstart](./quickstart) installs the chart on a local kind cluster and runs a query, end to end.
 - [Prerequisites](./prerequisites) explains the cluster and tooling requirements.
-- [Managed storage](./usage/managed-storage) configures the object storage every engine needs to start.
+- [Quickstart](./quickstart) installs the chart on a local kind cluster and runs a query, end to end.
+- [Object Storage](./usage/object-storage/amazon-s3) configures the object storage every engine needs to start.
 - [Single engine](./usage/single-engine) walks through a default install.
 - [Monitoring](./monitoring) describes the Prometheus metrics surface and the optional `PodMonitor` resources.
 - [Security](./security) records the chart's pod-hardening baseline and the responsibilities it leaves to the platform team.

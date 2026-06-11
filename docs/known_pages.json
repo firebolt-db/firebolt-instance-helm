@@ -19,10 +19,16 @@
   "/usage/external-postgres/",
   "/usage/image-overrides",
   "/usage/image-overrides/",
-  "/usage/managed-storage",
-  "/usage/managed-storage/",
   "/usage/multi-engine",
   "/usage/multi-engine/",
+  "/usage/object-storage",
+  "/usage/object-storage/",
+  "/usage/object-storage/amazon-s3",
+  "/usage/object-storage/amazon-s3/",
+  "/usage/object-storage/azure-blob-storage",
+  "/usage/object-storage/azure-blob-storage/",
+  "/usage/object-storage/google-cloud-storage",
+  "/usage/object-storage/google-cloud-storage/",
   "/usage/single-engine",
   "/usage/single-engine/"
 ]

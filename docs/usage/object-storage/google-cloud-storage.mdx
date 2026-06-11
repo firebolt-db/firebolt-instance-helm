@@ -1,0 +1,167 @@
+---
+description: Google Cloud Storage object storage for engine managed table data, with GKE Workload Identity Federation and intermediary service accounts for external access.
+sidebarTitle: Google Cloud Storage
+title: Google Cloud Storage
+---
+
+This page configures Google Cloud Storage as engine object storage.
+
+Every engine needs object storage for managed table data. The chart does not support local-filesystem storage for engines, so an engine pod never becomes Ready until `customEngineConfig.storage` points at object storage.
+
+With Google Cloud Storage as the backing store, durability does not depend on the per-pod data volumes mounted to each engine. Even a complete loss of those volumes does not cause data loss, because the authoritative copy of managed table data lives in the bucket.
+
+You configure object storage on the engine through `customEngineConfig.storage`, which the chart passes through unchanged into the engine's `config.yaml`. The `type`, `api_scheme`, and `bucket_name` keys match the Firebolt Core configuration schema, and the chart does not validate them. The engine reads Google Cloud credentials from the pod's Google identity, which you provide with [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity).
+
+<Note>
+The chart passes `customEngineConfig.storage` through unchanged and does not validate the `type`. The `gcs` backend requires an engine image that supports it. An unsupported `type` is written verbatim into the engine `config.yaml`, so the engine fails at startup rather than at install time.
+</Note>
+
+## Prerequisites
+
+Before you begin, ensure that you have the following installed and configured:
+
+- A Kubernetes cluster running on Google Kubernetes Engine with Workload Identity Federation enabled.
+- `kubectl` configured to access your cluster.
+- `helm` v3 installed on your local machine.
+- `gcloud` configured for your project.
+- A Google Cloud project with permissions to create buckets and IAM service accounts.
+- An engine image that supports the `gcs` storage backend.
+
+## Use Google Cloud Storage
+
+The following examples use a bucket named `firebolt-managed` in the project `my-project`, but you can choose any name you like.
+
+### Create a bucket
+
+Create a Google Cloud Storage bucket with uniform bucket-level access and public access prevention:
+
+```bash
+# Project, location, and bucket name used by the gcloud calls below.
+export GCP_PROJECT=my-project
+export GCP_LOCATION=us-east4
+export BUCKET_NAME=firebolt-managed
+
+# Create the bucket.
+gcloud storage buckets create "gs://${BUCKET_NAME}" \
+  --project="${GCP_PROJECT}" \
+  --location="${GCP_LOCATION}" \
+  --uniform-bucket-level-access \
+  --public-access-prevention
+```
+
+### Grant the engine a Google identity
+
+Create a Google service account, grant it object access on the bucket, and allow the engine's Kubernetes ServiceAccount to impersonate it:
+
+```bash
+# Identity names used by the gcloud calls below.
+export GSA_NAME=firebolt-engine
+export GSA_EMAIL="${GSA_NAME}@${GCP_PROJECT}.iam.gserviceaccount.com"
+export K8S_NAMESPACE=firebolt
+export K8S_SA=firebolt-engine
+
+# Create the Google service account for the engine.
+gcloud iam service-accounts create "${GSA_NAME}" \
+  --project="${GCP_PROJECT}"
+
+# Grant the service account object read and write access on the bucket.
+gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
+  --member="serviceAccount:${GSA_EMAIL}" \
+  --role="roles/storage.objectAdmin"
+
+# Allow the Kubernetes ServiceAccount to impersonate the Google service account.
+gcloud iam service-accounts add-iam-policy-binding "${GSA_EMAIL}" \
+  --project="${GCP_PROJECT}" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="serviceAccount:${GCP_PROJECT}.svc.id.goog[${K8S_NAMESPACE}/${K8S_SA}]"
+```
+
+Annotate the Kubernetes ServiceAccount with the Google service account so GKE injects credentials into engine pods that run under it:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: firebolt-engine
+  namespace: firebolt
+  annotations:
+    iam.gke.io/gcp-service-account: firebolt-engine@my-project.iam.gserviceaccount.com
+```
+
+### Point the chart at the bucket
+
+Run the engine pods under the annotated ServiceAccount and set the storage block to the Google Cloud Storage bucket. The default scheme for `gcs` is `gs://`.
+
+```yaml
+# my-values.yaml
+engineSpec:
+  serviceAccount: firebolt-engine
+
+customEngineConfig:
+  storage:
+    type: gcs
+    api_scheme: "gs://"
+    bucket_name: firebolt-managed
+```
+
+Create the ServiceAccount, then install the chart with the matching values:
+
+```bash
+# Create the Workload-Identity-annotated ServiceAccount in the release namespace.
+kubectl apply -f engine-serviceaccount.yaml
+
+# Install the chart against the bucket and the ServiceAccount.
+helm install firebolt ./helm \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
+### Confirm that object storage works
+
+Create a table, insert a row, and list the bucket to confirm the engine wrote data through to Google Cloud Storage:
+
+```bash
+# Forward the gateway Service to localhost:8080 in the background.
+kubectl -n firebolt port-forward svc/firebolt-gateway 8080:80 &
+
+# Create a table on the engine.
+curl -s http://localhost:8080/ -H "X-Firebolt-Engine: default" \
+  -H "Content-Type: text/plain" --data "create table t (val int)"
+
+# Insert one row, which forces the engine to write a tablet.
+curl -s http://localhost:8080/ -H "X-Firebolt-Engine: default" \
+  -H "Content-Type: text/plain" --data "insert into t values (1)"
+
+# List the bucket. New object-storage prefixes appear as the engine writes data.
+gcloud storage ls "gs://firebolt-managed"
+```
+
+New prefixes appear under the bucket as the engine writes data.
+
+## Restrict external access with an intermediary service account
+
+The bucket you set under `customEngineConfig.storage` holds the engine's managed tablet data, and the engine reaches it with the engine pod's own Google identity. Queries that read from or write to external locations, such as external tables that point at a different bucket, follow a separate credential path.
+
+By default, external access also uses the engine pod's own Google identity. That identity belongs to this chart release, so it is not a convenient identity for the owner of an external bucket to reference when they grant access.
+
+An intermediary service account gives external access a stable identity instead. When you set one, the engine impersonates the intermediary service account for external access rather than using its own pod identity. Because the service account is stable and known ahead of time, you can share it with third parties and reference it in bucket IAM policies, including on Google Cloud projects outside your own organization. Access to the object storage bucket always uses the engine pod's own identity, so the intermediary service account applies only to external locations.
+
+Create the intermediary Google service account, grant the engine's identity `roles/iam.serviceAccountTokenCreator` on it, and grant the intermediary the permissions it needs to reach the external data.
+
+Set its ID under `customEngineConfig.storage.gcp.intermediary_service_account_id`:
+
+```yaml
+customEngineConfig:
+  storage:
+    type: gcs
+    api_scheme: "gs://"
+    bucket_name: firebolt-managed
+    gcp:
+      intermediary_service_account_id: projects/my-project/serviceAccounts/firebolt-intermediary@my-project.iam.gserviceaccount.com
+```
+
+The chart passes the `storage.gcp` block through unchanged. The block is valid only when `type` is `gcs`.
+
+## Storage scope
+
+`customEngineConfig` is global to the release. Multiple engines under the same `engines:` list share the same `customEngineConfig.storage` block, and therefore the same bucket. To run engines against different buckets, install the chart twice in separate releases, each with its own `customEngineConfig.storage`.
