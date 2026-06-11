@@ -1,23 +1,18 @@
 ---
-# Overlay for inner-loop development: pulls engine and metadata through the
-# internal ECR pull-through cache at the mutable `:dev` tag. Pair with
-# `make install`, which provisions the `regcred` ECR pull secret.
+# Overlay for inner-loop development: pins engine and metadata to the mutable
+# `:dev` tag of their default public `ghcr.io/firebolt-db` repositories, and
+# points managed storage at the local floci S3 emulator. Use `make dev`.
 # Not for reproducible installs.
 #
-#   make install VALUES_FILE=helm/values-dev.yaml
-#   helm install firebolt ./helm -f values.yaml -f helm/values-dev.yaml
-
-imagePullSecrets:
-  - name: regcred
+#   make dev
+#   helm install firebolt ./helm -f helm/values-dev.yaml
 
 engineSpec:
   image:
-    repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/ghcr/firebolt-db/engine
     tag: dev
 
 metadata:
   image:
-    repository: 000000000000.dkr.ecr.us-east-1.amazonaws.com/ghcr/firebolt-db/metadata
     tag: dev
 
 # Point the engine's managed_storage at the local floci S3 emulator. The

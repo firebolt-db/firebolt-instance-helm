@@ -1,11 +1,10 @@
 # Local development
 
-`make dev` is the internal-Firebolt inner-loop install: engine and metadata pulled at the mutable `:dev` tag through the ECR pull-through cache, with floci standing in for managed-storage S3. External users want plain [`make install`](../docs/usage/single-engine.mdx).
+`make dev` is the inner-loop install: it pins engine and metadata to the mutable `:dev` tag of their default `ghcr.io/firebolt-db` repositories (instead of the pinned `appVersion` that `make install` uses), with floci standing in for managed-storage S3. For a reproducible install at the chart's pinned `appVersion`, use plain [`make install`](../docs/usage/single-engine.mdx).
 
 ## Prerequisites
 
-- AWS credentials with `ecr:GetAuthorizationToken` for account `000000000000` (e.g. via `aws sso login`).
-- A Kubernetes cluster the kubelet can reach the ECR pull-through cache from.
+- A Kubernetes cluster (`make create` spins up a local kind cluster).
 
 ## Install
 
@@ -15,7 +14,7 @@ make dev
 make test
 ```
 
-`make dev` runs `make floci` first (applies `local-floci.yaml`, waits for the bucket-create Job), refreshes the 12-hour `regcred` ECR pull secret, and installs the chart with `helm/values-dev.yaml`.
+`make dev` runs `make floci` first (applies `local-floci.yaml`, waits for the bucket-create Job), then installs the chart with `helm/values-dev.yaml`.
 
 ## Upgrade
 
@@ -23,8 +22,6 @@ make test
 | --- | --- |
 | `make install` | `make upgrade` |
 | `make dev` | `make upgrade-dev` |
-
-`make upgrade-dev` does not refresh the ECR secret. Re-run `make dev` (idempotent) when the 12-hour token expires.
 
 ## Why floci
 

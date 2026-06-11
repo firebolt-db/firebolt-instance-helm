@@ -42,7 +42,7 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 - `Chart.yaml` — chart and app version, name, icon, sources. Both bumped automatically by the release workflow (see project-specific rules in the root `AGENTS.md`).
 - `values.yaml` — configuration surface AND the source for the generated `README.md`. Annotate every value with `# --` for `helm-docs`.
 - `values.schema.json` — JSON Schema validating the value surface at `helm install`/`helm lint` time. Permissive by design (unknown keys pass); constrains only enums, ranges, and patterns. See "Adding a new value".
-- `values-dev.yaml` — committed overlay used by `make dev`: routes engine/metadata through the internal ECR pull-through cache at the `:dev` tag and points `customEngineConfig.storage` at the floci S3 emulator (so the dedicated-Pensieve managed-storage check is satisfied). The pinned `appVersion` stays the default for reproducible installs via plain `make install`.
+- `values-dev.yaml` — committed overlay used by `make dev`: pins engine/metadata to the mutable `:dev` tag (instead of the chart's pinned `appVersion`) and points `customEngineConfig.storage` at the floci S3 emulator (so the dedicated-Pensieve managed-storage check is satisfied). The pinned `appVersion` stays the default for reproducible installs via plain `make install`.
 - `README.md` — **generated.** Do not hand-edit. Run `make docs` from the repo root.
 - `CHANGELOG.md` — prepended one entry per release by the CD workflow.
 - `.helmignore` — excludes docs and scripts from the packaged chart.

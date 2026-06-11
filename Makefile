@@ -2,8 +2,6 @@ RELEASE      ?= firebolt
 NAMESPACE    ?= firebolt
 CHART        := ./helm
 VALUES_FILE  := $(CHART)/values-dev.yaml
-ECR_REGISTRY := 000000000000.dkr.ecr.us-east-1.amazonaws.com
-AWS_REGION   := us-east-1
 KIND_CLUSTER ?= firebolt-instance-helm
 
 # Kubernetes version for the e2e kind cluster, pinned by digest as kind requires.
@@ -83,13 +81,7 @@ install: ## Install the chart into $(NAMESPACE) with chart defaults (no overlay)
 	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 	helm install $(RELEASE) $(CHART) --namespace $(NAMESPACE)
 
-dev: floci ## Install with the dev overlay: floci pre-step + ECR pull secret + values-dev.yaml
-	kubectl create secret docker-registry regcred \
-	      --docker-server=$(ECR_REGISTRY) \
-	      --docker-username=AWS \
-	      --docker-password=$$(aws ecr get-login-password --region $(AWS_REGION)) \
-	      --namespace $(NAMESPACE) \
-	      --dry-run=client -o yaml | kubectl apply -f -
+dev: floci ## Install with the dev overlay: floci pre-step + values-dev.yaml (engine/metadata at the :dev tag)
 	helm install $(RELEASE) $(CHART) --namespace $(NAMESPACE) \
 	      -f $(VALUES_FILE)
 
@@ -99,9 +91,8 @@ upgrade: ## Upgrade the release with chart defaults (no overlay)
 upgrade-dev: ## Upgrade the release with the dev values overlay
 	helm upgrade $(RELEASE) $(CHART) --namespace $(NAMESPACE) -f $(VALUES_FILE)
 
-uninstall: ## Uninstall the release and remove the ECR pull secret
+uninstall: ## Uninstall the release
 	helm uninstall $(RELEASE) --namespace $(NAMESPACE)
-	kubectl delete secret regcred --namespace $(NAMESPACE) --ignore-not-found
 
 cleanup: ## Uninstall the release, delete PVCs, and remove the namespace
 	-$(MAKE) uninstall
