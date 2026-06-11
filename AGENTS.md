@@ -40,11 +40,12 @@ Helm chart that runs a Firebolt instance on Kubernetes: an Envoy gateway that ro
 
 ## Build, test, and lint
 
-All targets honour `RELEASE` (default `firebolt`), `NAMESPACE` (default `firebolt`), and `VALUES_FILE` (default `./helm/values-dev.yaml`, consumed by `make upgrade-dev`).
+All targets honour `RELEASE` (default `firebolt`), `NAMESPACE` (default `firebolt`), and `VALUES_FILE` (default `./helm/values-dev.yaml`, consumed by `make dev` and `make upgrade-dev`).
 
 - `make help` — list targets (also the default goal).
 - `make lint` — `helm lint --strict ./helm` + `helm template` dry-run. The fast inner-loop check.
 - `make docs` — regenerate `helm/README.md` from `helm/values.yaml` via `helm-docs`.
+- `make docs-check` — validate the Mintlify docs nav (`make -C docs check`): path depth and lost pages.
 - `make create` / `make delete` — create/destroy a local kind cluster.
 - `make install` — plain `helm install` of the chart with its defaults. No overlay, no floci. Useful for verifying chart behaviour against unmodified inputs.
 - `make floci` — apply `local-floci.yaml` (Deployment + Service + bucket-create Job) and wait for floci and the bucket. Idempotent; usable standalone, also a prerequisite of `make dev`.
@@ -56,7 +57,14 @@ All targets honour `RELEASE` (default `firebolt`), `NAMESPACE` (default `firebol
 - `make setup-pre-commit` — install pre-commit hooks (requires `pre-commit` and `helm-docs` on PATH).
 - `make setup-local-registry` — start the local Docker registry (`kind-registry` on `127.0.0.1:5001`, idempotent) that the kind node mirrors through. `setup-kind` runs it transitively.
 - `make flush-local-registry` — drop and recreate the registry (`cleanup-local-registry` + `setup-local-registry`); clears the cached layers. Use after a kind upgrade changes the Docker network or when a bad push is masking a real image bump.
-- `make prepare-test-e2e` — full e2e setup (`setup-kind` + `load-test-images`): start the registry, create (or reuse) the `firebolt-instance-helm` kind cluster (override with `KIND_CLUSTER`) from `scripts/ci/kind-config.yaml` wired to mirror `ghcr.io`/`docker.io` through the registry, then publish the chart + floci images into it. The cluster runs Kubernetes 1.35 via a digest-pinned `kindest/node` image; needs kind >= v0.31. The image is set in one place — the `NODE_IMAGE` variable in the `Makefile` — and overridable via the `NODE_IMAGE` env. The `Helm Test` workflow drives it from a `strategy.matrix` (one Kubernetes version per line), so adding a version to test is a one-line matrix change. A reused cluster that predates the `containerdConfigPatches` (no `config_path` in containerd) or runs a different K8s minor can't be retrofitted — both are create-time only — so `setup-kind-cluster.sh` detects either mismatch and auto-recreates the cluster. **No `kind load`** — the host pulls each image and pushes it into the registry; the node pulls from the registry on demand. This serves the **private** `ghcr.io/firebolt-db` engine/metadata images locally so the node never anonymously pulls (which would 401). **The host's `docker pull` still needs GHCR access**: locally run `docker login ghcr.io` first; in CI the `Helm Test` workflow grants the job `packages: read` and runs an explicit `docker login ghcr.io` step (the default `GITHUB_TOKEN` does not get `packages` scope under explicit job permissions). Override the cluster name with `KIND_CLUSTER` and the registry with `REGISTRY_NAME`/`REGISTRY_PORT`. Raise the Docker `memlock` limit first or the engine's io_uring fails (see `.github/workflows/helm-test.yaml`). **`GHCR_PACKAGES_PUBLIC`** (default `false`, single switch in the `Makefile` and the workflow's top-level `env`): set to `true` once the engine/metadata packages are public — the workflow then skips the GHCR login, and `setup-local-registry`, the containerd mirror wiring in `setup-kind-cluster.sh`, and `load-test-images` are all no-ops so the kind nodes pull every image directly from upstream.
+- `make prepare-test-e2e` — full e2e setup (`setup-kind` + `load-test-images`): start the local registry, create (or reuse) the kind cluster, and publish the chart + floci images into it. Run this before `make helm-test`. The moving parts:
+  - **Cluster:** creates or reuses the `firebolt-instance-helm` kind cluster (override `KIND_CLUSTER`) from `scripts/ci/kind-config.yaml`, wired to mirror `ghcr.io`/`docker.io` through the local registry.
+  - **Kubernetes version:** Kubernetes 1.35 via a digest-pinned `kindest/node` image (needs kind >= v0.31), set once via the `NODE_IMAGE` variable in the `Makefile` and overridable via the `NODE_IMAGE` env. The `Helm Test` workflow drives versions from a `strategy.matrix`, so adding one to test is a one-line matrix change.
+  - **Auto-recreate:** a reused cluster that predates the `containerdConfigPatches` (no `config_path` in containerd) or runs a different K8s minor can't be retrofitted — both are create-time only — so `setup-kind-cluster.sh` detects either mismatch and recreates the cluster.
+  - **Image flow (no `kind load`):** the host pulls each image and pushes it into the registry; the node pulls from the registry on demand. This serves the **private** `ghcr.io/firebolt-db` engine/metadata images locally so the node never anonymously pulls (which would 401).
+  - **GHCR access:** the host's `docker pull` still needs GHCR access — locally run `docker login ghcr.io` first; in CI the `Helm Test` workflow grants the job `packages: read` and runs an explicit `docker login ghcr.io` step (the default `GITHUB_TOKEN` does not get `packages` scope under explicit job permissions).
+  - **Overrides & memlock:** cluster name via `KIND_CLUSTER`, registry via `REGISTRY_NAME`/`REGISTRY_PORT`. Raise the Docker `memlock` limit first or the engine's io_uring fails (see `.github/workflows/helm-test.yaml`).
+  - **`GHCR_PACKAGES_PUBLIC`** (default `false`, single switch in the `Makefile` and the workflow's top-level `env`): set `true` once the engine/metadata packages are public — the workflow then skips the GHCR login, and `setup-local-registry`, the containerd mirror wiring in `setup-kind-cluster.sh`, and `load-test-images` all become no-ops so the kind nodes pull every image directly from upstream.
 - `make helm-test` — run `scripts/ci/helm-test.sh` against the current kube context. Walks `docs/quickstart.mdx` end to end (floci → `helm install` → wait for rollout → query through the gateway). Run `make prepare-test-e2e` first (it publishes the images; running `helm-test` against a cluster that never had `load-test-images` run causes `ImagePullBackOff`). This is the same check the `Helm Test` workflow runs on every PR.
 - `make cleanup-test-e2e` — delete the e2e kind cluster (`KIND_CLUSTER`). The local registry is left running (its layer cache speeds up the next run); use `make flush-local-registry` to drop it.
 - `./helm/scripts/validate-chart.sh` — the full validation pipeline CI runs (helm dep build, yamllint, helm lint, helm template + yamllint of rendered output). Use this when reproducing a CI failure.
@@ -65,6 +73,7 @@ All targets honour `RELEASE` (default `firebolt`), `NAMESPACE` (default `firebol
 
 You are expected to operate as a strategic collaborator, not a code generator.
 
+- **Verify; never assume.** Do not assume how something works — confirm it against the source of truth (the code first, documentation second) before acting or advising. State the fact you relied on (file, line, target, or doc) when it matters. An unverified claim is a bug waiting to happen.
 - **Challenge weak assumptions.** If a request contradicts the existing structure, conventions, or sound engineering practice, propose a better path before implementing. Surface the trade-off explicitly.
 - **Surface viability concerns early.** Before writing templates, sanity-check that the requested approach fits the chart's data model (the `engineSpec` / per-engine override pattern, the `fbinstance.fullname` naming, the gateway-routes-by-header model, the one-StatefulSet-per-node topology) and any cross-component constraints (Pensieve account ID matching, engine `appVersion` lockstep with metadata, StatefulSet name length limits, PVC retention on node removal).
 - **Think end-to-end.** A change is not done when `helm template` succeeds. It is done when `make lint`, a `make dev` against a kind cluster, and `make test` all pass, and the `helm/values.yaml` annotations have been updated so the regenerated `helm/README.md` is correct.
@@ -102,19 +111,24 @@ Code is not done until it is covered by tests where tests are reasonable.
 - Prefer fast, deterministic checks at the lowest level: `make lint` first, then a targeted `helm test`, then a full `make dev` + `make test` round-trip in kind only when the change is non-trivial.
 - A change that ships without tests, and without an explicit reason for not having them, is incomplete.
 
-## Issue tracking
+## How we work (agentic workflow)
 
-Work for this repository is tracked in Linear:
+Every change is tracked and lands through a branch and a pull request — no exceptions.
+
+- **A documented issue comes first.** Every task MUST have a corresponding issue before any work starts — a Linear ticket or a GitHub issue. If none exists, create one (GitHub issues use the templates under `.github/ISSUE_TEMPLATE/`). No issue, no work.
+- **Never touch `main` directly.** You MUST NEVER work in, commit to, or push to `main`. All work happens on a feature branch and merges via a reviewed PR. (`main` is only ever advanced by merging a PR or by the release workflow's automated version-bump commit — see project-specific rules.)
+- **Branch names tie the branch to its issue**, so work is traceable. Prefix the branch with the tracker identifier:
+  - Linear: `FB-<number>-<short-kebab-description>` (e.g. `FB-790-ci-testing`).
+  - GitHub issue: `<issue-number>-<short-kebab-description>`.
+  - Branch off the latest `main`, not off another in-flight feature branch.
+- **PRs follow the template.** Pull requests MUST follow `.github/PULL_REQUEST_TEMPLATE.md`: fill in **Background** (with `ISSUE-REF`), **Summary** (what changes and what it means going forward), and **Test Plan**. Re-check the template before opening a PR in case it has changed.
+- **Conventional-commit subject** in the merge commit drives the chart release version (see project-specific rules below).
+
+Linear specifics:
 
 - **Team:** `Firebolt` (key `FB`). All issue identifiers use the `FB-` prefix.
 - **Project:** `Firebolt Instance Helm Chart`.
-
-Any new Linear issue created in connection with this repo MUST be filed under team `Firebolt` AND project `Firebolt Instance Helm Chart`. Filing it in the team without the project leaves it unscoped.
-
-Branch and commit convention:
-
-- Branch names: `FB-<number>-<short-kebab-description>` (e.g. `FB-790-ci-testing`). Branch off the latest `main`, not off another in-flight feature branch.
-- Conventional-commit subject in the merge commit drives the chart release version (see project-specific rules below).
+- Any new Linear issue created in connection with this repo MUST be filed under team `Firebolt` AND project `Firebolt Instance Helm Chart`. Filing it in the team without the project leaves it unscoped.
 
 ## Known issues
 
