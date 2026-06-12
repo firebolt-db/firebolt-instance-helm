@@ -70,10 +70,12 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 ## Adding a new helm test
 
 1. Create `templates/tests/test-<name>.yaml` as a `Pod` with `metadata.annotations."helm.sh/hook": test`.
-2. Use `fbinstance.testShellHelpers` for the `log` / `pass` / `fail` shell helpers.
-3. Use `fbinstance.fullname` and `fbinstance.selectorLabels` for any name or selector.
-4. Verify with `make test` (which passes `--logs`, so any failure surfaces directly).
+2. Set `metadata.annotations."helm.sh/hook-delete-policy": before-hook-creation` (and only that — see "Known issues" below for why `hook-succeeded` is forbidden on test pods).
+3. Use `fbinstance.testShellHelpers` for the `log` / `pass` / `fail` shell helpers.
+4. Use `fbinstance.fullname` and `fbinstance.selectorLabels` for any name or selector.
+5. Verify with `make test` (which passes `--logs`, so any failure surfaces directly).
 
 ## Known issues
 
 - Symptom: engine pods can fail during startup if the chart moves `--data-dir` or the `data` volume away from `/firebolt-core/volume`. Cause: the engine treats `/firebolt-core/volume` as its writable runtime data directory. Resolution: keep the `data` mount, `--data-dir`, `config.yaml`, `auth.json`, and memlock PID files under `/firebolt-core/volume`.
+- Symptom: `make test` (i.e. `helm test --logs`) prints `Phase: Succeeded` for every suite and then exits 1 with `unable to get pod logs ... pods "<release>-test-<name>" not found`. Cause: a `helm.sh/hook-delete-policy` of `before-hook-creation,hook-succeeded` on the test pod tells helm to delete the pod the moment the hook succeeds, so by the time `helm test --logs` iterates the pods to fetch their logs they are already gone (helm/helm#8949). Resolution: test pods MUST set `helm.sh/hook-delete-policy: before-hook-creation` only — never include `hook-succeeded`. Stale pods are still cleaned up on the next `helm test` run by `before-hook-creation`, and `make test-cleanup` deletes them on demand.

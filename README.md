@@ -1,6 +1,6 @@
 # firebolt-instance-helm
 
-Helm chart for running a Firebolt instance on Kubernetes: Envoy gateway, Metadata Service, PostgreSQL, and one or more Firebolt query engine StatefulSets.
+Helm chart for running a Firebolt instance on Kubernetes: Gateway (Envoy), Metadata Service, PostgreSQL and one or more Firebolt Engines.
 
 The chart is published as `firebolt-instance` to `oci://ghcr.io/firebolt-db/helm-charts` on every change to `helm/` merged to `main`.
 
@@ -9,7 +9,7 @@ For more detailed information checkout our [official documentation](https://docs
 
 ## Scope
 
-The chart deploys a complete Firebolt instance — gateway, metadata, PostgreSQL, engines — into any Kubernetes cluster. For day-2 operational capabilities (zero-downtime engine rollouts, autoscaling, drift correction, reusable per-engine templates), use the [Firebolt Kubernetes Operator](docs/operator-upgrade-path.mdx). See [`docs/`](docs/) for usage patterns.
+The chart deploys a complete Firebolt Instance consistingo of a Gateway (Envoy), Metadata Service, PostgreSQL and Firebolt Engines into any Kubernetes cluster. For day-2 operational capabilities (zero-downtime engine rollouts, autoscaling, drift correction, reusable per-engine templates), take a look at the [Firebolt Kubernetes Operator](https://github.com/firebolt-db/firebolt-kubernetes-operator).
 
 ## Architecture
 
