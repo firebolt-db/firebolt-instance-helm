@@ -9,7 +9,7 @@ For more detailed information checkout our [official documentation](https://docs
 
 ## Scope
 
-The chart deploys a complete Firebolt Instance consistingo of a Gateway (Envoy), Metadata Service, PostgreSQL and Firebolt Engines into any Kubernetes cluster. For day-2 operational capabilities (zero-downtime engine rollouts, autoscaling, drift correction, reusable per-engine templates), take a look at the [Firebolt Kubernetes Operator](https://github.com/firebolt-db/firebolt-kubernetes-operator).
+The chart deploys a complete Firebolt Instance consisting of a Gateway (Envoy), Metadata Service, PostgreSQL and Firebolt Engines into any Kubernetes cluster. For day-2 operational capabilities (zero-downtime engine rollouts, autoscaling, drift correction, reusable per-engine templates), take a look at the [Firebolt Kubernetes Operator](https://github.com/firebolt-db/firebolt-kubernetes-operator).
 
 ## Architecture
 
