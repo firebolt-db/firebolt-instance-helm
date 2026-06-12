@@ -8,4 +8,4 @@ home: "https://github.com/firebolt-db/firebolt-instance-helm"
 sources: ["https://github.com/firebolt-db/firebolt-instance-helm"]
 version: 0.1.0
 # Bumped by upstream image-release automation.
-appVersion: "0.1.0"
+appVersion: "release-4.32.0-pre.0.20260609145613.22a1ea4abadb"
