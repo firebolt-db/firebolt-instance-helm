@@ -1,3 +1,7 @@
+# 0.1.2
+
+fix: collect pod logs after helm test (FB-1643) (#2)
+
 # 0.1.1
 
 chore(deps): bump amazon/aws-cli from 2.35.2 to 2.35.3 (#1)
