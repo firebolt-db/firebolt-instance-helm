@@ -1,3 +1,7 @@
+# 0.1.1
+
+chore(deps): bump amazon/aws-cli from 2.35.2 to 2.35.3 (#1)
+
 # Changelog
 
 ## 0.1.0
