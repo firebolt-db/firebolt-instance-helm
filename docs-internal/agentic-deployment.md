@@ -89,6 +89,7 @@ exit code.
 
 | `phase` / `failure_reason` | Meaning | Where to look |
 | --- | --- | --- |
+| `preflight` / `private_packages_unsupported` | `GHCR_PACKAGES_PUBLIC=false` — the agent path only supports public images | stderr: use the public default, or the CI flow (`make prepare-test-e2e`) for the private path |
 | `cluster` / `cluster_setup_failed` | kind cluster create/reuse failed | stderr: kind output; is Docker up, `memlock` raised, kind ≥ v0.31? |
 | `floci` / `floci_not_ready` | floci emulator or the bucket Job did not become ready in 120s | stderr: floci pod/Job state |
 | `install` / `helm_install_failed` | `helm install` rejected the release (`agent-up`) | stderr: helm error + namespace debug dump |
@@ -110,8 +111,11 @@ rather than a silent hang.
 - **kubectl** and **helm** (v3) on `PATH`.
 - **No registry auth or `docker login`** — the `ghcr.io/firebolt-db` engine and
   metadata images are public, so `GHCR_PACKAGES_PUBLIC` defaults to `true` and
-  the kind nodes pull them directly. (Override to `false` only to exercise the
-  private-package path through the local registry; see the root `AGENTS.md`.)
+  the kind nodes pull them directly. The agent path supports **only** this
+  public path; it does not load private images into a local registry, so it
+  fails fast (`private_packages_unsupported`) if `GHCR_PACKAGES_PUBLIC=false`.
+  The private-package path is the CI flow — `make prepare-test-e2e` +
+  `make helm-test` (see the root `AGENTS.md`).
 
 ## Inputs (environment overrides)
 

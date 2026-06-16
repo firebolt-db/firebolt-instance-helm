@@ -165,16 +165,14 @@ test-cleanup: ## Delete leftover helm test pods from previous runs
 
 agent-up: ## Clean machine -> running instance on kind (creates/reuses cluster, installs, smoke-queries). JSON on stdout, logs on stderr. THOROUGH=true also runs the helm test suite.
 	@KIND_CLUSTER=$(KIND_CLUSTER) NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CHART_DIR=$(CHART) \
-	  NODE_IMAGE='$(NODE_IMAGE)' REGISTRY_NAME=$(REGISTRY_NAME) REGISTRY_PORT=$(REGISTRY_PORT) \
-	  GHCR_PACKAGES_PUBLIC=$(GHCR_PACKAGES_PUBLIC) THOROUGH=$(THOROUGH) ./scripts/agent/up.sh
+	  NODE_IMAGE='$(NODE_IMAGE)' GHCR_PACKAGES_PUBLIC=$(GHCR_PACKAGES_PUBLIC) THOROUGH=$(THOROUGH) ./scripts/agent/up.sh
 
 agent-verify: ## Fast iteration: apply chart changes in place (helm upgrade) + smoke-query. JSON on stdout, logs on stderr. THOROUGH=true also runs the full helm test suite.
 	@KIND_CLUSTER=$(KIND_CLUSTER) NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CHART_DIR=$(CHART) \
-	  NODE_IMAGE='$(NODE_IMAGE)' REGISTRY_NAME=$(REGISTRY_NAME) REGISTRY_PORT=$(REGISTRY_PORT) \
-	  GHCR_PACKAGES_PUBLIC=$(GHCR_PACKAGES_PUBLIC) THOROUGH=$(THOROUGH) ./scripts/agent/verify.sh
+	  NODE_IMAGE='$(NODE_IMAGE)' GHCR_PACKAGES_PUBLIC=$(GHCR_PACKAGES_PUBLIC) THOROUGH=$(THOROUGH) ./scripts/agent/verify.sh
 
 agent-down: ## Tear down the agentic kind cluster, returning the host to a clean state. JSON result on stdout, logs on stderr.
-	@KIND_CLUSTER=$(KIND_CLUSTER) REGISTRY_NAME=$(REGISTRY_NAME) ./scripts/agent/down.sh
+	@KIND_CLUSTER=$(KIND_CLUSTER) ./scripts/agent/down.sh
 
 ##@ E2E quickstart pipeline
 

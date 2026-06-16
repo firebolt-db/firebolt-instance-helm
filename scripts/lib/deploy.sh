@@ -195,7 +195,18 @@ deploy_and_verify() {
   # bucket-create Job. The engine refuses to start until the bucket exists.
   set_phase floci floci_not_ready
   echo "Deploying floci S3 emulator and creating the firebolt-managed bucket..."
-  kubectl apply -n "${namespace}" -f "${repo_root}/local-floci.yaml"
+  # floci-mkbucket is a Job, and Kubernetes treats a Job's pod template as
+  # immutable — so `kubectl apply` fails with "field is immutable" if the live
+  # Job's template differs from the committed manifest (iterating on
+  # local-floci.yaml, or a cluster that predates a change to it). The
+  # bucket-create is idempotent, so on that conflict drop the old Job and
+  # re-apply. A steady-state re-run (unchanged manifest) takes the fast no-op
+  # apply path and never recreates the Job.
+  if ! kubectl apply -n "${namespace}" -f "${repo_root}/local-floci.yaml" 2>/dev/null; then
+    echo "floci apply conflicted (immutable floci-mkbucket Job template); recreating the Job and retrying..."
+    kubectl delete job/floci-mkbucket -n "${namespace}" --ignore-not-found
+    kubectl apply -n "${namespace}" -f "${repo_root}/local-floci.yaml"
+  fi
   kubectl -n "${namespace}" rollout status deployment/floci --timeout=120s
   kubectl -n "${namespace}" wait --for=condition=complete job/floci-mkbucket --timeout=120s
 
@@ -307,6 +318,23 @@ agent_json_init() {
   if [[ "${AGENT_OUTPUT}" == "json" ]]; then
     exec 3>&1
     exec 1>&2
+  fi
+}
+
+# Guard: the agent entrypoints support only the public image path. They run
+# registry-free (always setting up the cluster in public mode) and never run
+# load-e2e-images.sh, so they have no way to serve the private engine/metadata
+# images a local registry would mirror — that is the CI flow (load-e2e-images.sh
+# via `make prepare-test-e2e`). Rather than silently ignore an explicit
+# GHCR_PACKAGES_PUBLIC=false, fail fast with a classified error. Call after the
+# EXIT trap is set so the failure is reported as JSON.
+assert_public_packages() {
+  if [[ "${GHCR_PACKAGES_PUBLIC:-true}" != "true" ]]; then
+    set_phase preflight private_packages_unsupported
+    echo "GHCR_PACKAGES_PUBLIC=false is not supported by the agent path: it does not load" >&2
+    echo "private images into a local registry. Use the public images (the default), or the" >&2
+    echo "CI flow for the private path: 'make prepare-test-e2e' then 'make helm-test'." >&2
+    return 1
   fi
 }
 

@@ -51,14 +51,16 @@ AGENT_VALUES="${AGENT_VALUES:-${SCRIPT_DIR}/values.yaml}"
 agent_json_init
 trap 'agent_emit_deploy_result "${KIND_CLUSTER}" "${NAMESPACE}" "${RELEASE}" "${ENGINE_NAME}"' EXIT
 
+# The agent path is public-images only; fail fast (as JSON) on the private path.
+assert_public_packages
+
 echo "=== agent-up (cluster=${KIND_CLUSTER}, namespace=${NAMESPACE}, release=${RELEASE}) ==="
 
 # --- Cluster (create or reuse a matching kind cluster) ----------------------
+# Public images only (asserted above), so the kind nodes pull directly from
+# upstream — no local registry or containerd mirror is set up.
 set_phase cluster cluster_setup_failed
-NODE_IMAGE="${NODE_IMAGE:-}" \
-  REGISTRY_NAME="${REGISTRY_NAME:-kind-registry}" \
-  REGISTRY_PORT="${REGISTRY_PORT:-5001}" \
-  GHCR_PACKAGES_PUBLIC="${GHCR_PACKAGES_PUBLIC}" \
+NODE_IMAGE="${NODE_IMAGE:-}" GHCR_PACKAGES_PUBLIC=true \
   "${LIB_DIR}/setup-kind-cluster.sh" "${KIND_CLUSTER}"
 
 # --- Deploy + verify (clean install, layering the agent's local sizing) -----
