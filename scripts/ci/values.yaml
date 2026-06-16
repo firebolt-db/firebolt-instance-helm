@@ -8,7 +8,7 @@
 # my-values.yaml (it does not replace it) and only trims resources so the
 # install schedules in CI. It changes nothing a user follows in the quickstart.
 #
-# Applied via: helm install ... -f my-values.yaml -f scripts/ci/ci-values.yaml
+# Applied via: helm install ... -f my-values.yaml -f scripts/ci/values.yaml
 
 # One gateway replica is enough to route queries; two does not fit the runner.
 gateway:

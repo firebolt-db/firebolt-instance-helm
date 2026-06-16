@@ -72,8 +72,13 @@ spec:
   selector:
     app: floci
 ---
-# Idempotent bucket creation. BucketAlreadyOwnedByYou returns 254 which the
-# `|| true` swallows; head-bucket then asserts the bucket exists.
+# Idempotent bucket creation. The Job is applied alongside the floci Deployment,
+# so its pod can start before floci accepts connections; rather than let the
+# first attempt fail with a connection error and lean on a Job retry (which
+# prints a scary `Could not connect to the endpoint URL` line that an agent
+# tailing logs misreads as failure), it busy-waits on the endpoint first.
+# Then: BucketAlreadyOwnedByYou returns 254 which the `|| true` swallows, and
+# head-bucket asserts the bucket exists.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -99,5 +104,20 @@ spec:
             - -c
             - |
               set -eu
+              # Busy-wait until floci is reachable before touching the bucket.
+              # The aws-cli image ships no curl/nc, but floci is zero-auth so an
+              # unauthenticated list-buckets gets a response the moment it is up.
+              # 60 * 2s = 120s ceiling, matching the floci rollout wait.
+              echo "Waiting for floci at ${AWS_ENDPOINT_URL} to accept connections..."
+              i=0
+              until aws s3api list-buckets >/dev/null 2>&1; do
+                i=$((i + 1))
+                if [ "$i" -ge 60 ]; then
+                  echo "floci not reachable at ${AWS_ENDPOINT_URL} after $((i * 2))s" >&2
+                  exit 1
+                fi
+                sleep 2
+              done
+              echo "floci reachable; ensuring bucket firebolt-managed exists"
               aws s3api create-bucket --bucket firebolt-managed || true
               aws s3api head-bucket   --bucket firebolt-managed
