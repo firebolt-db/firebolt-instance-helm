@@ -50,7 +50,8 @@ fi
 
 # Pre-flight: the registry must be reachable on the host before we push.
 # Clearer error than `docker push` failing with "connection refused".
-"${SCRIPT_DIR}/setup-local-registry.sh" >/dev/null
+# setup-local-registry.sh is shared cluster-bringup machinery under scripts/lib.
+"${REPO_ROOT}/scripts/lib/setup-local-registry.sh" >/dev/null
 
 # Strip a leading `image:` key and surrounding quotes from a YAML line.
 strip_image_line() {
@@ -79,7 +80,7 @@ echo "Collecting image references..."
 images_raw="$(
   {
     helm template firebolt "${REPO_ROOT}/helm" \
-      -f "${SCRIPT_DIR}/ci-values.yaml" 2>/dev/null \
+      -f "${SCRIPT_DIR}/values.yaml" 2>/dev/null \
       | grep -E '^[[:space:]]*image:' | strip_image_line
     grep -E '^[[:space:]]*image:' "${REPO_ROOT}/local-floci.yaml" | strip_image_line
   } | sort -u

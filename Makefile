@@ -13,16 +13,22 @@ NODE_IMAGE ?= kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056
 # engine/metadata images locally so the node never anonymously pulls ghcr.io,
 # and keeps a layer cache across cluster recreations). Override REGISTRY_PORT /
 # REGISTRY_NAME if 5001 / kind-registry collide. Same defaults are baked into
-# scripts/ci/setup-local-registry.sh.
+# scripts/lib/setup-local-registry.sh.
 REGISTRY_NAME ?= kind-registry
 REGISTRY_PORT ?= 5001
 
-# Set to "true" once the ghcr.io/firebolt-db engine + metadata packages are
-# public. While "false" (private) the kind node mirrors the images through the
-# local registry above (pulled once on the authenticated host). When "true" the
-# kind nodes pull the images directly from upstream, so the local registry, the
-# containerd mirror wiring, and the image-publishing step are all skipped.
-GHCR_PACKAGES_PUBLIC ?= false
+# The ghcr.io/firebolt-db engine + metadata packages are now public, so the
+# default is "true": the kind nodes pull every image directly from upstream and
+# the local registry above, the containerd mirror wiring, and the
+# image-publishing step are all skipped. Override to "false" only to exercise
+# the private-package path (mirror the images through the local registry, pulled
+# once on a host authenticated with `docker login ghcr.io`).
+GHCR_PACKAGES_PUBLIC ?= true
+
+# Agent verification depth. "false" (default) runs the fast SELECT 1 smoke query;
+# "true" additionally runs the chart's full helm test suite after rollout. An
+# iterating agent sets THOROUGH=true when its change warrants broader coverage.
+THOROUGH ?= false
 
 .DEFAULT_GOAL := help
 
@@ -45,6 +51,9 @@ GHCR_PACKAGES_PUBLIC ?= false
 	cleanup \
 	test \
 	test-cleanup \
+	agent-up \
+	agent-verify \
+	agent-down \
 	prepare-test-e2e \
 	setup-local-registry \
 	setup-kind \
@@ -152,6 +161,21 @@ test-cleanup: ## Delete leftover helm test pods from previous runs
 	  echo "$$pods" | xargs kubectl delete -n $(NAMESPACE); \
 	fi
 
+##@ Agentic deployment (single-command up/down for AI agents)
+
+agent-up: ## Clean machine -> running instance on kind (creates/reuses cluster, installs, smoke-queries). JSON on stdout, logs on stderr. THOROUGH=true also runs the helm test suite.
+	@KIND_CLUSTER=$(KIND_CLUSTER) NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CHART_DIR=$(CHART) \
+	  NODE_IMAGE='$(NODE_IMAGE)' REGISTRY_NAME=$(REGISTRY_NAME) REGISTRY_PORT=$(REGISTRY_PORT) \
+	  GHCR_PACKAGES_PUBLIC=$(GHCR_PACKAGES_PUBLIC) THOROUGH=$(THOROUGH) ./scripts/agent/up.sh
+
+agent-verify: ## Fast iteration: apply chart changes in place (helm upgrade) + smoke-query. JSON on stdout, logs on stderr. THOROUGH=true also runs the full helm test suite.
+	@KIND_CLUSTER=$(KIND_CLUSTER) NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CHART_DIR=$(CHART) \
+	  NODE_IMAGE='$(NODE_IMAGE)' REGISTRY_NAME=$(REGISTRY_NAME) REGISTRY_PORT=$(REGISTRY_PORT) \
+	  GHCR_PACKAGES_PUBLIC=$(GHCR_PACKAGES_PUBLIC) THOROUGH=$(THOROUGH) ./scripts/agent/verify.sh
+
+agent-down: ## Tear down the agentic kind cluster, returning the host to a clean state. JSON result on stdout, logs on stderr.
+	@KIND_CLUSTER=$(KIND_CLUSTER) REGISTRY_NAME=$(REGISTRY_NAME) ./scripts/agent/down.sh
+
 ##@ E2E quickstart pipeline
 
 prepare-test-e2e: setup-kind load-test-images ## Full e2e setup: start the registry, create the kind cluster, publish images
@@ -160,11 +184,11 @@ setup-local-registry: ## Start the local Docker registry the kind node mirrors t
 	@if [ "$(GHCR_PACKAGES_PUBLIC)" = "true" ]; then \
 	  echo "GHCR_PACKAGES_PUBLIC=true: skipping local registry (kind nodes pull images directly)."; \
 	else \
-	  REGISTRY_NAME=$(REGISTRY_NAME) REGISTRY_PORT=$(REGISTRY_PORT) ./scripts/ci/setup-local-registry.sh; \
+	  REGISTRY_NAME=$(REGISTRY_NAME) REGISTRY_PORT=$(REGISTRY_PORT) ./scripts/lib/setup-local-registry.sh; \
 	fi
 
 setup-kind: setup-local-registry ## Create (or reuse) the e2e kind cluster and wire it to the local registry
-	@NODE_IMAGE='$(NODE_IMAGE)' REGISTRY_NAME=$(REGISTRY_NAME) REGISTRY_PORT=$(REGISTRY_PORT) GHCR_PACKAGES_PUBLIC=$(GHCR_PACKAGES_PUBLIC) ./scripts/ci/setup-kind-cluster.sh $(KIND_CLUSTER)
+	@NODE_IMAGE='$(NODE_IMAGE)' REGISTRY_NAME=$(REGISTRY_NAME) REGISTRY_PORT=$(REGISTRY_PORT) GHCR_PACKAGES_PUBLIC=$(GHCR_PACKAGES_PUBLIC) ./scripts/lib/setup-kind-cluster.sh $(KIND_CLUSTER)
 
 load-test-images: ## Pull the chart + floci images and push them into the local registry
 	@if [ "$(GHCR_PACKAGES_PUBLIC)" = "true" ]; then \

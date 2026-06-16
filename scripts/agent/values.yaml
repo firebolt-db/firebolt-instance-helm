@@ -1,0 +1,30 @@
+---
+# Local sizing overlay for the agent workflow (`make agent-up` / `make agent-verify`),
+# tuned for a fast, low-pressure local kind loop on a dev machine. The floci
+# managed-storage block is supplied separately by scripts/lib/deploy.sh (every
+# floci-backed deploy needs it), so this overlay only trims resources.
+#
+# Layered on top of the chart defaults via:
+#   helm install/upgrade ... -f <floci-storage> -f scripts/agent/values.yaml
+
+# One gateway replica is enough to route queries locally.
+gateway:
+  replicas: 1
+
+# A single small engine keeps memory pressure low and the iteration loop fast.
+# `name` must stay `default` so the gateway route and the X-Firebolt-Engine
+# header used by the smoke query keep matching.
+engines:
+  - name: default
+    replicas: 1
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "2Gi"
+      limits:
+        memory: "2Gi"
+    storage:
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 1Gi
