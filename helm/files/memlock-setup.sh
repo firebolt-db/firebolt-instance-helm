@@ -5,7 +5,7 @@
 # memlock limit.
 #
 
-PID_FILE="/firebolt-core/volume/entrypoint-$POD_UID.pid"
+PID_FILE="/var/lib/firebolt/entrypoint-$POD_UID.pid"
 CORE_PID=""
 
 function wait_for_core_pid() {

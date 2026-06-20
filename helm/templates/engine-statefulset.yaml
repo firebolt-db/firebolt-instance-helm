@@ -150,7 +150,7 @@ spec:
               }
 
               echo -n "[Setup] Firebolt Core version "
-              /firebolt-core/firebolt --version
+              firebolt --version
 
               {{- if $.Values.engineSpec.podSecurityContext.runAsNonRoot }}
               if [[ $(id -u) -eq 0 ]]; then
@@ -160,8 +160,8 @@ spec:
 
               {{- if $.Values.engineSpec.memlockSetup }}
               echo "[Setup] Core entrypoint PID: $BASHPID"
-              rm -f /firebolt-core/volume/entrypoint-*.pid
-              PID_FILE="/firebolt-core/volume/entrypoint-$POD_UID.pid"
+              rm -f /var/lib/firebolt/entrypoint-*.pid
+              PID_FILE="/var/lib/firebolt/entrypoint-$POD_UID.pid"
               echo "$BASHPID" > "$PID_FILE"
               trap "rm -f $PID_FILE" EXIT
 
@@ -189,7 +189,7 @@ spec:
 
               rm -f "$PID_FILE"
 
-              exec /firebolt-core/firebolt server --node "$FIREBOLT_CORE_NODE" --data-dir /firebolt-core/volume
+              exec firebolt server start --data-dir /var/lib/firebolt
           # Intra-engine peer ports (aragog/shufflepuff/storage-manager/
           # storage-agent) are intentionally omitted. ContainerPort entries
           # are informational only — the engine binary opens those
@@ -239,24 +239,22 @@ spec:
           terminationMessagePolicy: File
           volumeMounts:
             - name: data
-              mountPath: /firebolt-core/volume
+              mountPath: /var/lib/firebolt
             - name: engine-config
-              mountPath: /firebolt-core/volume/config.yaml
+              mountPath: /var/lib/firebolt/config.yaml
               subPath: config.yaml
               readOnly: true
             - name: auth-config
-              mountPath: /firebolt-core/volume/auth.json
+              mountPath: /var/lib/firebolt/auth.json
               subPath: auth.json
               readOnly: true
             # Scratch space outside the read-only root filesystem.
-            # `/var/run/firebolt` holds the engine's per-port unix
+            # `/run/firebolt` holds the engine's per-port unix
             # domain socket (`.s.firebolt.<port>`); the directory
-            # exists in the image but is on the root layer, so it
-            # needs an overlay to be writable.
-            - name: tmp
-              mountPath: /tmp
+            # is created by the volume mount and must be writable
+            # since the root filesystem is read-only.
             - name: runtime
-              mountPath: /var/run/firebolt
+              mountPath: /run/firebolt
           securityContext:
             # Engine processes untrusted SQL; a code-execution exploit
             # under a writable root could persist binaries or rewrite
@@ -337,7 +335,7 @@ spec:
               {{- include "fbinstance.memlockSetupScript" $ | nindent 14 }}
           volumeMounts:
             - name: data
-              mountPath: /firebolt-core/volume
+              mountPath: /var/lib/firebolt
         {{- end }}
 {{- $hpEnabled := $.Values.engineSpec.hostPathStorageEnabled }}
 {{- if or $.Values.engineSpec.customInitContainersTemplate $hpEnabled }}
@@ -352,8 +350,8 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |
-              echo "[Setup] changing ownership of /firebolt-core/volume to UID 3473"
-              chown -R 3473:3473 /firebolt-core/volume
+              echo "[Setup] changing ownership of /var/lib/firebolt to UID 3473"
+              chown -R 3473:3473 /var/lib/firebolt
           resources:
             limits:
               memory: 24Mi
@@ -369,7 +367,7 @@ spec:
                 - CHOWN
           volumeMounts:
             - name: data
-              mountPath: /firebolt-core/volume
+              mountPath: /var/lib/firebolt
         {{- end }}
 {{- end }}
       volumes:
@@ -377,8 +375,6 @@ spec:
         - name: nginx-writable-dir
           emptyDir: {}
         {{- end }}
-        - name: tmp
-          emptyDir: {}
         - name: runtime
           emptyDir: {}
         - name: engine-config
