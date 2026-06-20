@@ -1,6 +1,6 @@
 **Background**
 
-ISSUE-REF: Brief background explanation to understand why these changes are necessary
+<ISSUE-REF>: One sentence background explanation to understand why these changes are necessary.
 
 **Summary**
 
