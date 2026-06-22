@@ -1,3 +1,7 @@
+# 0.2.0
+
+feat(helm): align with engine FHS image layout (FB-1733) (#12)
+
 # 0.1.2
 
 fix: collect pod logs after helm test (FB-1643) (#2)
