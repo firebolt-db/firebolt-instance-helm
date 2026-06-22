@@ -124,7 +124,7 @@ Every change is tracked and lands through a branch and a pull request — no exc
   - Linear: `FB-<number>-<short-kebab-description>` (e.g. `FB-790-ci-testing`).
   - GitHub issue: `<issue-number>-<short-kebab-description>`.
   - Branch off the latest `main`, not off another in-flight feature branch.
-- **PRs follow the template.** Pull requests MUST follow `.github/PULL_REQUEST_TEMPLATE.md`: fill in **Background** (with `ISSUE-REF`), **Summary** (what changes and what it means going forward), and **Test Plan**. Re-check the template before opening a PR in case it has changed.
+- **PRs follow the template.** Pull requests MUST follow [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md): fill in **Background** (replace the whole `<ISSUE-REF>` placeholder with the actual reference — a Linear ticket like `FB-123` or a GitHub issue like `#123` — followed by `:` and the one-sentence why, e.g. `FB-123: switch to blue-green cutover because rolling restarts dropped queries`; do NOT keep the literal `<ISSUE-REF>` token), **Summary** (what changes and what it means going forward), and **Test Plan**. Re-check the template before opening a PR in case it has changed.
 - **Conventional-commit subject** in the merge commit drives the chart release version (see project-specific rules below).
 
 Linear specifics:
