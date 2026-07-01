@@ -7,7 +7,7 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 ## Public surface
 
 - **Chart name:** `firebolt-instance` (`Chart.yaml` `name`).
-- **Chart version:** `Chart.yaml` `version`. Bumped automatically by the release workflow based on conventional-commit subject.
+- **Chart version:** `Chart.yaml` `version`. Owned by release-please (bumped on the merged release PR from conventional-commit history) — do not hand-bump it.
 - **App version:** `Chart.yaml` `appVersion`. Default tag for both the engine and metadata images. Both registries publish matching `debug-` / `release-` prefixed tags, so the chart applies the same default tag to both components unless `metadata.image.tag` is overridden explicitly.
 - **Configuration surface:** every key in `values.yaml`. The annotated comments are the source of truth — `helm-docs` reads them and rewrites `README.md` from them.
 - **Cluster surface produced by the chart:**
@@ -39,12 +39,12 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 
 ## Files & Folders
 
-- `Chart.yaml` — chart and app version, name, icon, sources. Both bumped automatically by the release workflow (see project-specific rules in the root `AGENTS.md`).
+- `Chart.yaml` — chart and app version, name, icon, sources. `version` is owned by release-please; `appVersion` is bumped by the upstream image-release automation (see project-specific rules in the root `AGENTS.md`).
 - `values.yaml` — configuration surface AND the source for the generated `README.md`. Annotate every value with `# --` for `helm-docs`.
 - `values.schema.json` — JSON Schema validating the value surface at `helm install`/`helm lint` time. Permissive by design (unknown keys pass); constrains only enums, ranges, and patterns. See "Adding a new value".
 - `values-dev.yaml` — committed overlay used by `make dev`: pins engine/metadata to the mutable `:dev` tag (instead of the chart's pinned `appVersion`) and points `customEngineConfig.storage` at the floci S3 emulator (so the dedicated-Pensieve managed-storage check is satisfied). The pinned `appVersion` stays the default for reproducible installs via plain `make install`.
 - `README.md` — **generated.** Do not hand-edit. Run `make docs` from the repo root.
-- `CHANGELOG.md` — prepended one entry per release by the CD workflow.
+- `CHANGELOG.md` — owned by release-please; a section is prepended per release. Do not hand-edit.
 - `.helmignore` — excludes docs and scripts from the packaged chart.
 - `templates/_helpers.tpl` — naming, label, port, engine-config, auth-config, memlock-script, and test-shell-helper templates.
 - `templates/gateway-*.yaml` — Envoy Deployment, Service, ConfigMap, PodDisruptionBudget.

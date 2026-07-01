@@ -60,7 +60,11 @@ jobs:
   helm-test:
     name: helm-test (k8s ${{ matrix.k8s-version }})
     needs: detect
-    if: needs.detect.outputs.docs_only != 'true'
+    # Skip release-please's release PRs: they only bump Chart.yaml `version` +
+    # CHANGELOG.md over templates that already passed e2e on the feature PR, so
+    # re-running the 45-minute kind suite adds no coverage and a flake there
+    # would needlessly block the release.
+    if: needs.detect.outputs.docs_only != 'true' && !startsWith(github.head_ref, 'release-please')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
