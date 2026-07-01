@@ -63,7 +63,7 @@
       "package-name": "firebolt-instance",
       "component": "firebolt-instance",
       "include-component-in-tag": false,
-      "include-v-in-tag": true,
+      "include-v-in-tag": false,
       "changelog-path": "CHANGELOG.md"
     }
   }

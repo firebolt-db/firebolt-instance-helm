@@ -2,7 +2,8 @@
 # Chart versioning is driven by release-please: conventional-commit pushes to
 # main accumulate on an automated release PR (opened/updated by the release-please
 # job); merging that PR bumps helm/Chart.yaml `version`, prepends helm/CHANGELOG.md,
-# tags `v<version>`, and cuts a GitHub release. Only then does release-chart package
+# tags `<version>` (bare SemVer, matching the chart version and OCI tag), and cuts
+# a GitHub release. Only then does release-chart package
 # and push the OCI chart to GHCR. Chart `appVersion` is NOT managed here -- it is
 # bumped independently by the upstream image-release automation (a chore(deps):
 # commit, which release-please still counts as releasable).
