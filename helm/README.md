@@ -14,22 +14,22 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| auth | object | {} | Authentication configuration for the Firebolt engine's `auth.json`. Not enforced yet; reserved for future engine-level auth propagation. TODO: wire auth fields into Envoy config or engine auth once supported. |
-| auth.local | object | {} | Local authentication configuration. Used when `mode: local`. |
-| auth.local.credentialsSecretRef | string | `""` | Name of a Secret containing username/password or API keys. |
-| auth.mode | string | `"none"` | Authentication mode. One of `none`, `local`, or `sso`. |
-| auth.oidc | object | {} | OIDC/SSO configuration. Used when `mode: sso`. |
-| auth.oidc.claimMappings | object | {} | Claim mappings for OIDC token fields. |
-| auth.oidc.claimMappings.username | string | `"email"` | OIDC claim used as the username. |
-| auth.oidc.clientID | string | `""` | OIDC client ID. |
-| auth.oidc.issuerURL | string | `""` | OIDC issuer URL. |
+| auth | object | {} | Authentication configuration for the Firebolt engine, rendered into the engine's `config.yaml` under `instance.auth`. When `enabled` is false, nothing is rendered under `instance.auth` — the engine refuses to start if `admin` or `oidc` are present while auth is disabled. Everything beyond the admin account and signing keys (OIDC providers, `password_login`, `jwt.*`, JIT provisioning, `preferred_authorization_server`) is not a first-class value here — set it under `customEngineConfig.instance.auth`, which is deep-merged on top of the block this chart renders. |
+| auth.admin | object | {} | Bootstrap administrator account (`instance.auth.admin`). Required when `auth.enabled` is true. |
+| auth.admin.name | string | `"firebolt"` | Admin username (`instance.auth.admin.name`). |
+| auth.admin.password | object | {} | Admin password source. The chart only accepts an existing Secret — there is no literal-password value or certManager option (a password isn't a certificate), so enabling auth always requires a Secret to already exist. |
+| auth.admin.password.existingSecret | object | {} | Existing Secret containing the admin password under key `password`. Mounted read-only and passed to the engine as `password_file`. |
+| auth.admin.password.existingSecret.secretRef | string | `""` | Secret name. |
+| auth.enabled | bool | `false` | Enable authentication on the engine (`instance.auth.enabled`). |
+| auth.signingKeys | list | [] | JWT signing keys for the engine's embedded Authorization Server (`instance.auth.local.signing_keys`). An ordered list: the **first** entry is the active signer used for new tokens; every entry remains valid for verifying tokens already issued under it. **To rotate the signing key, prepend a new entry** rather than replacing the list, so tokens signed by the outgoing key keep validating until it's removed. At least one entry is required when `auth.enabled` is true — an engine with no explicit signing key falls back to a per-pod dev key that differs across nodes and breaks token validation in a multi-node engine.  Each entry sets exactly one of `existingSecret` / `certManager`:   - `id` — key identifier, published as the JWT `kid` header     (`instance.auth.local.signing_keys[].id`).   - `existingSecret.secretRef` — Secret containing the PEM private key     under key `tls.key`.   - `certManager` — a chart-rendered cert-manager `Certificate` request     (`algorithm`, `size`, `issuerRef.{name,kind}`). Requires cert-manager     and its CRDs installed in-cluster. The chart pins     `privateKey.rotationPolicy: Never` so cert-manager never silently     rotates a key out from under already-issued tokens — rotate by     prepending a new list entry instead. |
 | createNamespace | bool | `false` | When true, a Namespace resource is included in the chart output. Pair with `helm install --create-namespace --set createNamespace=false`. |
-| customEngineConfig | object | {} | Custom engine configuration deep-merged into the rendered engine config.yaml at the root. The rendered document follows the Firebolt Core configuration schema (`schema_version: "1.0"`); user-supplied keys at the top of `customEngineConfig` become siblings of the chart-managed `engine:` and `instance:` blocks (e.g. `auth:`, `logging:`), and keys nested under `instance:` merge into the instance block (e.g. `instance.id`).  Chart-authoritative paths are silently stripped from this input and cannot be overridden: `schema_version`, `engine.id`, `engine.nodes`, `instance.type`, and `instance.multi_engine`. |
+| customEngineConfig | object | {} | Custom engine configuration deep-merged into the rendered engine config.yaml at the root. The rendered document follows the Firebolt Core configuration schema (`schema_version: "1.0"`); user-supplied keys at the top of `customEngineConfig` become siblings of the chart-managed `engine:` and `instance:` blocks (e.g. `logging:`), and keys nested under `instance:` merge into the instance block (e.g. `instance.id`, or `instance.auth.*` alongside the admin account and signing keys the `auth` value block below renders when `auth.enabled` is true — see `auth` for what belongs there instead of here).  Chart-authoritative paths are silently stripped from this input and cannot be overridden: `schema_version`, `engine.id`, `engine.nodes`, `engine.termination_grace_period`, `instance.type`, `instance.multi_engine`, and — only while `tls.engine.enabled` is actually rendering it — `endpoints.http.listeners`. |
 | customEngineConfig.instance | object | {} | Instance identity. `id` propagates internally to `account_id`, `account_name`, `organization_id`, and `organization_name`, so the chart only needs to set the ULID once. |
 | customEngineConfig.instance.id | string | `"01KP98J0000000000000000000"` | ULID for the Firebolt instance. Must match the account reconciled by the metadata service at startup. |
 | engineSpec | object | {} | Shared engine pod defaults applied to all engines unless overridden per-engine. |
 | engineSpec.affinity | object | `{}` | Affinity rules for engine pod scheduling. |
 | engineSpec.customInitContainersTemplate | list | `[]` | Custom init containers injected into engine pods (supports templating). |
+| engineSpec.customVolumeMounts | list | `[]` | Custom volume mounts injected into the engine `core` container, paired with `customVolumes` above — a volume declared there is inert until also mounted here. |
 | engineSpec.customVolumes | list | `[]` | Custom volumes injected into engine pods. |
 | engineSpec.defaultStorage | object | {} | Default PVC storage spec for engines. `storageClassName` is intentionally absent — the cluster default storage class is used. Override here or per-engine to specify a class (e.g. `storageClassName: gp3`). |
 | engineSpec.defaultStorage.accessModes | list | `["ReadWriteOnce"]` | Access modes for the default PVC. |
@@ -158,6 +158,28 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | postgresql.resources | object | `{"limits":{"cpu":"250m","memory":"256Mi"},"requests":{"cpu":"25m","memory":"64Mi"}}` | Resource requests and limits for the bundled PostgreSQL container. |
 | postgresql.schema | string | `"public"` | PostgreSQL schema. |
 | postgresql.username | string | `"firebolt"` | Database username. |
+| tls | object | {} | TLS configuration for the Envoy gateway's client-facing listener and the engine's query listener. Each of `gateway` / `engine` is provisioned by exactly one of `existingSecret` (a `kubernetes.io/tls` Secret) or `certManager` (a chart-rendered cert-manager `Certificate`); setting both or neither on an enabled block fails the render. |
+| tls.engine | object | {} | TLS on the engine's query listener (port 3473) and, correspondingly, the gateway's upstream connection to engines (including the active engine health check, which runs over the same connection). |
+| tls.engine.certManager | object | {} | cert-manager `Certificate` request. DNS names are derived automatically from the engine's per-node and headless-service FQDNs. Requires cert-manager and its CRDs installed in-cluster. |
+| tls.engine.certManager.algorithm | string | `"RSA"` | Private key algorithm. One of `RSA` or `ECDSA`. |
+| tls.engine.certManager.issuerRef | object | {} | cert-manager issuer reference. |
+| tls.engine.certManager.issuerRef.kind | string | `"ClusterIssuer"` | Issuer kind. One of `Issuer` or `ClusterIssuer`. |
+| tls.engine.certManager.issuerRef.name | string | `""` | Issuer name. |
+| tls.engine.certManager.size | int | `2048` | Private key size in bits. |
+| tls.engine.enabled | bool | `false` | Enable TLS on the engine query listener. |
+| tls.engine.existingSecret | object | {} | Existing `kubernetes.io/tls` Secret. Requires all three keys: `tls.crt` / `tls.key`, plus `ca.crt` with the issuing CA — both the engine's own self-health-check and the gateway need `ca.crt` on its own to validate the chain. For a genuinely self-signed leaf with no separate CA, set `ca.crt` to a copy of `tls.crt`. |
+| tls.engine.existingSecret.secretRef | string | `""` | Secret name. |
+| tls.gateway | object | {} | TLS termination at the Envoy gateway (client → gateway). |
+| tls.gateway.certManager | object | {} | cert-manager `Certificate` request. Requires cert-manager and its CRDs installed in-cluster. |
+| tls.gateway.certManager.algorithm | string | `"RSA"` | Private key algorithm. One of `RSA` or `ECDSA`. |
+| tls.gateway.certManager.dnsNames | list | `[]` | DNS names for the certificate. The chart cannot infer the externally-visible gateway hostname — set this explicitly (e.g. the LoadBalancer hostname or ingress DNS name). |
+| tls.gateway.certManager.issuerRef | object | {} | cert-manager issuer reference. |
+| tls.gateway.certManager.issuerRef.kind | string | `"ClusterIssuer"` | Issuer kind. One of `Issuer` or `ClusterIssuer`. |
+| tls.gateway.certManager.issuerRef.name | string | `""` | Issuer name. |
+| tls.gateway.certManager.size | int | `2048` | Private key size in bits. |
+| tls.gateway.enabled | bool | `false` | Enable TLS on the gateway's client-facing listener. |
+| tls.gateway.existingSecret | object | {} | Existing `kubernetes.io/tls` Secret (`tls.crt` / `tls.key`). |
+| tls.gateway.existingSecret.secretRef | string | `""` | Secret name. |
 | utilitiesImage | string | `"debian:stable-slim@sha256:5012d0517aa0075a7150a45aae67586641e898913b7af3b08228108565b5f90c"` | Image used for utility init/sidecar containers (e.g. the memlock-setup sidecar). Pinned to an immutable digest so a registry-side tag override cannot silently change what runs in production. Bump the digest together with the tag when upgrading. |
 
 ----------------------------------------------

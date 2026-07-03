@@ -1,3 +1,15 @@
+{{- /*
+Secret names for gateway/engine TLS, resolved once up front (both are
+instance-wide, not per-replica).
+*/ -}}
+{{- $gatewayTlsSecret := "" -}}
+{{- if .Values.tls.gateway.enabled -}}
+{{-   $gatewayTlsSecret = include "fbinstance.secretSourceName" (dict "source" .Values.tls.gateway "certManagerSecretName" (printf "%s-tls-gateway" (include "fbinstance.fullname" .)) "context" "tls.gateway") -}}
+{{- end -}}
+{{- $engineCaSecret := "" -}}
+{{- if .Values.tls.engine.enabled -}}
+{{-   $engineCaSecret = include "fbinstance.secretSourceName" (dict "source" .Values.tls.engine "certManagerSecretName" (printf "%s-tls-engine" (include "fbinstance.fullname" .)) "context" "tls.engine") -}}
+{{- end -}}
 {{- if .Values.gateway.enabled }}
 apiVersion: apps/v1
 kind: Deployment
@@ -22,6 +34,17 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/gateway-configmap.yaml") . | sha256sum }}
+        {{- /*
+        See the equivalent comment in engine-statefulset.yaml: these Secrets
+        live outside chart-rendered templates, so `lookup` their live content
+        rather than hashing a rendered template.
+        */}}
+        {{- if .Values.tls.gateway.enabled }}
+        checksum/tls-gateway: {{ (lookup "v1" "Secret" .Release.Namespace $gatewayTlsSecret).data | toYaml | sha256sum }}
+        {{- end }}
+        {{- if .Values.tls.engine.enabled }}
+        checksum/tls-engine-ca: {{ (lookup "v1" "Secret" .Release.Namespace $engineCaSecret).data | toYaml | sha256sum }}
+        {{- end }}
         {{- with .Values.gateway.podTemplate.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -114,6 +137,12 @@ spec:
             httpGet:
               path: /healthz
               port: http
+              {{- if .Values.tls.gateway.enabled }}
+              # kubelet HTTPS probes don't verify the server certificate
+              # chain, so a self-signed/internal-CA cert needs no extra
+              # trust configuration here.
+              scheme: HTTPS
+              {{- end }}
             initialDelaySeconds: 1
             periodSeconds: 15
             timeoutSeconds: 3
@@ -121,6 +150,9 @@ spec:
             httpGet:
               path: /healthz
               port: http
+              {{- if .Values.tls.gateway.enabled }}
+              scheme: HTTPS
+              {{- end }}
             initialDelaySeconds: 1
             # ~4s worst-case detection (period × failureThreshold) fits inside
             # the 8s preStop window while still requiring two consecutive bad
@@ -152,6 +184,16 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.tls.gateway.enabled }}
+            - name: gateway-tls
+              mountPath: /etc/envoy/tls/gateway
+              readOnly: true
+            {{- end }}
+            {{- if .Values.tls.engine.enabled }}
+            - name: engine-ca
+              mountPath: /etc/envoy/tls/engine-ca
+              readOnly: true
+            {{- end }}
           {{- with .Values.gateway.podTemplate.volumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -167,6 +209,16 @@ spec:
                 path: envoy.yaml
         - name: tmp
           emptyDir: {}
+        {{- if .Values.tls.gateway.enabled }}
+        - name: gateway-tls
+          secret:
+            secretName: {{ $gatewayTlsSecret }}
+        {{- end }}
+        {{- if .Values.tls.engine.enabled }}
+        - name: engine-ca
+          secret:
+            secretName: {{ $engineCaSecret }}
+        {{- end }}
         {{- with .Values.gateway.podTemplate.volumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

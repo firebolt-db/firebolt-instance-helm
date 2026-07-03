@@ -1,0 +1,95 @@
+{{- /*
+Renders one cert-manager `Certificate` per configured artifact whose secret source is
+`certManager` (as opposed to an `existingSecret`). Requires cert-manager and its CRDs
+installed in-cluster; nothing here is rendered for artifacts using `existingSecret`, so a
+chart install with only BYO secrets has no cert-manager dependency at all.
+
+`algorithm` / `size` / `issuerRef.kind` are defaulted here (RSA / 2048 / ClusterIssuer)
+rather than relying on the values.yaml defaults propagating through a `--set` or a partial
+values override — Helm doesn't apply per-item schema defaults to list entries, so a
+signingKeys/tls entry that only sets `issuerRef.name` would otherwise render an empty
+`algorithm:`/`size:`/`kind:` and fail at the cert-manager API server.
+
+Secret naming mirrors what fbinstance.secretSourceName resolves to for the certManager
+branch of each artifact, so the volume-mounting templates (engine-statefulset.yaml,
+gateway-deployment.yaml) reference these Certificates' `secretName` by re-deriving the same
+name rather than reading it back from here.
+*/ -}}
+{{- if and .Values.tls.gateway.enabled (include "fbinstance.usesCertManager" (dict "source" .Values.tls.gateway)) }}
+{{- if not .Values.tls.gateway.certManager.dnsNames }}
+{{- fail "tls.gateway.certManager is set but dnsNames is empty — the chart cannot infer the gateway's externally-visible hostname; set tls.gateway.certManager.dnsNames explicitly" -}}
+{{- end }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-tls-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" . | nindent 4 }}
+    firebolt/component: gateway
+spec:
+  secretName: {{ include "fbinstance.fullname" . }}-tls-gateway
+  privateKey:
+    algorithm: {{ .Values.tls.gateway.certManager.algorithm | default "RSA" }}
+    size: {{ .Values.tls.gateway.certManager.size | default 2048 }}
+  dnsNames:
+    {{- toYaml .Values.tls.gateway.certManager.dnsNames | nindent 4 }}
+  issuerRef:
+    name: {{ .Values.tls.gateway.certManager.issuerRef.name }}
+    kind: {{ .Values.tls.gateway.certManager.issuerRef.kind | default "ClusterIssuer" }}
+{{- end }}
+{{- if and .Values.tls.engine.enabled (include "fbinstance.usesCertManager" (dict "source" .Values.tls.engine)) }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-tls-engine
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" . | nindent 4 }}
+    firebolt/component: engine
+spec:
+  secretName: {{ include "fbinstance.fullname" . }}-tls-engine
+  privateKey:
+    algorithm: {{ .Values.tls.engine.certManager.algorithm | default "RSA" }}
+    size: {{ .Values.tls.engine.certManager.size | default 2048 }}
+  # Derived automatically — covers every engine node's per-node FQDN (the host the engine's
+  # own self-health-check dials once TLS is enabled) plus each engine's headless-service
+  # FQDN. See fbinstance.engineTlsDnsNames for why this must track fbinstance.engineConfig.
+  dnsNames:
+    {{- include "fbinstance.engineTlsDnsNames" . | nindent 4 }}
+  issuerRef:
+    name: {{ .Values.tls.engine.certManager.issuerRef.name }}
+    kind: {{ .Values.tls.engine.certManager.issuerRef.kind | default "ClusterIssuer" }}
+{{- end }}
+{{- if .Values.auth.enabled }}
+{{- range $ki, $key := .Values.auth.signingKeys }}
+{{- if include "fbinstance.usesCertManager" (dict "source" $key) }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "fbinstance.fullname" $ }}-auth-signing-{{ $ki }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" $ | nindent 4 }}
+    firebolt/component: engine
+spec:
+  secretName: {{ include "fbinstance.fullname" $ }}-auth-signing-{{ $ki }}
+  # No DNS/service identity — this is a JWT signing key, not a TLS endpoint cert. commonName
+  # is the only identity cert-manager requires when dnsNames/ipAddresses/uris are all empty.
+  commonName: {{ $key.id | quote }}
+  privateKey:
+    algorithm: {{ $key.certManager.algorithm | default "RSA" }}
+    size: {{ $key.certManager.size | default 2048 }}
+    # Signing keys must never be silently rotated by cert-manager's renewal timer — a
+    # rotated key that vanishes from the active `signing_keys[0]` slot invalidates every
+    # token signed under it. Rotation is a deliberate chart-value change (prepend a new
+    # signingKeys entry), not a cert-manager renewal.
+    rotationPolicy: Never
+  issuerRef:
+    name: {{ $key.certManager.issuerRef.name }}
+    kind: {{ $key.certManager.issuerRef.kind | default "ClusterIssuer" }}
+{{- end }}
+{{- end }}
+{{- end }}

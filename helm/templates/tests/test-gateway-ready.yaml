@@ -18,9 +18,15 @@ spec:
         - |
           set -e
           {{- include "fbinstance.testShellHelpers" . | nindent 10 }}
+          {{- if .Values.tls.gateway.enabled }}
+          URL="https://{{ include "fbinstance.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.gateway.service.port }}/healthz"
+          CURL_INSECURE="-k"
+          {{- else }}
           URL="http://{{ include "fbinstance.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.gateway.service.port }}/healthz"
+          CURL_INSECURE=""
+          {{- end }}
           log "Gateway readiness (GET $URL)"
-          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 3 --retry-connrefused "$URL")
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' $CURL_INSECURE --retry 5 --retry-delay 3 --retry-connrefused "$URL")
           [ "$HTTP_CODE" = "200" ] || fail "expected HTTP 200 but got $HTTP_CODE"
           pass "gateway is healthy"
 {{- end }}

@@ -140,9 +140,47 @@
     "auth": {
       "type": "object",
       "properties": {
-        "mode": {
-          "type": "string",
-          "enum": ["none", "local", "sso"]
+        "enabled": {
+          "type": "boolean"
+        },
+        "admin": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "password": {
+              "type": "object",
+              "properties": {
+                "existingSecret": {
+                  "type": "object",
+                  "properties": {
+                    "secretRef": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "signingKeys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/secretSourceKeyed"
+          }
+        }
+      }
+    },
+    "tls": {
+      "type": "object",
+      "properties": {
+        "gateway": {
+          "$ref": "#/definitions/secretSource"
+        },
+        "engine": {
+          "$ref": "#/definitions/secretSource"
         }
       }
     },
@@ -200,6 +238,80 @@
           }
         }
       }
+    }
+  },
+  "definitions": {
+    "certManagerSource": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": ["RSA", "ECDSA"]
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dnsNames": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "issuerRef": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": ["Issuer", "ClusterIssuer"]
+            }
+          }
+        }
+      }
+    },
+    "secretSource": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingSecret": {
+          "type": "object",
+          "properties": {
+            "secretRef": {
+              "type": "string"
+            }
+          }
+        },
+        "certManager": {
+          "$ref": "#/definitions/certManagerSource"
+        }
+      }
+    },
+    "secretSourceKeyed": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "existingSecret": {
+          "type": "object",
+          "properties": {
+            "secretRef": {
+              "type": "string"
+            }
+          }
+        },
+        "certManager": {
+          "$ref": "#/definitions/certManagerSource"
+        }
+      },
+      "required": ["id"]
     }
   }
 }

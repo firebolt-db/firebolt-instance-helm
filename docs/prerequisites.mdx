@@ -114,3 +114,5 @@ AKS does not expose `LimitMEMLOCK` through its supported node configuration, so 
 
 - **Prometheus Operator CRDs**. Required only if you set `podMonitor.engines.enabled` or `podMonitor.gateway.enabled`. The chart renders `monitoring.coreos.com/v1` `PodMonitor` resources gated on those values.
 - **A private image registry**. The chart pulls engine and metadata images from `ghcr.io/firebolt-db` by default. To mirror through your own registry, see [Image overrides](./usage/image-overrides).
+- **An engine image with `instance.auth` support**. Required only if you set `auth.enabled` or `tls.engine.enabled`. The chart's pinned `appVersion` predates that config schema; an engine on that build crash-loops instead of starting. See [Authentication and TLS](./usage/authentication).
+- **cert-manager**. Required only if you set a `certManager` block under `auth.signingKeys`, `tls.gateway`, or `tls.engine`. The chart renders `cert-manager.io/v1` `Certificate` resources gated on those blocks.

@@ -1,0 +1,226 @@
+---
+description: Enabling engine authentication, provisioning JWT signing keys, rotating them, and enabling TLS on the gateway's client listener and the engine's query listener.
+sidebarTitle: Authentication and TLS
+title: Authentication and TLS
+---
+
+This page shows how to enable authentication on the Firebolt Engine and TLS on the gateway and engine listeners.
+
+<Note>
+`auth.enabled` and `tls.engine.enabled` require an engine image that understands the `instance.auth` and `endpoints.http.listeners[].tls` config keys. The chart's pinned `appVersion` predates that schema — an engine on that build crash-loops on startup with `Configuration entry does not exist` if either is turned on. Until a release image with this support ships, override `engineSpec.image.tag` (and `metadata.image.tag`) to a build that includes it.
+</Note>
+
+## Authentication
+
+`auth.enabled` turns on the engine's built-in authentication: a bootstrap administrator account and JWT signing keys for the engine's embedded authorization server. Everything beyond that — OIDC providers, `password_login`, JWT lifetime, just-in-time provisioning — is set through `customEngineConfig.instance.auth`, which the chart deep-merges alongside the admin account and signing keys it renders.
+
+The chart never accepts a literal password value for the admin account. Enabling auth always requires an existing Secret.
+
+### Values
+
+```yaml
+# my-values.yaml
+auth:
+  enabled: true
+  admin:
+    name: firebolt
+    password:
+      existingSecret:
+        secretRef: firebolt-admin-password # Secret with a `password` key
+
+  signingKeys:
+    - id: key-2026-01
+      existingSecret:
+        secretRef: firebolt-signing-key-2026-01 # Secret with a `tls.key` PEM private key
+```
+
+### Install
+
+Create the admin password Secret and a signing key Secret, then install the chart:
+
+```bash
+kubectl create secret generic firebolt-admin-password -n firebolt \
+  --from-literal=password='…'
+
+# tls.key holds a PEM RSA private key; the chart uses only the private key,
+# not a certificate, to sign JSON Web Tokens.
+openssl genrsa -out signing-key.pem 2048
+kubectl create secret generic firebolt-signing-key-2026-01 -n firebolt \
+  --from-file=tls.key=signing-key.pem
+
+helm install firebolt ./helm \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
+<Note>
+A multi-node engine needs an explicit signing key. Without one, each engine node generates its own development key on first startup, and tokens signed by one node fail validation on another. The chart's render fails immediately if `auth.enabled` is true and `signingKeys` is empty.
+</Note>
+
+### Verify
+
+Request a token and use it to authenticate a query. The example below runs from inside the cluster; substitute your own client for anything reaching the engine over the gateway.
+
+```bash
+ENGINE_URL="http://firebolt-engine-default-node-0-0.firebolt-engine-default-hl.firebolt.svc.cluster.local:3473"
+INSTANCE_ID="<customEngineConfig.instance.id from your values>"
+
+# An unauthenticated query is rejected.
+curl -i -X POST "$ENGINE_URL/" -H "Content-Type: text/plain" --data "SELECT 1"
+# HTTP/1.1 401 Unauthorized
+
+# The RFC 8707 resource indicator must match this instance's OAuth audience.
+TOKEN=$(curl -s -X POST "$ENGINE_URL/oauth/token" \
+  -u "firebolt:$(kubectl get secret firebolt-admin-password -n firebolt -o jsonpath='{.data.password}' | base64 -d)" \
+  --data-urlencode "grant_type=client_credentials" \
+  --data-urlencode "resource=https://firebolt.io/instance/$INSTANCE_ID" \
+  | sed -n 's/.*"access_token": *"\([^"]*\)".*/\1/p')
+
+curl -X POST "$ENGINE_URL/" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: text/plain" \
+  --data "SELECT 1"
+```
+
+Kubernetes health probes and the gateway's active engine health check keep working without a token — the engine exempts `/health/live` and `/health/ready` from authentication.
+
+### Signing key rotation
+
+`signingKeys` is an ordered list. The **first** entry is the active signer used for new tokens; every entry in the list remains valid for verifying tokens already issued under it. To rotate, prepend a new entry rather than replacing the list, and remove the old entry only once every token it signed has expired:
+
+```yaml
+auth:
+  signingKeys:
+    - id: key-2026-02 # now active
+      existingSecret:
+        secretRef: firebolt-signing-key-2026-02
+    - id: key-2026-01 # still verifies old tokens until they expire
+      existingSecret:
+        secretRef: firebolt-signing-key-2026-01
+```
+
+### cert-manager as a signing-key source
+
+As an alternative to an existing Secret, a signing key entry can request a [cert-manager](https://cert-manager.io) `Certificate` instead:
+
+```yaml
+auth:
+  signingKeys:
+    - id: key-2026-01
+      certManager:
+        algorithm: RSA
+        size: 2048
+        issuerRef:
+          name: internal-ca
+          kind: ClusterIssuer
+```
+
+The chart pins `privateKey.rotationPolicy: Never` on signing-key Certificates, so cert-manager's renewal timer never silently replaces an active signing key out from under already-issued tokens. Rotate by prepending a new `signingKeys` entry, the same as with an existing Secret.
+
+### OIDC and other auth settings
+
+OIDC providers, `password_login`, JWT lifetime, and just-in-time provisioning are not first-class values. Set them under `customEngineConfig.instance.auth`, which is deep-merged alongside the admin account and signing keys the chart renders:
+
+```yaml
+customEngineConfig:
+  instance:
+    auth:
+      password_login: admin_only
+      oidc:
+        providers:
+          - name: corporate_idp
+            discovery_url: https://idp.example.com/.well-known/openid-configuration
+            username_mapping: "{{ email }}"
+```
+
+## TLS
+
+`tls.gateway` and `tls.engine` each enable TLS independently, provisioned the same way as `auth.signingKeys`: an existing `kubernetes.io/tls` Secret, or a chart-rendered cert-manager `Certificate`.
+
+- `tls.gateway` terminates TLS on the gateway's client-facing listener (client → gateway).
+- `tls.engine` enables TLS on the engine's query listener and, correspondingly, the gateway's connection to engines — including the active engine health check, which runs over the same connection.
+
+They can be enabled independently or together.
+
+### Values
+
+```yaml
+# my-values.yaml
+tls:
+  gateway:
+    enabled: true
+    existingSecret:
+      secretRef: firebolt-gateway-tls # kubernetes.io/tls Secret: tls.crt, tls.key
+
+  engine:
+    enabled: true
+    existingSecret:
+      secretRef: firebolt-engine-tls # kubernetes.io/tls Secret: tls.crt, tls.key, ca.crt
+```
+
+<Note>
+`tls.engine`'s Secret requires all three keys — `tls.crt`, `tls.key`, and `ca.crt` — even for a self-signed certificate with no separate CA (set `ca.crt` to a copy of `tls.crt` in that case). The engine's own internal health check and the gateway's upstream connection both need the issuing CA to validate the certificate independently of `tls.crt`.
+</Note>
+
+### Install
+
+```bash
+kubectl create secret tls firebolt-gateway-tls -n firebolt \
+  --cert=gateway.crt --key=gateway.key
+
+# ca.crt is required in addition to the standard tls.crt / tls.key keys.
+kubectl create secret generic firebolt-engine-tls -n firebolt \
+  --from-file=tls.crt=engine.crt --from-file=tls.key=engine.key --from-file=ca.crt=ca.crt
+
+helm install firebolt ./helm \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
+### cert-manager as a certificate source
+
+```yaml
+tls:
+  engine:
+    enabled: true
+    certManager:
+      algorithm: RSA
+      size: 2048
+      issuerRef:
+        name: internal-ca
+        kind: ClusterIssuer
+
+  gateway:
+    enabled: true
+    certManager:
+      algorithm: RSA
+      size: 2048
+      dnsNames:
+        - firebolt.example.com # the chart can't infer the externally-visible hostname
+      issuerRef:
+        name: internal-ca
+        kind: ClusterIssuer
+```
+
+The engine's certificate's DNS names are derived automatically from every engine node's per-node hostname and each engine's internal service hostname — don't set `dnsNames` under `tls.engine.certManager`. The gateway's certificate has no such derivation; set `dnsNames` to whatever hostname clients use to reach the gateway.
+
+### Verify
+
+```bash
+# Gateway: client-facing TLS.
+kubectl port-forward -n firebolt svc/firebolt-gateway 8443:80
+curl -k https://localhost:8443/ -H "X-Firebolt-Engine: default" --data "SELECT 1"
+
+# Engine: confirm the query listener now speaks TLS.
+kubectl exec -n firebolt firebolt-engine-default-node-0-0 -c core -- \
+  curl -k -o /dev/null -s -w '%{http_code}\n' https://localhost:3473/health/ready
+```
+
+### Caveats
+
+- The `core-ui` sidecar (`engineSpec.uiSidecar`) follows `tls.engine.enabled` automatically, proxying to the engine over HTTPS without verifying its certificate — the connection is over loopback within the pod, so this doesn't need a trusted CA.
+- cert-manager and its CRDs must already be installed in the cluster before `certManager` blocks are set on any value; the chart's `Certificate` resources otherwise fail to apply.
+
+## See also
+
+- [Security model](../security): pod-hardening baseline and secrets handling across the whole chart.

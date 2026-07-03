@@ -121,16 +121,37 @@ canonical document has shape:
 
 .Values.customEngineConfig is deep-merged on top of the canonical
 document at the root: keys at the top become siblings of `engine`
-and `instance` (e.g. `auth:`, `logging:`), and keys nested under
-`instance:` merge into the inner instance block (e.g. `instance.id`,
-which the engine internally propagates to account_id, account_name,
-organization_id, and organization_name).
+and `instance` (e.g. `logging:`), and keys nested under `instance:`
+merge into the inner instance block (e.g. `instance.id`, which the
+engine internally propagates to account_id, account_name,
+organization_id, and organization_name; or `instance.auth.oidc` /
+`instance.auth.local.signing_algorithm` / `instance.auth.jwt`,
+deep-merged alongside the auth.* value block below).
 
 Chart-authoritative paths are silently stripped from the user input
 before the merge: `schema_version`, `engine.id`, `engine.nodes`,
 `engine.termination_grace_period`, `instance.type`,
-`instance.multi_engine`. The same customEngineConfig therefore stays
-portable across chart versions.
+`instance.multi_engine`, and — only when `tls.engine.enabled` — the
+`endpoints.http.listeners` this helper renders for the query
+listener's TLS. The same customEngineConfig therefore stays portable
+across chart versions.
+
+When `auth.enabled` is true, `instance.auth.{enabled,admin,
+local.signing_keys}` are built from `auth.admin` / `auth.signingKeys`
+using chart-owned secret mount paths (see engine-statefulset.yaml for
+the matching volumes); rendering nothing under `instance.auth`
+otherwise, since the engine refuses to start if `admin` / `oidc` /
+`preferred_authorization_server` are present while auth is disabled.
+`auth.enabled` with an empty `auth.signingKeys` fails the render — an
+engine with no explicit signing key falls back to a per-pod dev key
+that differs across nodes and breaks cross-node token validation.
+
+When `tls.engine.enabled` is true, `endpoints.http.listeners` is set
+to a single TLS-terminated TCP listener on the query port (3473),
+using the combined-chain file an init container builds from the
+mounted TLS secret (see engine-statefulset.yaml) — the engine's own
+internal health-check dials this listener over HTTPS and needs the
+issuing CA reachable from the same file it serves.
 
 Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 */}}
@@ -156,12 +177,7 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{- $gracePeriod := int $root.Values.engineSpec.terminationGracePeriodSeconds -}}
 {{- $shutdownWait := sub $gracePeriod 5 -}}
 {{- if lt $shutdownWait 1 -}}{{- $shutdownWait = 1 -}}{{- end -}}
-{{- $canonical := dict
-      "schema_version" "1.0"
-      "engine" (dict "id" $engine.name "nodes" $nodes "termination_grace_period" (printf "%ds" $shutdownWait))
-      "instance" (dict "type" "multi_engine" "multi_engine" (dict "metadata_endpoint" $metadataEndpoint))
-      "logging" (dict "format" "json")
--}}
+
 {{- $user := deepCopy (default (dict) $root.Values.customEngineConfig) -}}
 {{- $_ := unset $user "schema_version" -}}
 {{/*
@@ -186,8 +202,136 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{-     $_ := unset $user "instance" -}}
 {{-   end -}}
 {{- end -}}
+
+{{- $instanceCanonical := dict "type" "multi_engine" "multi_engine" (dict "metadata_endpoint" $metadataEndpoint) -}}
+{{- if $root.Values.auth.enabled -}}
+{{-   if not $root.Values.auth.admin.password.existingSecret.secretRef -}}
+{{-     fail "auth.enabled is true but auth.admin.password.existingSecret.secretRef is empty — enabling auth requires an existing Secret with the admin password" -}}
+{{-   end -}}
+{{-   if not $root.Values.auth.signingKeys -}}
+{{-     fail "auth.enabled is true but auth.signingKeys is empty — an engine with no explicit signing key falls back to a per-pod dev key that differs across nodes and breaks token validation in a multi-node engine" -}}
+{{-   end -}}
+{{-   $signingKeys := list -}}
+{{-   range $ki, $key := $root.Values.auth.signingKeys -}}
+{{-     if not $key.id -}}
+{{-       fail (printf "auth.signingKeys[%d].id is empty — every signing key needs a non-empty id, published as the JWT kid header" $ki) -}}
+{{-     end -}}
+{{-     $signingKeys = append $signingKeys (dict "id" $key.id "private_key_path" (printf "/secrets/auth/signing-%d/tls.key" $ki)) -}}
+{{-   end -}}
+{{-   $_ := set $instanceCanonical "auth" (dict
+        "enabled" true
+        "admin" (dict "name" $root.Values.auth.admin.name "password_file" "/secrets/auth/admin/password")
+        "local" (dict "signing_keys" $signingKeys)
+      ) -}}
+{{- end -}}
+
+{{- $canonical := dict
+      "schema_version" "1.0"
+      "engine" (dict "id" $engine.name "nodes" $nodes "termination_grace_period" (printf "%ds" $shutdownWait))
+      "instance" $instanceCanonical
+      "logging" (dict "format" "json")
+-}}
+{{- if $root.Values.tls.engine.enabled -}}
+{{-   $_ := set $canonical "endpoints" (dict "http" (dict "listeners" (list (dict
+        "type" "tcp"
+        "port" 3473
+        "tls" (dict
+          "certificate_file" "/etc/firebolt/tls/engine/fullchain.pem"
+          "private_key_file" "/secrets/tls/engine-raw/tls.key"
+        )
+      )))) -}}
+{{/*
+  endpoints.http.listeners is only chart-authoritative while we're actually
+  rendering it (tls.engine.enabled); leave it fully user-controlled via
+  customEngineConfig otherwise (e.g. to add a unix-socket listener with TLS
+  off).
+*/}}
+{{-   if hasKey $user "endpoints" -}}
+{{-     if kindIs "map" $user.endpoints -}}
+{{-       if and (hasKey $user.endpoints "http") (kindIs "map" $user.endpoints.http) -}}
+{{-         $_ := unset $user.endpoints.http "listeners" -}}
+{{-       else if hasKey $user.endpoints "http" -}}
+{{-         $_ := unset $user.endpoints "http" -}}
+{{-       end -}}
+{{-     else -}}
+{{-       $_ := unset $user "endpoints" -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+
 {{- $merged := mergeOverwrite $canonical $user -}}
 {{ $merged | toYaml }}
+{{- end -}}
+
+{{/*
+Resolves a "secret source" object — {existingSecret: {secretRef}, certManager: {...}} —
+to the name of the Kubernetes Secret that should be mounted. Exactly one of
+existingSecret.secretRef or certManager.issuerRef.name must be set (the presence of a
+non-empty issuerRef.name is what distinguishes "certManager configured" from "certManager
+left at its structural defaults", since the value tree always carries the certManager map).
+Fails the render otherwise, naming the offending value path.
+
+Usage: {{ include "fbinstance.secretSourceName" (dict "source" <secretSourceValue> "certManagerSecretName" <name> "context" "<value path, for error messages>") }}
+*/}}
+{{- define "fbinstance.secretSourceName" -}}
+{{- $source := .source -}}
+{{- $hasExisting := and $source.existingSecret (ne ($source.existingSecret.secretRef | default "") "") -}}
+{{- $hasCertManager := and $source.certManager $source.certManager.issuerRef (ne ($source.certManager.issuerRef.name | default "") "") -}}
+{{- if and $hasExisting $hasCertManager -}}
+{{- fail (printf "%s: set exactly one of existingSecret.secretRef or certManager.issuerRef.name, not both" .context) -}}
+{{- else if $hasExisting -}}
+{{- $source.existingSecret.secretRef -}}
+{{- else if $hasCertManager -}}
+{{- .certManagerSecretName -}}
+{{- else -}}
+{{- fail (printf "%s: set one of existingSecret.secretRef or certManager.issuerRef.name" .context) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+True (non-empty string "true") when a secret-source object's certManager block is the one
+in effect, i.e. the chart should render a cert-manager Certificate for it. Mirrors the
+certManager branch of fbinstance.secretSourceName's resolution but never fails — safe to use
+as a template guard ({{- if include "fbinstance.usesCertManager" (dict "source" ...) }}).
+The corresponding fbinstance.secretSourceName call at the mount site still enforces the
+exactly-one-of validation.
+
+Usage: {{ include "fbinstance.usesCertManager" (dict "source" <secretSourceValue>) }}
+*/}}
+{{- define "fbinstance.usesCertManager" -}}
+{{- $source := .source -}}
+{{- $hasExisting := and $source.existingSecret (ne ($source.existingSecret.secretRef | default "") "") -}}
+{{- $hasCertManager := and $source.certManager $source.certManager.issuerRef (ne ($source.certManager.issuerRef.name | default "") "") -}}
+{{- if and $hasCertManager (not $hasExisting) -}}true{{- end -}}
+{{- end -}}
+
+{{/*
+DNS names for the shared engine TLS certificate (one Secret/Certificate mounted by every
+engine pod across every engine in .Values.engines). Includes every node's per-node FQDN,
+each engine's headless-service FQDN, and "localhost".
+
+MUST track the exact node-FQDN format fbinstance.engineConfig builds (the `$fqdn` in its
+`engine.nodes` list): that format is the hostname the engine's own internal
+FireboltCoreHealthChecker dials once TLS is enabled (it uses the node's configured hostname,
+not localhost, for both the connection and SNI/cert verification — see
+FireboltCoreHealthChecker.cpp). A mismatch here leaves every engine node permanently
+NotReady, not just cosmetically wrong.
+
+Usage: {{ include "fbinstance.engineTlsDnsNames" . }}
+*/}}
+{{- define "fbinstance.engineTlsDnsNames" -}}
+{{- $root := . -}}
+{{- $ns := $root.Release.Namespace -}}
+{{- $names := list "localhost" -}}
+{{- range $engine := $root.Values.engines -}}
+{{-   $baseName := printf "%s-engine-%s" (include "fbinstance.fullname" $root) $engine.name -}}
+{{-   $svcName := printf "%s-hl" $baseName -}}
+{{-   $names = append $names (printf "%s.%s.svc%s" $svcName $ns $root.Values.engineSpec.nodeHostSuffix) -}}
+{{-   range $i := until (int $engine.replicas) -}}
+{{-     $names = append $names (printf "%s-node-%d-0.%s.%s.svc%s" $baseName $i $svcName $ns $root.Values.engineSpec.nodeHostSuffix) -}}
+{{-   end -}}
+{{- end -}}
+{{- toYaml $names -}}
 {{- end -}}
 
 {{/*
@@ -200,29 +344,6 @@ values.schema.json patterns.
 {{- define "fbinstance.xmlEscape" -}}
 {{- . | replace "&" "&amp;" | replace "<" "&lt;" | replace ">" "&gt;" -}}
 {{- end -}}
-
-{{/*
-Auth config JSON helper.
-Produces a JSON object based on auth.mode.
-*/}}
-{{- define "fbinstance.authConfig" -}}
-{{- if eq .Values.auth.mode "none" -}}
-{"mode": "none"}
-{{- else if eq .Values.auth.mode "local" -}}
-{"mode": "local", "credentialsSecretRef": {{ .Values.auth.local.credentialsSecretRef | quote }}}
-{{- else if eq .Values.auth.mode "sso" -}}
-{
-  "mode": "sso",
-  "oidc": {
-    "issuerURL": {{ .Values.auth.oidc.issuerURL | quote }},
-    "clientID": {{ .Values.auth.oidc.clientID | quote }},
-    "claimMappings": {{ .Values.auth.oidc.claimMappings | toJson }}
-  }
-}
-{{- else }}
-{{- fail (printf "auth.mode must be one of: none, local, sso. Got: %s" .Values.auth.mode) }}
-{{- end }}
-{{- end }}
 
 {{/*
 Memlock setup sidecar script — loaded from files/memlock-setup.sh

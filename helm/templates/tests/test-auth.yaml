@@ -1,0 +1,91 @@
+{{- /*
+Only meaningful when auth is actually enabled — there's no admin/signing key to test
+against otherwise. Targets the first engine node directly (bypassing the gateway): auth
+enforcement is a property of the shared instance.auth config every node renders
+identically, not of gateway routing, so one node is representative and this stays
+independent of gateway.enabled / tls.gateway settings.
+*/ -}}
+{{- if .Values.auth.enabled }}
+{{- $engine := index .Values.engines 0 }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-test-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fbinstance.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  restartPolicy: Never
+  volumes:
+    - name: admin-password
+      secret:
+        secretName: {{ .Values.auth.admin.password.existingSecret.secretRef }}
+  containers:
+    - name: check
+      image: curlimages/curl:latest
+      volumeMounts:
+        - name: admin-password
+          mountPath: /secrets/admin
+          readOnly: true
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+          {{- include "fbinstance.testShellHelpers" . | nindent 10 }}
+          HOST="{{ include "fbinstance.fullname" . }}-engine-{{ $engine.name }}-node-0-0.{{ include "fbinstance.fullname" . }}-engine-{{ $engine.name }}-hl.{{ .Release.Namespace }}.svc.cluster.local"
+          {{- if .Values.tls.engine.enabled }}
+          # tls.engine.enabled: the query listener speaks HTTPS. This test only exercises
+          # auth enforcement, not certificate trust (the live TLS path covers that
+          # separately), so it doesn't verify the chain.
+          ENGINE_URL="https://${HOST}:3473"
+          CURL_INSECURE="-k"
+          {{- else }}
+          ENGINE_URL="http://${HOST}:3473"
+          CURL_INSECURE=""
+          {{- end }}
+          ADMIN_USER="{{ .Values.auth.admin.name }}"
+          ADMIN_PASSWORD=$(cat /secrets/admin/password)
+          # RFC 8707 resource indicator: must equal this instance's OAuth audience,
+          # which the engine derives from instance.id (AuthConfig.h BuildInstanceIssuerUrl).
+          RESOURCE="https://firebolt.io/instance/{{ .Values.customEngineConfig.instance.id }}"
+
+          log "Auth: unauthenticated query is rejected"
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+            --retry 12 --retry-delay 5 --retry-connrefused \
+            $CURL_INSECURE \
+            -X POST "$ENGINE_URL/" \
+            -H "Content-Type: text/plain" \
+            --data "SELECT 1")
+          [ "$HTTP_CODE" = "401" ] \
+            || fail "unauthenticated query returned HTTP $HTTP_CODE (expected 401)"
+          pass "unauthenticated query rejected with 401"
+
+          log "Auth: health check stays unauthenticated"
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://${HOST}:8122/health/ready")
+          [ "$HTTP_CODE" = "200" ] \
+            || fail "/health/ready returned HTTP $HTTP_CODE (expected 200) while unauthenticated"
+          pass "/health/ready stays reachable without a token"
+
+          log "Auth: requesting a token for admin user '$ADMIN_USER'"
+          TOKEN_RESPONSE=$(curl -s $CURL_INSECURE -X POST "$ENGINE_URL/oauth/token" \
+            -u "$ADMIN_USER:$ADMIN_PASSWORD" \
+            --data-urlencode "grant_type=client_credentials" \
+            --data-urlencode "resource=$RESOURCE")
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | sed -n 's/.*"access_token": *"\([^"]*\)".*/\1/p')
+          [ -n "$ACCESS_TOKEN" ] \
+            || fail "did not receive access_token, response: $TOKEN_RESPONSE"
+          pass "obtained access token"
+
+          log "Auth: authenticated query succeeds"
+          RESPONSE=$(curl --fail -s $CURL_INSECURE \
+            -X POST "$ENGINE_URL/" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: text/plain" \
+            --data "SELECT 1")
+          echo "$RESPONSE" | grep -q "1" || fail "unexpected response from authenticated query: $RESPONSE"
+          pass "authenticated query returned a result containing '1'"
+{{- end }}

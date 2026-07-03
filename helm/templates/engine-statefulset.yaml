@@ -11,6 +11,23 @@ deletion makes sense for stale generation cleanup; in this chart, an STS is
 deleted whenever a user reduces `replicas`, so Delete would silently destroy
 the removed node's data PVC. Stick with the K8s default (Retain).
 */ -}}
+{{- /*
+Secret names for auth/TLS artifacts, resolved once up front: these are shared across
+every engine and node (one admin account, one signing-key set, one TLS cert for the
+whole instance), not per-node, so there's no reason to recompute them inside the loop.
+*/ -}}
+{{- $authAdminSecret := "" -}}
+{{- $authSigningSecrets := list -}}
+{{- if $.Values.auth.enabled -}}
+{{-   $authAdminSecret = $.Values.auth.admin.password.existingSecret.secretRef -}}
+{{-   range $ki, $key := $.Values.auth.signingKeys -}}
+{{-     $authSigningSecrets = append $authSigningSecrets (include "fbinstance.secretSourceName" (dict "source" $key "certManagerSecretName" (printf "%s-auth-signing-%d" (include "fbinstance.fullname" $) $ki) "context" (printf "auth.signingKeys[%d]" $ki))) -}}
+{{-   end -}}
+{{- end -}}
+{{- $engineTlsSecret := "" -}}
+{{- if $.Values.tls.engine.enabled -}}
+{{-   $engineTlsSecret = include "fbinstance.secretSourceName" (dict "source" $.Values.tls.engine "certManagerSecretName" (printf "%s-tls-engine" (include "fbinstance.fullname" $)) "context" "tls.engine") -}}
+{{- end -}}
 {{- range .Values.engines }}
 {{- $engine := . }}
 {{- range $i := until (int $engine.replicas) }}
@@ -41,11 +58,27 @@ spec:
   template:
     metadata:
       annotations:
-        # Roll this engine's pods when its own config.yaml or the shared
-        # auth.json changes. The config hash is scoped to this engine so a
-        # change to one engine doesn't restart the others.
+        # Roll this engine's pods when its own config.yaml changes. The
+        # config hash is scoped to this engine so a change to one engine
+        # doesn't restart the others.
         checksum/config: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) | sha256sum }}
-        checksum/auth: {{ include (print $.Template.BasePath "/auth-configmap.yaml") $ | sha256sum }}
+        {{- /*
+        These secrets live outside chart-rendered templates (BYO or
+        cert-manager-created), so there's no rendered content to hash the
+        usual way — `lookup` the live Secret and hash its data instead, so a
+        rotated Secret (same name, new content) still rolls the pods. Blank
+        during `helm template`/offline `--dry-run` (no cluster access), which
+        matches the existing metadata-service-secret.yaml precedent.
+        */}}
+        {{- if $.Values.auth.enabled }}
+        checksum/auth-admin: {{ (lookup "v1" "Secret" $.Release.Namespace $authAdminSecret).data | toYaml | sha256sum }}
+        {{- range $ki, $secretName := $authSigningSecrets }}
+        checksum/auth-signing-{{ $ki }}: {{ (lookup "v1" "Secret" $.Release.Namespace $secretName).data | toYaml | sha256sum }}
+        {{- end }}
+        {{- end }}
+        {{- if $.Values.tls.engine.enabled }}
+        checksum/tls-engine: {{ (lookup "v1" "Secret" $.Release.Namespace $engineTlsSecret).data | toYaml | sha256sum }}
+        {{- end }}
         {{- with $engine.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -251,10 +284,31 @@ spec:
               mountPath: /var/lib/firebolt/config.yaml
               subPath: config.yaml
               readOnly: true
-            - name: auth-config
-              mountPath: /var/lib/firebolt/auth.json
-              subPath: auth.json
+            {{- if $.Values.auth.enabled }}
+            - name: auth-admin
+              mountPath: /secrets/auth/admin
               readOnly: true
+            {{- range $ki, $secretName := $authSigningSecrets }}
+            - name: auth-signing-{{ $ki }}
+              mountPath: /secrets/auth/signing-{{ $ki }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- if $.Values.tls.engine.enabled }}
+            # engine-tls-raw carries tls.key (read directly as private_key_file)
+            # plus tls.crt/ca.crt, which the tls-chain-setup init container
+            # combines into engine-tls-chain's fullchain.pem (certificate_file) —
+            # see that init container for why the two can't just be one mount.
+            - name: engine-tls-raw
+              mountPath: /secrets/tls/engine-raw
+              readOnly: true
+            - name: engine-tls-chain
+              mountPath: /etc/firebolt/tls/engine
+              readOnly: true
+            {{- end }}
+            {{- with $.Values.engineSpec.customVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
             # Scratch space outside the read-only root filesystem.
             # `/run/firebolt` holds the engine's per-port unix
             # domain socket (`.s.firebolt.<port>`); the directory
@@ -284,7 +338,10 @@ spec:
           imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
           env:
             - name: FIREBOLT_CORE_URL
-              value: http://localhost:3473
+              # The sidecar's nginx reverse proxy defaults proxy_ssl_verify to off, so
+              # proxying to the engine's self-signed/private-CA cert over loopback HTTPS
+              # needs no extra trust configuration on this side.
+              value: {{ if $.Values.tls.engine.enabled }}https{{ else }}http{{ end }}://localhost:3473
           ports:
             - containerPort: 9100
               name: web-ui
@@ -345,10 +402,53 @@ spec:
               mountPath: /var/lib/firebolt
         {{- end }}
 {{- $hpEnabled := $.Values.engineSpec.hostPathStorageEnabled }}
-{{- if or $.Values.engineSpec.customInitContainersTemplate $hpEnabled }}
+{{- if or $.Values.engineSpec.customInitContainersTemplate $hpEnabled $.Values.tls.engine.enabled }}
       initContainers:
         {{- if $.Values.engineSpec.customInitContainersTemplate }}
         {{- tpl (toYaml $.Values.engineSpec.customInitContainersTemplate) $ | nindent 8 }}
+        {{- end }}
+        {{- if $.Values.tls.engine.enabled }}
+        - name: tls-chain-setup
+          # Builds the full certificate chain (leaf + issuing CA) the engine's
+          # own `certificate_file` needs: its internal self-health-check uses
+          # that same file as its curl trust bundle (CURLOPT_CAINFO), so a
+          # leaf-only cert (e.g. cert-manager's tls.crt with the CA split into
+          # a separate ca.crt) fails self-verification and the pod never
+          # reaches Ready. A plain volume mount can't concatenate two Secret
+          # keys into one file, hence the init container. `ca.crt` is a
+          # required key in tls.engine's Secret (see values.yaml) — this
+          # fails loudly and immediately if it's missing, rather than
+          # silently shipping a leaf-only chain that fails self-verification
+          # later with a much less obvious curl/SSL error.
+          image: {{ $.Values.utilitiesImage }}
+          imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              echo "[Setup] building engine TLS certificate chain"
+              cat /secrets/tls/engine-raw/tls.crt /secrets/tls/engine-raw/ca.crt > /etc/firebolt/tls/engine/fullchain.pem
+          resources:
+            limits:
+              memory: 24Mi
+            requests:
+              cpu: 25m
+              memory: 24Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 3473
+            runAsGroup: 3473
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: engine-tls-raw
+              mountPath: /secrets/tls/engine-raw
+              readOnly: true
+            - name: engine-tls-chain
+              mountPath: /etc/firebolt/tls/engine
         {{- end }}
         {{- if $hpEnabled }}
         - name: host-path-setup
@@ -387,9 +487,23 @@ spec:
         - name: engine-config
           configMap:
             name: {{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-config
-        - name: auth-config
-          configMap:
-            name: {{ include "fbinstance.fullname" $ }}-auth
+        {{- if $.Values.auth.enabled }}
+        - name: auth-admin
+          secret:
+            secretName: {{ $authAdminSecret }}
+        {{- range $ki, $secretName := $authSigningSecrets }}
+        - name: auth-signing-{{ $ki }}
+          secret:
+            secretName: {{ $secretName }}
+        {{- end }}
+        {{- end }}
+        {{- if $.Values.tls.engine.enabled }}
+        - name: engine-tls-raw
+          secret:
+            secretName: {{ $engineTlsSecret }}
+        - name: engine-tls-chain
+          emptyDir: {}
+        {{- end }}
         {{- with $.Values.engineSpec.customVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
