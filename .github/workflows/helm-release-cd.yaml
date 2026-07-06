@@ -1,4 +1,12 @@
 ---
+# Chart versioning is driven by release-please: conventional-commit pushes to
+# main accumulate on an automated release PR (opened/updated by the release-please
+# job); merging that PR bumps helm/Chart.yaml `version`, prepends helm/CHANGELOG.md,
+# tags `<version>` (bare SemVer, matching the chart version and OCI tag), and cuts
+# a GitHub release. Only then does release-chart package
+# and push the OCI chart to GHCR. Chart `appVersion` is NOT managed here -- it is
+# bumped independently by the upstream image-release automation (a chore(deps):
+# commit, which release-please still counts as releasable).
 name: Helm - Release Chart
 
 env:
@@ -8,8 +16,6 @@ env:
 on:
   push:
     branches: [main]
-    paths:
-      - "helm/**"
   workflow_dispatch:
 
 permissions: {}
@@ -18,7 +24,44 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      # Single package at path `helm`, so release-please-action keys its outputs
+      # by that path (`helm--<name>`) rather than the un-prefixed root aliases.
+      release_created: ${{ steps.release.outputs['helm--release_created'] }}
+      tag_name: ${{ steps.release.outputs['helm--tag_name'] }}
+      version: ${{ steps.release.outputs['helm--version'] }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          show-progress: "false"
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.GH_APP_FB_DB_CI_WRITER_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_FB_DB_CI_WRITER_APP_KEY_PEM }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Release Please
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
   release-chart:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -28,7 +71,6 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           show-progress: "false"
-          fetch-depth: 2
           persist-credentials: false
 
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -49,65 +91,30 @@ jobs:
           sudo tar -xzf "${HELM_DOCS_ARCHIVE}" -C /usr/local/bin helm-docs
           rm -f "${HELM_DOCS_ARCHIVE}" checksums.txt
 
-      - name: Determine chart version
-        id: chart
+      - name: Sync generated chart README to released version
+        # release-please bumps Chart.yaml `version` on the release PR but does not
+        # run helm-docs, so the README version badge lags by one release. Regenerate
+        # and commit it back. helm/README.md is cosmetic (the chart's .helmignore
+        # excludes *.md, so it is never packaged). The commit carries `[skip ci]` so
+        # this direct push to main does not trigger a second (no-op) release run;
+        # its `docs:` type is non-releasable and it is still picked up (hidden) in
+        # release-please's next commit-range scan.
         env:
           GH_APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_VERSION: ${{ needs.release-please.outputs.version }}
         run: |
-          CURR_VERSION=$(yq '.version' helm/Chart.yaml)
-          APP_VERSION=$(yq '.appVersion' helm/Chart.yaml)
-
-          # workflow_dispatch: publish the version already in Chart.yaml.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "chart_version=$CURR_VERSION" >> "$GITHUB_OUTPUT"
-            echo "Releasing existing chart version $CURR_VERSION (appVersion: $APP_VERSION)"
-            exit 0
-          fi
-
-          # If the developer already bumped Chart.version in their commit, honour it.
-          PREV_VERSION=$(git show HEAD~1:helm/Chart.yaml | yq '.version')
-          if [ "$PREV_VERSION" != "$CURR_VERSION" ]; then
-            echo "chart_version=$CURR_VERSION" >> "$GITHUB_OUTPUT"
-            echo "Chart.version already bumped ($PREV_VERSION -> $CURR_VERSION); using as-is."
-            exit 0
-          fi
-
-          # ── Auto-bump based on conventional-commit message ────────────────
-          COMMIT_MSG=$(git log --format='%s' -1)
-          COMMIT_BODY=$(git log --format='%b' -1)
-
-          MAJOR=$(echo "$CURR_VERSION" | cut -d. -f1)
-          MINOR=$(echo "$CURR_VERSION" | cut -d. -f2)
-          PATCH=$(echo "$CURR_VERSION" | cut -d. -f3)
-
-          if echo "$COMMIT_BODY" | grep -qi 'BREAKING CHANGE'; then
-            NEW_VERSION="$((MAJOR + 1)).0.0"
-            BUMP_TYPE="major"
-          elif echo "$COMMIT_MSG" | grep -qE '^feat(\(|:)'; then
-            NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
-            BUMP_TYPE="minor"
-          else
-            NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
-            BUMP_TYPE="patch"
-          fi
-
-          echo "Auto $BUMP_TYPE bump: $CURR_VERSION -> $NEW_VERSION (commit: $COMMIT_MSG)"
-
-          yq -i ".version = \"$NEW_VERSION\"" helm/Chart.yaml
-
-          printf "# %s\n\n%s\n\n" "$NEW_VERSION" "$COMMIT_MSG" \
-            | cat - helm/CHANGELOG.md > /tmp/CHANGELOG.md
-          mv /tmp/CHANGELOG.md helm/CHANGELOG.md
-
           helm-docs --chart-search-root=helm
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add helm/Chart.yaml helm/CHANGELOG.md helm/README.md
-          git commit -m "chore(helm): bump chart to $NEW_VERSION"
-          git push "https://x-access-token:${GH_APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          git add helm/README.md
 
-          echo "chart_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          if git diff --staged --quiet; then
+            echo "Chart README already in sync; nothing to commit."
+          else
+            git commit -m "docs: regenerate chart README for ${RELEASE_VERSION} [skip ci]"
+            git push "https://x-access-token:${GH_APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          fi
 
       - name: Set up Helm
         uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
@@ -130,11 +137,28 @@ jobs:
           echo "Packaged: $(ls /tmp/helm-packages)"
 
       - name: Push chart to GitHub Container Registry
+        env:
+          CHART_VERSION: ${{ needs.release-please.outputs.version }}
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
           helm push \
-            "/tmp/helm-packages/firebolt-instance-${STEPS_CHART_OUTPUTS_CHART_VERSION}.tgz" \
-            "oci://${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.HELM_CHARTS_NAMESPACE }}"
-          echo "Pushed firebolt-instance:${STEPS_CHART_OUTPUTS_CHART_VERSION} to GHCR"
+            "/tmp/helm-packages/firebolt-instance-${CHART_VERSION}.tgz" \
+            "oci://${GHCR_REGISTRY}/${REPO_OWNER}/${HELM_CHARTS_NAMESPACE}"
+          echo "Pushed firebolt-instance:${CHART_VERSION} to GHCR"
 
+      - name: Job summary
         env:
-          STEPS_CHART_OUTPUTS_CHART_VERSION: ${{ steps.chart.outputs.chart_version }}
+          CHART_VERSION: ${{ needs.release-please.outputs.version }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          {
+            echo "### Helm chart published :rocket:"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| **Chart** | \`firebolt-instance\` |"
+            echo "| **Version** | \`${CHART_VERSION}\` |"
+            echo "| **Release tag** | \`${TAG_NAME}\` |"
+            echo "| **Registry** | \`oci://${GHCR_REGISTRY}/${REPO_OWNER}/${HELM_CHARTS_NAMESPACE}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

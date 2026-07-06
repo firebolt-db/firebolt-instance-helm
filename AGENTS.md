@@ -2,7 +2,7 @@
 
 ## What this project does
 
-Helm chart that runs a Firebolt instance on Kubernetes: an Envoy gateway that routes by `X-Firebolt-Engine` header, the Pensieve metadata service, a bundled or external PostgreSQL for metadata storage, and one or more `firebolt-core` query engines as StatefulSets. The chart is published as `firebolt-instance` to `oci://ghcr.io/firebolt-db/helm-charts` on every push to `main` that touches `helm/`.
+Helm chart that runs a Firebolt instance on Kubernetes: an Envoy gateway that routes by `X-Firebolt-Engine` header, the Pensieve metadata service, a bundled or external PostgreSQL for metadata storage, and one or more `firebolt-core` query engines as StatefulSets. The chart is published as `firebolt-instance` to `oci://ghcr.io/firebolt-db/helm-charts` when a release-please release PR is merged to `main` (see project-specific rules).
 
 ## Repo structure
 
@@ -28,7 +28,7 @@ Helm chart that runs a Firebolt instance on Kubernetes: an Envoy gateway that ro
 ├── docs/                     # user-facing docs, Mintlify MDX (docs.json drives nav; see docs/AGENTS.md for style)
 ├── docs-internal/            # Firebolt-internal docs (e.g. the make dev / floci flow), plain Markdown
 ├── .github/
-│   ├── workflows/            # helm-validate, helm-release-cd, gha-lint, helm-test
+│   ├── workflows/            # helm-validate, helm-release-cd (release-please), pr-title, gha-lint, helm-test
 │   └── ISSUE_TEMPLATE/
 ├── static/                   # chart icon
 ├── .pre-commit-config.yaml   # helm-docs, helm lint --strict, helm template dry-run
@@ -90,7 +90,7 @@ You MUST keep documentation in sync with code. When making changes:
 
 - **AGENTS.md** — update the relevant `AGENTS.md` (root or `helm/AGENTS.md`) if you change structure, conventions, public surface, commands, or config formats. If your change makes existing AGENTS.md content wrong, fix it before finishing.
 - **`helm/values.yaml` annotations** — every value rendered into `helm/README.md` is documented inline via `# --` comments processed by `helm-docs`. When you add, rename, remove, or change the meaning of a value, update its annotation in the same change. Then regenerate `helm/README.md` via `make docs` (or let the pre-commit `helm-docs` hook do it on commit).
-- **`helm/CHANGELOG.md`** — the `helm-release-cd` workflow prepends a new entry on each release based on the conventional-commit message of the merge commit. You do not normally hand-edit this file; you DO need to write a conventional-commit message (`feat:` / `fix:` / `chore:` / etc.) so the auto-bump and changelog entry are correct.
+- **`helm/CHANGELOG.md`** — release-please owns this file, prepending a section for each release from the conventional-commit history since the last release. You do not hand-edit it; you DO need conventional-commit PR titles (`feat:` / `fix:` / `chore(deps):` / etc.) so the version bump and changelog entry are correct.
 - **`README.md` (root)** — overview-only. Update when your change affects what a human reader needs to know about what the project is or how to run it. Implementation detail belongs in this file or `helm/AGENTS.md`, not the README.
 - **`helm/README.md`** — never hand-edit. It is regenerated.
 
@@ -119,7 +119,7 @@ Code is not done until it is covered by tests where tests are reasonable.
 Every change is tracked and lands through a branch and a pull request — no exceptions.
 
 - **A documented issue comes first.** Every task MUST have a corresponding issue before any work starts — a Linear ticket or a GitHub issue. If none exists, create one (GitHub issues use the templates under `.github/ISSUE_TEMPLATE/`). No issue, no work.
-- **Never touch `main` directly.** You MUST NEVER work in, commit to, or push to `main`. All work happens on a feature branch and merges via a reviewed PR. (`main` is only ever advanced by merging a PR or by the release workflow's automated version-bump commit — see project-specific rules.)
+- **Never touch `main` directly.** You MUST NEVER work in, commit to, or push to `main`. All work happens on a feature branch and merges via a reviewed PR. (`main` is only ever advanced by merging a PR — including release-please's automated release PR — see project-specific rules.)
 - **Branch names tie the branch to its issue**, so work is traceable. Prefix the branch with the tracker identifier:
   - Linear: `FB-<number>-<short-kebab-description>` (e.g. `FB-790-ci-testing`).
   - GitHub issue: `<issue-number>-<short-kebab-description>`.
@@ -139,7 +139,7 @@ Linear specifics:
 
 ## Project-specific rules
 
-- **Conventional commits drive releases.** The `helm-release-cd` workflow on `main` parses the merge-commit subject. `feat:` bumps minor, `fix:`/`chore:`/anything-else bumps patch, and a body containing `BREAKING CHANGE` bumps major. Chart version in `helm/Chart.yaml` is auto-bumped and committed back to `main` by a GitHub App; `helm/CHANGELOG.md` is prepended; `helm/README.md` is regenerated; the chart is packaged and pushed to GHCR. If you bump `helm/Chart.yaml` `version` manually in your commit, the workflow honours it as-is and skips the auto-bump.
+- **Conventional commits drive releases via release-please.** The `helm-release-cd` workflow on `main` runs [release-please](https://github.com/googleapis/release-please) (config: `release-please-config.json`, state: `.release-please-manifest.json`), which accumulates conventional-commit merges onto an automated release PR. `feat:` bumps minor, `fix:`/`perf:`/`revert:`/`chore(deps):` bump patch, and `BREAKING CHANGE` bumps minor while pre-1.0 (`bump-minor-pre-major`). Merging that release PR bumps `helm/Chart.yaml` `version`, prepends `helm/CHANGELOG.md`, tags `<version>` (bare SemVer, no `v` — matching the chart version and OCI tag), and cuts a GitHub release; only then does the `release-chart` job regenerate `helm/README.md`, package the chart, and push it to GHCR. Do NOT hand-bump `helm/Chart.yaml` `version` — release-please owns it. `appVersion` is the exception: it is managed by the upstream image-release automation, not release-please.
 - **`appVersion` is the shared default image tag.** `helm/Chart.yaml`'s `appVersion` is the default for both `engineSpec.image.tag` and `metadata.image.tag`, and both image registries now publish matching `debug-` / `release-` prefixed tags. Override `metadata.image.tag` only when the metadata service must run a version other than the engine.
 - **GitHub Actions are pinned to commit SHAs.** All `uses:` references in `.github/workflows/*` use full 40-char SHAs with a version comment. `actionlint` and `zizmor` run on every push/PR that touches `.github/`. New actions you introduce MUST follow the same pinning convention.
 - **Pre-commit hook quirk: first-run helm-docs aborts the commit.** The `helm-docs` pre-commit hook regenerates `helm/README.md` and stages the result; if the regeneration changes the file, the commit aborts so you can re-run `git commit` with the now-staged README.md included. This is documented in `.pre-commit-config.yaml` and is intentional.

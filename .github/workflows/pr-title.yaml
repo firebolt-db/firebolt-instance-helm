@@ -1,0 +1,60 @@
+---
+# release-please derives the next chart version and CHANGELOG from the
+# conventional-commit subject of each squash-merged PR, so the PR title IS the
+# commit message that reaches main. This gate enforces that contract.
+name: PR Title
+
+on:
+  pull_request:
+    # 'edited' is required so that fixing a failed title (which changes only the
+    # title, not the commits) re-triggers validation. The default activity types
+    # (opened, synchronize, reopened) do not cover title edits.
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+
+permissions: {}
+
+jobs:
+  validate:
+    name: PR Title
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    if: ${{ !startsWith(github.head_ref, 'dependabot') && !startsWith(github.head_ref, 'release-please') }}
+    steps:
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # List of allowed commit types
+          types: |
+            build
+            chore
+            ci
+            docs
+            feat
+            fix
+            perf
+            refactor
+            revert
+            style
+            test
+
+          subjectPattern: ^[a-z0-9_].*\((#[0-9]+|[A-Z]+-[0-9]+)\)$
+          requireScope: false
+          validateSingleCommit: false
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}" didn't match the configured pattern.
+
+            We follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+            Our CI is configured to forbid PRs with titles that don't follow this standard.
+            That's it, all commits landing in the `main` branch must be formatted in this way.
+            Please make sure you read and understand this convention.
+
+            The subject must not start with a capital letter, and must end with an issue
+            reference in parentheses: either a GitHub issue like "(#123)" or a tracker
+            ticket like "(FB-1234)".
