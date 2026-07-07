@@ -1,0 +1,92 @@
+---
+description: Enabling TLS on the gateway's client listener and the engine's query listener.
+sidebarTitle: TLS
+title: TLS
+---
+
+This page shows how to enable TLS on the gateway and engine listeners.
+
+`tls.gateway` and `tls.engine` each enable TLS independently, provisioned the same way as `auth.signingKeys` (see [Authentication](./authentication)): an existing `kubernetes.io/tls` Secret, or a chart-rendered cert-manager `Certificate`.
+
+- `tls.gateway` terminates TLS on the gateway's client-facing listener (client → gateway).
+- `tls.engine` enables TLS on the engine's query listener and, correspondingly, the gateway's connection to engines — including the active engine health check, which runs over the same connection.
+
+They can be enabled independently or together.
+
+### Values
+
+```yaml
+# my-values.yaml
+tls:
+  gateway:
+    enabled: true
+    existingSecret:
+      secretRef: firebolt-gateway-tls # kubernetes.io/tls Secret: tls.crt, tls.key
+
+  engine:
+    enabled: true
+    existingSecret:
+      secretRef: firebolt-engine-tls # kubernetes.io/tls Secret: tls.crt, tls.key, ca.crt
+```
+
+<Note>
+`tls.engine`'s Secret requires all three keys — `tls.crt`, `tls.key`, and `ca.crt` — even for a self-signed certificate with no separate CA (set `ca.crt` to a copy of `tls.crt` in that case). The engine's own internal health check and the gateway's upstream connection both need the issuing CA to validate the certificate independently of `tls.crt`.
+
+The certificate's SANs must also cover every engine node's per-node hostname (`<release>-engine-<engine>-node-<i>-0.<release>-engine-<engine>-hl.<namespace>.svc.cluster.local`) and each engine's headless-service hostname (`<release>-engine-<engine>-hl.<namespace>.svc.cluster.local`) — both the engine's self-health-check and the gateway's `auto_san_validation` verify against these names. A missing SAN leaves the affected engine node permanently `NotReady` with no other symptom. `tls.engine.certManager` derives these automatically; a BYO certificate has to include them explicitly.
+</Note>
+
+### Install
+
+```bash
+kubectl create secret tls firebolt-gateway-tls -n firebolt \
+  --cert=gateway.crt --key=gateway.key
+
+# ca.crt is required in addition to the standard tls.crt / tls.key keys.
+kubectl create secret generic firebolt-engine-tls -n firebolt \
+  --from-file=tls.crt=engine.crt --from-file=tls.key=engine.key --from-file=ca.crt=ca.crt
+
+helm install firebolt ./helm \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
+### cert-manager as a certificate source
+
+```yaml
+tls:
+  engine:
+    enabled: true
+    certManager:
+      algorithm: RSA
+      size: 2048
+      issuerRef:
+        name: internal-ca
+        kind: ClusterIssuer
+
+  gateway:
+    enabled: true
+    certManager:
+      algorithm: RSA
+      size: 2048
+      dnsNames:
+        - firebolt.example.com # the chart can't infer the externally-visible hostname
+      issuerRef:
+        name: internal-ca
+        kind: ClusterIssuer
+```
+
+The engine's certificate's DNS names are derived automatically from every engine node's per-node hostname and each engine's internal service hostname — don't set `dnsNames` under `tls.engine.certManager`. The gateway's certificate has no such derivation; set `dnsNames` to whatever hostname clients use to reach the gateway.
+
+<Note>
+The issuer behind `tls.engine.certManager` must populate `ca.crt` in the Certificate's Secret, not just `tls.crt`/`tls.key`. CA and Vault issuers do this; a bare self-signed or ACME issuer may not. The chart's `tls-chain-setup` init container needs `ca.crt` to build the engine's own health-check trust bundle and fails the pod at startup if it's missing.
+</Note>
+
+### Caveats
+
+- The `core-ui` sidecar (`engineSpec.uiSidecar`) follows `tls.engine.enabled` automatically, proxying to the engine over HTTPS without verifying its certificate — the connection is over loopback within the pod, so this doesn't need a trusted CA.
+- cert-manager and its CRDs must already be installed in the cluster before `certManager` blocks are set on any value; the chart's `Certificate` resources otherwise fail to apply.
+
+## See also
+
+- [Authentication](./authentication): enabling engine authentication and JWT signing key rotation.
+- [Security model](../security): pod-hardening baseline and secrets handling across the whole chart.

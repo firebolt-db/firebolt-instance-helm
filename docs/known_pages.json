@@ -34,5 +34,7 @@
   "/usage/object-storage/s3-compatible",
   "/usage/object-storage/s3-compatible/",
   "/usage/single-engine",
-  "/usage/single-engine/"
+  "/usage/single-engine/",
+  "/usage/tls",
+  "/usage/tls/"
 ]

@@ -1,0 +1,2 @@
+value_67A867BC754C44390E7B54969C75EEE8 # Example Kubernetes Secret name "firebolt-signing-key-2026-02" in helm/values.yaml and docs/usage/authentication.mdx — a resource reference, not a credential value.
+value_8FAFF5AF6AA62BB96EAF8C4A1C3ED99F # Example Kubernetes Secret name "firebolt-signing-key-2026-01" in docs/usage/authentication.mdx — a resource reference, not a credential value.
