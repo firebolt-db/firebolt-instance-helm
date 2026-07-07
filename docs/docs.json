@@ -23,6 +23,8 @@
                 ]
               },
               "usage/external-postgres",
+              "usage/authentication",
+              "usage/tls",
               "usage/image-overrides"
             ]
           },

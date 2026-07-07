@@ -59,6 +59,8 @@ Platform teams should apply `NetworkPolicy` objects covering at least the allowe
 
 Cross-engine traffic (replicas of *different* engines), gateway-to-metadata, and gateway-to-PostgreSQL are not required by any chart-emitted control flow and should be denied.
 
+`tls.gateway.enabled` and `tls.engine.enabled` change what's carried on the "External clients → Gateway" and "Gateway → Engine pods" flows above from plaintext HTTP to TLS; they don't change which flows are required. See [TLS](./usage/tls).
+
 ### Namespace-level resource ceilings
 
 A `ResourceQuota` capping the aggregate of `requests.cpu`, `requests.memory`, pod count, and PVC size across all engines in a namespace is a platform concern. The chart applies per-engine `resources.requests` and `resources.limits` from your values, but does not emit a `ResourceQuota` and does not validate the per-engine `resources` block against a Helm-side maximum. The per-namespace budget is a deployment-target decision (test cluster vs. multi-tenant production).
@@ -107,8 +109,16 @@ The chart never sees those cloud provider credentials. For an S3-compatible endp
 
 The chart does not currently expose `sslmode` or a CA-bundle mount for the Metadata Service's PostgreSQL connection. Encrypt the PostgreSQL connection at the network layer (VPC peering, sidecar TLS proxy, or service-mesh mTLS) until the chart grows native support.
 
+### Authentication and TLS
+
+`auth.enabled`, `auth.signingKeys`, and `tls.{gateway,engine}` are each provisioned by exactly one of an existing Secret you create yourself, or a chart-rendered [cert-manager](https://cert-manager.io) `Certificate`. The chart never generates or accepts a literal admin password. See [Authentication](./usage/authentication) and [TLS](./usage/tls) for the full setup, including signing-key rotation and the cert-manager option.
+
+When engine query-listener TLS is enabled (`tls.engine.enabled`), the gateway's upstream connection and its active engine health check both switch to TLS along with it; kubelet's own probes against the engine's dedicated health port continue over plain HTTP.
+
 ## See also
 
+- [Authentication](./usage/authentication): enabling engine authentication and JWT signing key rotation.
+- [TLS](./usage/tls): enabling TLS on the gateway and engine listeners.
 - [Monitoring](./monitoring): metrics surface and Prometheus Operator integration.
 - [Operator upgrade path](./operator-upgrade-path): when continuous admission, drift correction, and CR-status surfaces are required.
 - [`SECURITY.md`](https://github.com/firebolt-db/firebolt-instance-helm/blob/main/SECURITY.md): vulnerability reporting policy for this repository.

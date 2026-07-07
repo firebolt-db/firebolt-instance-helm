@@ -38,7 +38,22 @@ data:
               address: 0.0.0.0
               port_value: {{ .Values.gateway.containerPort }}
           filter_chains:
-            - filters:
+            - {{- if .Values.tls.gateway.enabled }}
+              # Client → gateway TLS termination. tls.crt/tls.key are mounted
+              # from the resolved tls.gateway Secret (BYO or cert-manager);
+              # see gateway-deployment.yaml for the volume.
+              transport_socket:
+                name: envoy.transport_sockets.tls
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+                  common_tls_context:
+                    tls_certificates:
+                      - certificate_chain:
+                          filename: /etc/envoy/tls/gateway/tls.crt
+                        private_key:
+                          filename: /etc/envoy/tls/gateway/tls.key
+              {{- end }}
+              filters:
                 - name: envoy.filters.network.http_connection_manager
                   typed_config:
                     "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
@@ -191,6 +206,35 @@ data:
       clusters:
         - name: dynamic_forward_proxy
           lb_policy: CLUSTER_PROVIDED
+          {{- if .Values.tls.engine.enabled }}
+          # Upstream TLS to engines. auto_sni/auto_san_validation (under
+          # typed_extension_protocol_options, NOT the deprecated
+          # Cluster.upstream_http_protocol_options field) derive SNI and the
+          # expected SAN from the :authority the Lua filter rewrites
+          # per-request — required because this is a dynamic_forward_proxy
+          # cluster with one sub-cluster per engine authority, so a static
+          # SNI/SAN would only ever validate against whichever engine
+          # happened to be dialed first. trusted_ca is the engine's own CA
+          # (ca.crt is a required key in tls.engine's Secret); this same
+          # transport_socket also covers the active health_checks below,
+          # since both hit the query port.
+          transport_socket:
+            name: envoy.transport_sockets.tls
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+              common_tls_context:
+                validation_context:
+                  trusted_ca:
+                    filename: /etc/envoy/tls/engine-ca/ca.crt
+          typed_extension_protocol_options:
+            envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+              "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+              explicit_http_config:
+                http_protocol_options: {}
+              upstream_http_protocol_options:
+                auto_sni: true
+                auto_san_validation: true
+          {{- end }}
           # Mirror the listener's per_connection_buffer_limit_bytes onto
           # the cluster so upstream connection buffering matches the
           # downstream limit. The router consults the smaller of the

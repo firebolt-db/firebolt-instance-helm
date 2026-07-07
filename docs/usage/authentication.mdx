@@ -1,0 +1,108 @@
+---
+description: Enabling engine authentication, provisioning JWT signing keys, and rotating them.
+sidebarTitle: Authentication
+title: Authentication
+---
+
+This page shows how to enable authentication on the Firebolt Engine.
+
+`auth.enabled` turns on the engine's built-in authentication: a bootstrap administrator account and JWT signing keys for the engine's embedded authorization server. Everything beyond that — OIDC providers, `password_login`, JWT lifetime, just-in-time provisioning — is set through `customEngineConfig.instance.auth`, which the chart deep-merges alongside the admin account and signing keys it renders.
+
+The chart never accepts a literal password value for the admin account. Enabling auth always requires an existing Secret.
+
+### Values
+
+```yaml
+# my-values.yaml
+auth:
+  enabled: true
+  admin:
+    name: firebolt
+    password:
+      existingSecret:
+        secretRef: firebolt-admin-password # Secret with a `password` key
+
+  signingKeys:
+    - id: key-2026-01
+      existingSecret:
+        secretRef: firebolt-signing-key-2026-01 # Secret with a `tls.key` PEM private key
+```
+
+### Install
+
+Create the admin password Secret and a signing key Secret, then install the chart:
+
+```bash
+kubectl create secret generic firebolt-admin-password -n firebolt \
+  --from-literal=password='…'
+
+# tls.key holds a PEM RSA private key; the chart uses only the private key,
+# not a certificate, to sign JSON Web Tokens.
+openssl genrsa -out signing-key.pem 2048
+kubectl create secret generic firebolt-signing-key-2026-01 -n firebolt \
+  --from-file=tls.key=signing-key.pem
+
+helm install firebolt ./helm \
+  --namespace firebolt --create-namespace \
+  -f my-values.yaml
+```
+
+<Note>
+A multi-node engine needs an explicit signing key. Without one, each engine node generates its own development key on first startup, and tokens signed by one node fail validation on another. The chart's render fails immediately if `auth.enabled` is true and `signingKeys` is empty.
+</Note>
+
+Kubernetes health probes and the gateway's active engine health check keep working without a token — the engine exempts `/health/live` and `/health/ready` from authentication.
+
+### Signing key rotation
+
+`signingKeys` is an ordered list. The **first** entry is the active signer used for new tokens; every entry in the list remains valid for verifying tokens already issued under it. To rotate, prepend a new entry rather than replacing the list, and remove the old entry only once every token it signed has expired:
+
+```yaml
+auth:
+  signingKeys:
+    - id: key-2026-02 # now active
+      existingSecret:
+        secretRef: firebolt-signing-key-2026-02
+    - id: key-2026-01 # still verifies old tokens until they expire
+      existingSecret:
+        secretRef: firebolt-signing-key-2026-01
+```
+
+### cert-manager as a signing-key source
+
+As an alternative to an existing Secret, a signing key entry can request a [cert-manager](https://cert-manager.io) `Certificate` instead:
+
+```yaml
+auth:
+  signingKeys:
+    - id: key-2026-01
+      certManager:
+        algorithm: RSA
+        size: 2048
+        issuerRef:
+          name: internal-ca
+          kind: ClusterIssuer
+```
+
+The chart pins `privateKey.rotationPolicy: Never` on signing-key Certificates, so cert-manager's renewal timer never silently replaces an active signing key out from under already-issued tokens. Rotate by prepending a new `signingKeys` entry, the same as with an existing Secret.
+
+### OIDC and other auth settings
+
+OIDC providers, `password_login`, JWT lifetime, and just-in-time provisioning are not first-class values. Set them under `customEngineConfig.instance.auth`, which is deep-merged alongside the admin account and signing keys the chart renders:
+
+```yaml
+customEngineConfig:
+  instance:
+    auth:
+      password_login: admin_only
+      oidc:
+        providers:
+          - name: corporate_idp
+            discovery_url: https://idp.example.com/.well-known/openid-configuration
+            username_mapping: "{{ email }}"
+```
+
+## See also
+
+- [TLS](./tls): enabling TLS on the gateway's client listener and the engine's query listener.
+- [Security model](../security): pod-hardening baseline and secrets handling across the whole chart.

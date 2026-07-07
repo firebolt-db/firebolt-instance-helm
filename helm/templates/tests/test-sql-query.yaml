@@ -14,23 +14,62 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
   restartPolicy: Never
+  {{- if $.Values.auth.enabled }}
+  volumes:
+    - name: admin-password
+      secret:
+        secretName: {{ $.Values.auth.admin.password.existingSecret.secretRef }}
+  {{- end }}
   containers:
     - name: check
       image: curlimages/curl:latest
+      {{- if $.Values.auth.enabled }}
+      volumeMounts:
+        - name: admin-password
+          mountPath: /secrets/admin
+          readOnly: true
+      {{- end }}
       command:
         - sh
         - -c
         - |
           set -e
           {{- include "fbinstance.testShellHelpers" $ | nindent 10 }}
+          {{- if $.Values.tls.gateway.enabled }}
+          GW="https://{{ include "fbinstance.fullname" $ }}-gateway.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.gateway.service.port }}"
+          CURL_INSECURE="-k"
+          {{- else }}
           GW="http://{{ include "fbinstance.fullname" $ }}-gateway.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.gateway.service.port }}"
+          CURL_INSECURE=""
+          {{- end }}
           ENGINE="{{ $engine.name }}"
+          {{- if $.Values.auth.enabled }}
+          log "SQL: requesting a token for admin user via gateway (engine: $ENGINE)"
+          ADMIN_PASSWORD=$(cat /secrets/admin/password)
+          # RFC 8707 resource indicator: must equal this instance's OAuth audience,
+          # which the engine derives from instance.id (AuthConfig.h BuildInstanceIssuerUrl).
+          RESOURCE="https://firebolt.io/instance/{{ $.Values.customEngineConfig.instance.id }}"
+          TOKEN_RESPONSE=$(curl -s $CURL_INSECURE \
+            --retry 10 --retry-delay 5 --retry-connrefused \
+            --max-time 30 \
+            -X POST "$GW/oauth/token" \
+            -H "X-Firebolt-Engine: $ENGINE" \
+            -u "{{ $.Values.auth.admin.name }}:$ADMIN_PASSWORD" \
+            --data-urlencode "grant_type=client_credentials" \
+            --data-urlencode "resource=$RESOURCE")
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | sed -n 's/.*"access_token": *"\([^"]*\)".*/\1/p')
+          [ -n "$ACCESS_TOKEN" ] \
+            || fail "did not receive access_token, response: $TOKEN_RESPONSE"
+          {{- end }}
           log "SQL: SELECT 1 via gateway (engine: $ENGINE)"
-          RESPONSE=$(curl --fail --silent \
+          RESPONSE=$(curl --fail --silent $CURL_INSECURE \
             --retry 10 --retry-delay 5 --retry-connrefused \
             --max-time 30 \
             -X POST "$GW/" \
             -H "X-Firebolt-Engine: $ENGINE" \
+            {{- if $.Values.auth.enabled }}
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            {{- end }}
             -H "Content-Type: text/plain" \
             --data "SELECT 1")
           echo "Response: $RESPONSE"
