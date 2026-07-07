@@ -10,10 +10,10 @@ Every engine needs object storage for managed table data. The chart does not sup
 
 With Azure Blob Storage as the backing store, durability does not depend on the per-pod data volumes mounted to each engine. Even a complete loss of those volumes does not cause data loss, because the authoritative copy of managed table data lives in object storage.
 
-You configure object storage on the engine through `customEngineConfig.storage`, which the chart passes through unchanged into the engine's `config.yaml`. The `type`, `api_scheme`, and `bucket_name` keys match the Firebolt Core configuration schema, and the chart does not validate them. The engine reads Azure credentials from the pod's Azure identity, which you provide with [Microsoft Entra Workload ID](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview).
+You configure object storage on the engine through `customEngineConfig.storage`, which the chart passes through unchanged into the engine's `config.yaml`. The `managed_table_storage` and `managed_table_bucket_name` keys match the Firebolt Core configuration schema, and the chart does not validate them. The engine reads Azure credentials from the pod's Azure identity, which you provide with [Microsoft Entra Workload ID](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview).
 
 <Note>
-The chart passes `customEngineConfig.storage` through unchanged and does not validate the `type`. The `abs` backend requires an engine image that supports it. An unsupported `type` is written verbatim into the engine `config.yaml`, so the engine fails at startup rather than at install time.
+The chart passes `customEngineConfig.storage` through unchanged and does not validate `managed_table_storage`. The `abs` backend requires an engine image that supports it. An unsupported value is written verbatim into the engine `config.yaml`, so the engine fails at startup rather than at install time.
 </Note>
 
 ## Prerequisites
@@ -117,7 +117,7 @@ metadata:
 
 ### Point the chart at the container
 
-Run the engine pods under the annotated ServiceAccount, label them so Workload ID injects credentials, and set the storage block to the container. The default scheme for `abs` is `azure://`, `bucket_name` is the container name, and `azure.storage_account_name` is the storage account that holds it.
+Run the engine pods under the annotated ServiceAccount, label them so Workload ID injects credentials, and set the storage block to the container. `managed_table_bucket_name` is the container name, and `azure.storage_account_name` is the storage account that holds it.
 
 ```yaml
 # my-values.yaml
@@ -132,9 +132,8 @@ engines:
 
 customEngineConfig:
   storage:
-    type: abs
-    api_scheme: "azure://"
-    bucket_name: firebolt-managed
+    managed_table_storage: abs
+    managed_table_bucket_name: firebolt-managed
     azure:
       storage_account_name: fireboltenginedemo
 ```
@@ -192,15 +191,14 @@ Set its application client ID under `customEngineConfig.storage.azure.intermedia
 ```yaml
 customEngineConfig:
   storage:
-    type: abs
-    api_scheme: "azure://"
-    bucket_name: firebolt-managed
+    managed_table_storage: abs
+    managed_table_bucket_name: firebolt-managed
     azure:
       storage_account_name: fireboltenginedemo
       intermediary_service_principal_client_id: 35f11db5-082b-46e8-9f2f-5466d8630003
 ```
 
-The chart passes the `storage.azure` block through unchanged. The block is valid when `type` is `abs` or `azurite`.
+The chart passes the `storage.azure` block through unchanged. The block is valid when `managed_table_storage` is `abs`.
 
 ## Storage scope
 

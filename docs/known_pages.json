@@ -29,6 +29,8 @@
   "/usage/object-storage/azure-blob-storage/",
   "/usage/object-storage/google-cloud-storage",
   "/usage/object-storage/google-cloud-storage/",
+  "/usage/object-storage/s3-compatible",
+  "/usage/object-storage/s3-compatible/",
   "/usage/single-engine",
   "/usage/single-engine/"
 ]

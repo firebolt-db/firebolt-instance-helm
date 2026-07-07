@@ -1,0 +1,71 @@
+---
+title: S3-compatible storage
+description: Back Firebolt engines with a non-AWS S3-compatible object store (Nebius, CoreWeave, MinIO) using firebolt-instance-helm.
+sidebarTitle: S3-compatible
+---
+
+Besides Amazon S3, the engine can use any **S3-compatible** object store — for example [Nebius](https://nebius.com/) Object Storage, [CoreWeave](https://www.coreweave.com/) Object Storage, or a self-hosted [MinIO](https://min.io/). You point the engine at the store's endpoint and supply credentials through the engine container environment.
+
+## How it differs from Amazon S3
+
+For [Amazon S3](./amazon-s3) you set only `managed_table_storage` and `managed_table_bucket_name`, and credentials come from the pod's AWS identity (IRSA / Pod Identity). For an S3-compatible store you additionally set, under `storage.aws`:
+
+- `endpoint` — the store's S3 API endpoint (`https://…`).
+- `path_style_addressing` — the addressing style. **This applies only to a custom (non-AWS) endpoint; it is ignored for Amazon S3.**
+  - `true` (path-style, `endpoint/bucket/key`) — the default. Used by MinIO and Nebius.
+  - `false` (virtual-hosted, `bucket.endpoint/key`) — required by providers that support virtual-hosted addressing only, such as CoreWeave.
+- `verify_ssl` — set to `false` only for a store with a self-signed certificate or plain HTTP.
+
+Credentials are read from the AWS SDK environment chain. Inject `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` into the engine container with `engineSpec.extraEnv` (or `engineSpec.extraEnvFrom` to pull them from a `Secret`).
+
+## Nebius Object Storage
+
+Nebius exposes an S3 API at `https://storage.<region>.nebius.cloud` and supports path-style addressing (the default).
+
+Create a `Secret` from a Nebius static access key:
+
+```bash
+kubectl -n firebolt create secret generic nebius-s3-credentials \
+  --from-literal=AWS_ACCESS_KEY_ID=<nebius-access-key-id> \
+  --from-literal=AWS_SECRET_ACCESS_KEY=<nebius-secret>
+```
+
+```yaml
+# my-values.yaml
+engineSpec:
+  extraEnvFrom:
+    - secretRef:
+        name: nebius-s3-credentials
+
+customEngineConfig:
+  storage:
+    managed_table_storage: s3
+    managed_table_bucket_name: my-firebolt-bucket
+    aws:
+      endpoint: https://storage.us-central1.nebius.cloud
+      path_style_addressing: true # non-AWS S3-compatible store; ignored for AWS S3
+```
+
+## CoreWeave Object Storage
+
+CoreWeave Object Storage supports virtual-hosted addressing only, so set `path_style_addressing: false`. Use the endpoint for your CoreWeave Object Storage account, and create a `Secret` (`coreweave-s3-credentials`) the same way.
+
+```yaml
+# my-values.yaml
+engineSpec:
+  extraEnvFrom:
+    - secretRef:
+        name: coreweave-s3-credentials
+
+customEngineConfig:
+  storage:
+    managed_table_storage: s3
+    managed_table_bucket_name: my-firebolt-bucket
+    aws:
+      endpoint: https://<coreweave-object-storage-endpoint>
+      path_style_addressing: false # CoreWeave supports virtual-hosted addressing only
+```
+
+## Confirm that object storage works
+
+Install the chart with your values, wait for the engine to become `Ready`, then create a table and insert a row (see the [Quickstart](../../quickstart) for connecting to the engine). New object-storage prefixes appear under your bucket as the engine writes data — list them with your provider's CLI (`aws s3 ls s3://my-firebolt-bucket --endpoint-url <endpoint>`).

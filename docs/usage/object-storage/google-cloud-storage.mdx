@@ -10,10 +10,10 @@ Every engine needs object storage for managed table data. The chart does not sup
 
 With Google Cloud Storage as the backing store, durability does not depend on the per-pod data volumes mounted to each engine. Even a complete loss of those volumes does not cause data loss, because the authoritative copy of managed table data lives in the bucket.
 
-You configure object storage on the engine through `customEngineConfig.storage`, which the chart passes through unchanged into the engine's `config.yaml`. The `type`, `api_scheme`, and `bucket_name` keys match the Firebolt Core configuration schema, and the chart does not validate them. The engine reads Google Cloud credentials from the pod's Google identity, which you provide with [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity).
+You configure object storage on the engine through `customEngineConfig.storage`, which the chart passes through unchanged into the engine's `config.yaml`. The `managed_table_storage` and `managed_table_bucket_name` keys match the Firebolt Core configuration schema, and the chart does not validate them. The engine reads Google Cloud credentials from the pod's Google identity, which you provide with [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity).
 
 <Note>
-The chart passes `customEngineConfig.storage` through unchanged and does not validate the `type`. The `gcs` backend requires an engine image that supports it. An unsupported `type` is written verbatim into the engine `config.yaml`, so the engine fails at startup rather than at install time.
+The chart passes `customEngineConfig.storage` through unchanged and does not validate `managed_table_storage`. The `gcs` backend requires an engine image that supports it. An unsupported value is written verbatim into the engine `config.yaml`, so the engine fails at startup rather than at install time.
 </Note>
 
 ## Prerequisites
@@ -99,9 +99,8 @@ engineSpec:
 
 customEngineConfig:
   storage:
-    type: gcs
-    api_scheme: "gs://"
-    bucket_name: firebolt-managed
+    managed_table_storage: gcs
+    managed_table_bucket_name: firebolt-managed
 ```
 
 Create the ServiceAccount, then install the chart with the matching values:
@@ -153,14 +152,13 @@ Set its ID under `customEngineConfig.storage.gcp.intermediary_service_account_id
 ```yaml
 customEngineConfig:
   storage:
-    type: gcs
-    api_scheme: "gs://"
-    bucket_name: firebolt-managed
+    managed_table_storage: gcs
+    managed_table_bucket_name: firebolt-managed
     gcp:
       intermediary_service_account_id: projects/my-project/serviceAccounts/firebolt-intermediary@my-project.iam.gserviceaccount.com
 ```
 
-The chart passes the `storage.gcp` block through unchanged. The block is valid only when `type` is `gcs`.
+The chart passes the `storage.gcp` block through unchanged. The block is valid only when `managed_table_storage` is `gcs`.
 
 ## Storage scope
 

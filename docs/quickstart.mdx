@@ -70,17 +70,24 @@ floci stores data in the pod's ephemeral filesystem and validates no credentials
 
 ## Configure the engine
 
-Create a values file that points the engine's storage at the floci endpoint. The `type: minio` mode signs requests for an S3-compatible endpoint, and `bucket_name` matches the bucket floci created.
+Create a values file that points the engine's storage at the floci endpoint. `managed_table_storage: s3` with `aws.endpoint` targets floci, and `managed_table_bucket_name` matches the bucket floci created. floci is zero-auth, so any AWS credentials work (set via `engineSpec.extraEnv`).
 
 ```yaml
 # my-values.yaml
+engineSpec:
+  extraEnv:
+    - name: AWS_ACCESS_KEY_ID
+      value: firebolt
+    - name: AWS_SECRET_ACCESS_KEY
+      value: firebolt
+
 customEngineConfig:
   storage:
-    type: minio
-    api_scheme: "s3://"
-    bucket_name: firebolt-managed
-    minio:
+    managed_table_storage: s3
+    managed_table_bucket_name: firebolt-managed
+    aws:
       endpoint: http://floci.firebolt.svc.cluster.local:4566
+      path_style_addressing: true # non-AWS S3-compatible store; ignored for AWS S3
 ```
 
 This is the only value the local install needs. The chart's defaults provide one engine named `default`, the Envoy gateway, the Metadata Service, and a bundled PostgreSQL.

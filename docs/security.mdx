@@ -101,7 +101,7 @@ Object-storage credentials for engines are not represented as Helm values. The c
 - Azure: [Microsoft Entra Workload ID](./usage/object-storage/azure-blob-storage#grant-the-engine-an-azure-identity).
 - Google Cloud: [Workload Identity Federation for GKE](./usage/object-storage/google-cloud-storage#grant-the-engine-a-google-identity).
 
-The chart never sees those cloud provider credentials. For S3-compatible endpoints that use the `minio` storage type, the endpoint must accept the credentials expected by the engine mode documented in [Amazon S3](./usage/object-storage/amazon-s3#use-an-s3-compatible-endpoint).
+The chart never sees those cloud provider credentials. For an S3-compatible endpoint (`managed_table_storage: s3` with `aws.endpoint`), the engine authenticates with the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` you inject via `engineSpec.extraEnv` (from a Secret in production); see [S3-compatible storage](./usage/object-storage/s3-compatible).
 
 ### TLS to PostgreSQL is not exposed
 

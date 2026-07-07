@@ -10,7 +10,7 @@ Every engine needs object storage for managed table data. The chart does not sup
 
 With object storage as the backing store, durability does not depend on the per-pod data volumes mounted to each engine. Even a complete loss of those volumes does not cause data loss, because the authoritative copy of managed table data lives in the object store.
 
-You configure object storage on the engine through `customEngineConfig.storage`, which the chart passes through unchanged into the engine's `config.yaml`. The `type`, `api_scheme`, and `bucket_name` keys match the Firebolt Core configuration schema, and the chart does not validate them. The engine reads AWS credentials from the pod's workload identity, which you configure through [AWS IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) or [AWS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html).
+You configure object storage on the engine through `customEngineConfig.storage`, which the chart passes through unchanged into the engine's `config.yaml`. The `managed_table_storage` and `managed_table_bucket_name` keys match the Firebolt Core configuration schema, and the chart does not validate them. The engine reads AWS credentials from the pod's workload identity, which you configure through [AWS IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) or [AWS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html).
 
 ## Prerequisites
 
@@ -98,9 +98,8 @@ engineSpec:
 
 customEngineConfig:
   storage:
-    type: s3
-    api_scheme: "s3://"
-    bucket_name: firebolt-managed
+    managed_table_storage: s3
+    managed_table_bucket_name: firebolt-managed
 ```
 
 Create the ServiceAccount, then install the chart with the matching values:
@@ -115,15 +114,15 @@ helm install firebolt ./helm \
   -f my-values.yaml
 ```
 
-To set the AWS region explicitly, add `region` to the storage block. The EKS identity webhook usually injects the region automatically.
+To set the AWS region explicitly, add `region` under `aws`. The EKS identity webhook usually injects the region automatically.
 
 ```yaml
 customEngineConfig:
   storage:
-    type: s3
-    api_scheme: "s3://"
-    bucket_name: firebolt-managed
-    region: us-east-1
+    managed_table_storage: s3
+    managed_table_bucket_name: firebolt-managed
+    aws:
+      region: us-east-1
 ```
 
 ### Confirm that object storage works
@@ -150,16 +149,16 @@ New prefixes appear under the bucket as the engine writes data.
 
 ## Use an S3-compatible endpoint
 
-For any S3-compatible endpoint reachable from the engine pods, such as self-hosted MinIO, Ceph RGW, or an in-cluster S3 emulator, use `type: minio`. The engine signs requests with the access key and secret key `firebolt` in this mode, so the endpoint must accept those credentials.
+For any S3-compatible endpoint reachable from the engine pods, such as self-hosted MinIO, Ceph RGW, or a managed store like Nebius or CoreWeave, set `managed_table_storage: s3` and point `aws.endpoint` at the store. Supply credentials through the engine environment (`engineSpec.extraEnv` / `extraEnvFrom`); a zero-auth emulator accepts any values. See [S3-compatible storage](./s3-compatible) for Nebius and CoreWeave.
 
 ```yaml
 customEngineConfig:
   storage:
-    type: minio
-    api_scheme: "s3://"
-    bucket_name: firebolt-managed
-    minio:
+    managed_table_storage: s3
+    managed_table_bucket_name: firebolt-managed
+    aws:
       endpoint: http://minio.minio.svc.cluster.local:9000
+      path_style_addressing: true # non-AWS S3-compatible store; ignored for AWS S3
 ```
 
 `endpoint` must be a URL the engine pod can resolve and reach. Create the bucket out of band before the engine starts.
@@ -179,14 +178,13 @@ Set the intermediary role ARN under `customEngineConfig.storage.aws.intermediary
 ```yaml
 customEngineConfig:
   storage:
-    type: s3
-    api_scheme: "s3://"
-    bucket_name: firebolt-managed
+    managed_table_storage: s3
+    managed_table_bucket_name: firebolt-managed
     aws:
       intermediary_access_role: arn:aws:iam::<account-id>:role/firebolt-intermediary
 ```
 
-The chart passes the `storage.aws` block through unchanged. The block is valid only when `type` is `s3`.
+The chart passes the `storage.aws` block through unchanged. The block is valid only when `managed_table_storage` is `s3`.
 
 ## Storage scope
 
