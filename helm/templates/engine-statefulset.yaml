@@ -21,7 +21,7 @@ whole instance), not per-node, so there's no reason to recompute them inside the
 {{- if $.Values.auth.enabled -}}
 {{-   $authAdminSecret = $.Values.auth.admin.password.existingSecret.secretRef -}}
 {{-   range $ki, $key := $.Values.auth.signingKeys -}}
-{{-     $authSigningSecrets = append $authSigningSecrets (include "fbinstance.secretSourceName" (dict "source" $key "certManagerSecretName" (printf "%s-auth-signing-%d" (include "fbinstance.fullname" $) $ki) "context" (printf "auth.signingKeys[%d]" $ki))) -}}
+{{-     $authSigningSecrets = append $authSigningSecrets (include "fbinstance.secretSourceName" (dict "source" $key "certManagerSecretName" (include "fbinstance.authSigningKeySecretName" (dict "root" $ "key" $key)) "context" (printf "auth.signingKeys[%d]" $ki))) -}}
 {{-   end -}}
 {{- end -}}
 {{- $engineTlsSecret := "" -}}

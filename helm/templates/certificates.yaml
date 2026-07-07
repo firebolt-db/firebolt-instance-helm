@@ -69,13 +69,13 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "fbinstance.fullname" $ }}-auth-signing-{{ $ki }}
+  name: {{ include "fbinstance.authSigningKeySecretName" (dict "root" $ "key" $key) }}
   namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "fbinstance.labels" $ | nindent 4 }}
     firebolt/component: engine
 spec:
-  secretName: {{ include "fbinstance.fullname" $ }}-auth-signing-{{ $ki }}
+  secretName: {{ include "fbinstance.authSigningKeySecretName" (dict "root" $ "key" $key) }}
   # No DNS/service identity — this is a JWT signing key, not a TLS endpoint cert. commonName
   # is the only identity cert-manager requires when dnsNames/ipAddresses/uris are all empty.
   commonName: {{ $key.id | quote }}

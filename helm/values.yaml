@@ -640,8 +640,10 @@ engines:
 # Chart-authoritative paths are silently stripped from this input and
 # cannot be overridden: `schema_version`, `engine.id`, `engine.nodes`,
 # `engine.termination_grace_period`, `instance.type`,
-# `instance.multi_engine`, and — only while `tls.engine.enabled` is
-# actually rendering it — `endpoints.http.listeners`.
+# `instance.multi_engine`, and — only while `auth.enabled` /
+# `tls.engine.enabled` are actually rendering them —
+# `instance.auth.{enabled,admin,local.signing_keys}` and
+# `endpoints.http.listeners`.
 # @default -- {}
 customEngineConfig:
   # -- Instance identity. `id` propagates internally to `account_id`,

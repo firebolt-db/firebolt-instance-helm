@@ -160,6 +160,8 @@ tls:
 
 <Note>
 `tls.engine`'s Secret requires all three keys — `tls.crt`, `tls.key`, and `ca.crt` — even for a self-signed certificate with no separate CA (set `ca.crt` to a copy of `tls.crt` in that case). The engine's own internal health check and the gateway's upstream connection both need the issuing CA to validate the certificate independently of `tls.crt`.
+
+The certificate's SANs must also cover every engine node's per-node hostname (`<release>-engine-<engine>-node-<i>-0.<release>-engine-<engine>-hl.<namespace>.svc.cluster.local`) and each engine's headless-service hostname (`<release>-engine-<engine>-hl.<namespace>.svc.cluster.local`) — both the engine's self-health-check and the gateway's `auto_san_validation` verify against these names. A missing SAN leaves the affected engine node permanently `NotReady` with no other symptom. `tls.engine.certManager` derives these automatically; a BYO certificate has to include them explicitly.
 </Note>
 
 ### Install
@@ -203,6 +205,10 @@ tls:
 ```
 
 The engine's certificate's DNS names are derived automatically from every engine node's per-node hostname and each engine's internal service hostname — don't set `dnsNames` under `tls.engine.certManager`. The gateway's certificate has no such derivation; set `dnsNames` to whatever hostname clients use to reach the gateway.
+
+<Note>
+The issuer behind `tls.engine.certManager` must populate `ca.crt` in the Certificate's Secret, not just `tls.crt`/`tls.key`. CA and Vault issuers do this; a bare self-signed or ACME issuer may not. The chart's `tls-chain-setup` init container needs `ca.crt` to build the engine's own health-check trust bundle and fails the pod at startup if it's missing.
+</Note>
 
 ### Verify
 

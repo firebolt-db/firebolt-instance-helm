@@ -131,10 +131,11 @@ deep-merged alongside the auth.* value block below).
 Chart-authoritative paths are silently stripped from the user input
 before the merge: `schema_version`, `engine.id`, `engine.nodes`,
 `engine.termination_grace_period`, `instance.type`,
-`instance.multi_engine`, and — only when `tls.engine.enabled` — the
-`endpoints.http.listeners` this helper renders for the query
-listener's TLS. The same customEngineConfig therefore stays portable
-across chart versions.
+`instance.multi_engine`, and — only while `auth.enabled` /
+`tls.engine.enabled` are actually rendering them —
+`instance.auth.{enabled,admin,local.signing_keys}` and
+`endpoints.http.listeners`. The same customEngineConfig therefore
+stays portable across chart versions.
 
 When `auth.enabled` is true, `instance.auth.{enabled,admin,
 local.signing_keys}` are built from `auth.admin` / `auth.signingKeys`
@@ -198,6 +199,30 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{-   if kindIs "map" $user.instance -}}
 {{-     $_ := unset $user.instance "type" -}}
 {{-     $_ := unset $user.instance "multi_engine" -}}
+{{/*
+  Only the enabled/admin/local.signing_keys fields this helper itself builds are
+  chart-authoritative — oidc, password_login, jwt, preferred_authorization_server, and
+  signing_algorithm stay fully user-controlled. Stripped only while auth.enabled is
+  actually rendering instance.auth, mirroring the endpoints.http.listeners stripping
+  below: mergeOverwrite otherwise lets customEngineConfig win and can point the engine
+  at admin/signing-key paths the chart never mounts, or flip enabled back off while the
+  admin block remains — which the engine itself then refuses to start on.
+*/}}
+{{-     if and $root.Values.auth.enabled (hasKey $user.instance "auth") -}}
+{{-       if kindIs "map" $user.instance.auth -}}
+{{-         $_ := unset $user.instance.auth "enabled" -}}
+{{-         $_ := unset $user.instance.auth "admin" -}}
+{{-         if hasKey $user.instance.auth "local" -}}
+{{-           if kindIs "map" $user.instance.auth.local -}}
+{{-             $_ := unset $user.instance.auth.local "signing_keys" -}}
+{{-           else -}}
+{{-             $_ := unset $user.instance.auth "local" -}}
+{{-           end -}}
+{{-         end -}}
+{{-       else -}}
+{{-         $_ := unset $user.instance "auth" -}}
+{{-       end -}}
+{{-     end -}}
 {{-   else -}}
 {{-     $_ := unset $user "instance" -}}
 {{-   end -}}
@@ -303,6 +328,21 @@ Usage: {{ include "fbinstance.usesCertManager" (dict "source" <secretSourceValue
 {{- $hasExisting := and $source.existingSecret (ne ($source.existingSecret.secretRef | default "") "") -}}
 {{- $hasCertManager := and $source.certManager $source.certManager.issuerRef (ne ($source.certManager.issuerRef.name | default "") "") -}}
 {{- if and $hasCertManager (not $hasExisting) -}}true{{- end -}}
+{{- end -}}
+
+{{/*
+Stable chart-managed Secret/Certificate name for a cert-manager-provisioned auth signing
+key, derived from the key's own `id` rather than its position in `auth.signingKeys`.
+Rotation is prepend-a-new-entry (see values.yaml), which shifts every existing key to a
+higher index — an index-derived name would make cert-manager treat the shifted key as a
+brand-new certificate request and reissue fresh material, orphaning the private key that
+already-issued tokens were signed with. Hashed (not used verbatim) because `id` has no
+DNS-1123 charset/length constraint of its own.
+
+Usage: {{ include "fbinstance.authSigningKeySecretName" (dict "root" $ "key" $key) }}
+*/}}
+{{- define "fbinstance.authSigningKeySecretName" -}}
+{{- printf "%s-auth-signing-%s" (include "fbinstance.fullname" .root) (.key.id | sha256sum | trunc 16) -}}
 {{- end -}}
 
 {{/*

@@ -218,6 +218,12 @@ spec:
         - name: engine-ca
           secret:
             secretName: {{ $engineCaSecret }}
+            # Envoy only ever reads ca.crt (trusted_ca.filename below). Project just that
+            # key rather than mounting the whole Secret — the engine's tls.key has no
+            # business being readable on the gateway pod's filesystem.
+            items:
+              - key: ca.crt
+                path: ca.crt
         {{- end }}
         {{- with .Values.gateway.podTemplate.volumes }}
         {{- toYaml . | nindent 8 }}

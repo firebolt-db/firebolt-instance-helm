@@ -36,7 +36,7 @@ spec:
         - |
           set -e
           {{- include "fbinstance.testShellHelpers" . | nindent 10 }}
-          HOST="{{ include "fbinstance.fullname" . }}-engine-{{ $engine.name }}-node-0-0.{{ include "fbinstance.fullname" . }}-engine-{{ $engine.name }}-hl.{{ .Release.Namespace }}.svc.cluster.local"
+          HOST="{{ include "fbinstance.fullname" . }}-engine-{{ $engine.name }}-node-0-0.{{ include "fbinstance.fullname" . }}-engine-{{ $engine.name }}-hl.{{ .Release.Namespace }}.svc{{ .Values.engineSpec.nodeHostSuffix }}"
           {{- if .Values.tls.engine.enabled }}
           # tls.engine.enabled: the query listener speaks HTTPS. This test only exercises
           # auth enforcement, not certificate trust (the live TLS path covers that
