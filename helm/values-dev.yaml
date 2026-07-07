@@ -10,20 +10,25 @@
 engineSpec:
   image:
     tag: dev
+  # floci is zero-auth; the engine still signs S3 requests, so supply any creds.
+  extraEnv:
+    - name: AWS_ACCESS_KEY_ID
+      value: firebolt
+    - name: AWS_SECRET_ACCESS_KEY
+      value: firebolt
 
 metadata:
   image:
     tag: dev
 
-# Point the engine's managed_storage at the local floci S3 emulator. The
-# engine refuses to start in dedicated-Pensieve mode without managed storage
-# on object storage. `type: minio` flips its S3 client into MinIO-compat mode
-# and hardcodes the access/secret to firebolt/firebolt, which floci (zero-auth)
-# accepts. Apply local-floci.yaml in the same namespace before `make install`.
+# Point the engine's managed storage at the local floci S3 emulator. The engine
+# refuses to start in dedicated-Pensieve mode without managed storage on object
+# storage. floci is zero-auth, so any AWS creds work (set via engineSpec.extraEnv
+# above). Apply local-floci.yaml in the same namespace before `make install`.
 customEngineConfig:
   storage:
-    type: minio
-    api_scheme: "s3://"
-    bucket_name: firebolt-managed
-    minio:
+    managed_table_storage: s3
+    managed_table_bucket_name: firebolt-managed
+    aws:
       endpoint: http://floci.firebolt.svc.cluster.local:4566
+      path_style_addressing: true # non-AWS S3-compatible store; ignored for AWS S3

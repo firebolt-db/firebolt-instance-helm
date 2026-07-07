@@ -124,6 +124,13 @@ spec:
             # startup.
             - name: FIREBOLT_CORE_MODE
               value: "1"
+            {{- with $.Values.engineSpec.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with $.Values.engineSpec.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           command: ["/bin/bash", "-c"]
           tty: true
           stdin: true
