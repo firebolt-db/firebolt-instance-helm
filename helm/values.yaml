@@ -111,6 +111,17 @@ engineSpec:
   # -- Suffix appended after `.svc` in node FQDNs in `config.yaml`.
   nodeHostSuffix: ".cluster.local"
 
+  # -- Extra environment variables for the engine container. Use this to inject
+  # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (for example via `valueFrom.secretKeyRef`)
+  # for a custom S3-compatible store (`managed_table_storage: s3` + `aws.endpoint`).
+  # @default -- []
+  extraEnv: []
+
+  # -- Extra `envFrom` sources for the engine container. Use a `secretRef` to load a
+  # Secret holding AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for a custom S3-compatible store.
+  # @default -- []
+  extraEnvFrom: []
+
   # -- Default PVC storage spec for engines. `storageClassName` is intentionally absent —
   # the cluster default storage class is used. Override here or per-engine to specify a class
   # (e.g. `storageClassName: gp3`).

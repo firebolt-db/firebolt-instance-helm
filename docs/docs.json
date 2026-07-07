@@ -17,6 +17,7 @@
                 "group": "Object Storage",
                 "pages": [
                   "usage/object-storage/amazon-s3",
+                  "usage/object-storage/s3-compatible",
                   "usage/object-storage/google-cloud-storage",
                   "usage/object-storage/azure-blob-storage"
                 ]
