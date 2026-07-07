@@ -5,7 +5,7 @@ title: Amazon S3
 ---
 
 <Warning>
-  **Breaking change (FB-1684).** Managed-table storage now uses `managed_table_storage` and `managed_table_bucket_name` with a per-cloud `storage.aws` / `gcp` / `azure` block. The former keys — `type`, `api_scheme`, `bucket_name`, and the `minio` / `azurite` types — are removed and are rejected by the engine at startup. This schema requires a post-FB-1684 engine image; keep the chart and engine on matching versions.
+  **Breaking change.** Managed-table storage now uses `managed_table_storage` and `managed_table_bucket_name` with a per-cloud `storage.aws` / `gcp` / `azure` block. The former keys — `type`, `api_scheme`, `bucket_name`, and the `minio` / `azurite` types — are removed and are rejected by the engine at startup. This schema requires a recent engine image; keep the chart and engine on matching versions.
 </Warning>
 
 This page configures Amazon S3 or an S3-compatible endpoint as engine object storage.

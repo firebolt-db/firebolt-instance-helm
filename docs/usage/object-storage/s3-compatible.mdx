@@ -5,7 +5,7 @@ sidebarTitle: S3-compatible
 ---
 
 <Warning>
-  **Breaking change (FB-1684).** Managed-table storage now uses `managed_table_storage` and `managed_table_bucket_name` with a per-cloud `storage.aws` / `gcp` / `azure` block. The former keys — `type`, `api_scheme`, `bucket_name`, and the `minio` / `azurite` types — are removed and are rejected by the engine at startup. This schema requires a post-FB-1684 engine image; keep the chart and engine on matching versions.
+  **Breaking change.** Managed-table storage now uses `managed_table_storage` and `managed_table_bucket_name` with a per-cloud `storage.aws` / `gcp` / `azure` block. The former keys — `type`, `api_scheme`, `bucket_name`, and the `minio` / `azurite` types — are removed and are rejected by the engine at startup. This schema requires a recent engine image; keep the chart and engine on matching versions.
 </Warning>
 
 Besides Amazon S3, the engine can use any **S3-compatible** object store — for example [Nebius](https://nebius.com/) Object Storage, [CoreWeave](https://www.coreweave.com/) Object Storage, or a self-hosted [MinIO](https://min.io/). You point the engine at the store's endpoint and supply credentials through the engine container environment.
