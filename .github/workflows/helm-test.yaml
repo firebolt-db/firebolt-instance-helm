@@ -30,7 +30,16 @@ jobs:
     permissions:
       contents: read
     outputs:
-      docs_only: ${{ steps.detect.outputs.docs_only }}
+      # helm-test is a required check, so the job must always run and report a
+      # conclusion — a job-level `if` would leave branch protection waiting on
+      # a check that never reports. The skip decision is exported here instead,
+      # and every step in helm-test no-ops on it, so the check completes green
+      # without the 45-minute kind run. Skipped cases:
+      #   - docs-only PRs (nothing the e2e suite covers changed);
+      #   - release-please's release PRs: they only bump Chart.yaml `version` +
+      #     CHANGELOG.md over templates that already passed e2e on the feature
+      #     PR, and a flake would needlessly block the release.
+      skip: ${{ steps.detect.outputs.docs_only == 'true' || startsWith(github.head_ref, 'release-please') }}
     steps:
       - name: Determine whether the PR changed only docs
         id: detect
@@ -60,11 +69,10 @@ jobs:
   helm-test:
     name: helm-test (k8s ${{ matrix.k8s-version }})
     needs: detect
-    # Skip release-please's release PRs: they only bump Chart.yaml `version` +
-    # CHANGELOG.md over templates that already passed e2e on the feature PR, so
-    # re-running the 45-minute kind suite adds no coverage and a flake there
-    # would needlessly block the release.
-    if: needs.detect.outputs.docs_only != 'true' && !startsWith(github.head_ref, 'release-please')
+    # No job-level `if`: this is a required check, so it must always report.
+    # When `needs.detect.outputs.skip` is true every step below no-ops and the
+    # job succeeds immediately (see the `skip` output in `detect` for when and
+    # why).
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -81,7 +89,14 @@ jobs:
           - k8s-version: "1.35"
             node-image: "kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f"
     steps:
+      - name: Explain the no-op
+        if: needs.detect.outputs.skip == 'true'
+        run: |
+          echo "Docs-only or release-please PR — skipping the e2e suite and" \
+            "reporting success so the required check passes."
+
       - name: Free up disk space on the runner
+        if: needs.detect.outputs.skip != 'true'
         run: |
           df -h /
           sudo rm -rf /usr/lib/jvm /usr/local/.ghcup /opt/ghc \
@@ -91,6 +106,7 @@ jobs:
           df -h /
 
       - name: Raise memlock limit for kind nodes (engine io_uring)
+        if: needs.detect.outputs.skip != 'true'
         run: |
           # The engine maps io_uring buffers and needs a high memlock limit.
           # Containers inherit it from the Docker daemon, so raise it there
@@ -112,11 +128,13 @@ jobs:
           sudo systemctl restart docker
 
       - name: Checkout code
+        if: needs.detect.outputs.skip != 'true'
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
       - name: Install kind
+        if: needs.detect.outputs.skip != 'true'
         env:
           KIND_VERSION: v0.32.0
         run: |
@@ -127,6 +145,7 @@ jobs:
           kind version
 
       - name: Set up Helm
+        if: needs.detect.outputs.skip != 'true'
         uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
         with:
           # Stay on Helm v3 (see helm-validate.yaml for the rationale).
@@ -136,20 +155,22 @@ jobs:
         # While the engine/metadata packages are private, the host's docker pull
         # in load-e2e-images.sh needs GHCR auth or it 401s. Skipped once the
         # packages are public (GHCR_PACKAGES_PUBLIC=true) — anonymous pulls work.
-        if: env.GHCR_PACKAGES_PUBLIC != 'true'
+        if: needs.detect.outputs.skip != 'true' && env.GHCR_PACKAGES_PUBLIC != 'true'
         env:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ github.token }}
         run: echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
 
       - name: Prepare kind cluster and load images
+        if: needs.detect.outputs.skip != 'true'
         env:
           NODE_IMAGE: ${{ matrix.node-image }}
         run: make prepare-test-e2e
 
       - name: Run quickstart end-to-end check
+        if: needs.detect.outputs.skip != 'true'
         run: make helm-test
 
       - name: Delete kind cluster
-        if: always()
+        if: always() && needs.detect.outputs.skip != 'true'
         run: make cleanup-test-e2e || true
