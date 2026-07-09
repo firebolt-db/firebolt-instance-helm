@@ -1,6 +1,6 @@
 # firebolt-instance
 
-![Version: 0.2.0](https://img.shields.io/badge/Version-0.2.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: release-5.0.1-0.20260622084213.3ef06de4e9aa](https://img.shields.io/badge/AppVersion-release--5.0.1--0.20260622084213.3ef06de4e9aa-informational?style=flat-square)
+![Version: 0.2.0](https://img.shields.io/badge/Version-0.2.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: release-5.0.1-0.20260709071413.53735f172429](https://img.shields.io/badge/AppVersion-release--5.0.1--0.20260709071413.53735f172429-informational?style=flat-square)
 
 Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 
@@ -34,6 +34,8 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.defaultStorage | object | {} | Default PVC storage spec for engines. `storageClassName` is intentionally absent — the cluster default storage class is used. Override here or per-engine to specify a class (e.g. `storageClassName: gp3`). |
 | engineSpec.defaultStorage.accessModes | list | `["ReadWriteOnce"]` | Access modes for the default PVC. |
 | engineSpec.defaultStorage.resources.requests.storage | string | `"100Gi"` | Default storage size for engine PVCs. |
+| engineSpec.extraEnv | list | [] | Extra environment variables for the engine container. Use this to inject AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (for example via `valueFrom.secretKeyRef`) for a custom S3-compatible store (`managed_table_storage: s3` + `aws.endpoint`). |
+| engineSpec.extraEnvFrom | list | [] | Extra `envFrom` sources for the engine container. Use a `secretRef` to load a Secret holding AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for a custom S3-compatible store. |
 | engineSpec.hostPathStorageEnabled | bool | `false` | When true, uses hostPath instead of PVC for engine data. |
 | engineSpec.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | engineSpec.image.repository | string | `"ghcr.io/firebolt-db/engine"` | Container repository for the Firebolt engine image. |
