@@ -77,17 +77,18 @@ spec:
               -H "Content-Type: text/plain" \
               --data "$QUERY")
             echo "Response: $RESPONSE"
-            echo "$RESPONSE" | grep -q "$EXPECTED" || fail "unexpected response for $LABEL"
+            [ -z "$EXPECTED" ] || echo "$RESPONSE" | grep -q "$EXPECTED" \
+              || fail "unexpected response for $LABEL"
           }
 
           sql_query "SELECT 1" "SELECT 1" "1"
 
           TABLE="helm_storage_smoke_$(printf '%s' "$ENGINE" | tr -c 'A-Za-z0-9_' '_')"
-          sql_query "managed table cleanup" "DROP TABLE IF EXISTS $TABLE" "OK"
-          sql_query "managed table create" "CREATE TABLE $TABLE (id INT, name TEXT)" "OK"
-          sql_query "managed table insert" "INSERT INTO $TABLE (id, name) VALUES (1, 'floci'), (2, 'managed-storage')" "OK"
+          sql_query "managed table cleanup" "DROP TABLE IF EXISTS $TABLE" ""
+          sql_query "managed table create" "CREATE TABLE $TABLE (id INT, name TEXT)" ""
+          sql_query "managed table insert" "INSERT INTO $TABLE (id, name) VALUES (1, 'floci'), (2, 'managed-storage')" ""
           sql_query "managed table select" "SELECT name FROM $TABLE WHERE id = 2" "managed-storage"
-          sql_query "managed table final cleanup" "DROP TABLE IF EXISTS $TABLE" "OK"
+          sql_query "managed table final cleanup" "DROP TABLE IF EXISTS $TABLE" ""
           pass "SELECT 1 and managed-table read/write checks passed"
 {{- end }}
 {{- end }}

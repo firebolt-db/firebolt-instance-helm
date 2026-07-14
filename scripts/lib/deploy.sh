@@ -81,13 +81,17 @@ wait_rollout() {
   return 1
 }
 
-# Run a query through the instance gateway and assert the result contains an
-# expected substring. Mirrors the curl example in docs/quickstart.mdx: the
+# Run a query through the instance gateway and optionally assert the result
+# contains an expected substring. Mirrors the curl example in docs/quickstart.mdx: the
 # gateway Service is <release>-gateway in the same namespace, and the target
 # engine is selected via the X-Firebolt-Engine header.
 #
 # Usage:
 #   run_query <namespace> <gateway-service> <engine> [query] [expected] [attempts] [sleep]
+#
+# An empty expected string means HTTP success is enough. DDL/DML statements may
+# return a 2xx response with no body, while SELECT statements should assert a
+# result substring.
 #
 # A rolled-out engine can still need a few seconds before the gateway routes
 # queries to it (engine HTTP listener warming up), so this polls.
@@ -115,8 +119,12 @@ run_query() {
         -H "X-Firebolt-Engine: ${engine}" \
         -H "Content-Type: text/plain" \
         --data-binary "${query}" 2>/dev/null); then
-      if printf '%s' "${output}" | grep -q "${expected}"; then
-        echo "Query succeeded after ${i} attempt(s); result contains '${expected}':"
+      if [[ -z "${expected}" ]] || printf '%s' "${output}" | grep -q "${expected}"; then
+        if [[ -z "${expected}" ]]; then
+          echo "Query succeeded after ${i} attempt(s)."
+        else
+          echo "Query succeeded after ${i} attempt(s); result contains '${expected}':"
+        fi
         printf '%s\n' "${output}"
         return 0
       fi
@@ -141,11 +149,11 @@ run_managed_table_smoke() {
   local engine="$3"
   local table="helm_storage_smoke"
 
-  run_query "${namespace}" "${gateway}" "${engine}" "DROP TABLE IF EXISTS ${table}" "OK"
-  run_query "${namespace}" "${gateway}" "${engine}" "CREATE TABLE ${table} (id INT, name TEXT)" "OK"
-  run_query "${namespace}" "${gateway}" "${engine}" "INSERT INTO ${table} (id, name) VALUES (1, 'floci'), (2, 'managed-storage')" "OK"
+  run_query "${namespace}" "${gateway}" "${engine}" "DROP TABLE IF EXISTS ${table}" ""
+  run_query "${namespace}" "${gateway}" "${engine}" "CREATE TABLE ${table} (id INT, name TEXT)" ""
+  run_query "${namespace}" "${gateway}" "${engine}" "INSERT INTO ${table} (id, name) VALUES (1, 'floci'), (2, 'managed-storage')" ""
   run_query "${namespace}" "${gateway}" "${engine}" "SELECT name FROM ${table} WHERE id = 2" "managed-storage"
-  run_query "${namespace}" "${gateway}" "${engine}" "DROP TABLE IF EXISTS ${table}" "OK"
+  run_query "${namespace}" "${gateway}" "${engine}" "DROP TABLE IF EXISTS ${table}" ""
 }
 
 # Current pipeline phase and the failure_reason to report if this phase fails.
