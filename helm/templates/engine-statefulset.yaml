@@ -334,8 +334,8 @@ spec:
                 - ALL
         {{- if $.Values.engineSpec.uiSidecar }}
         - name: core-ui
-          image: ghcr.io/firebolt-db/firebolt-core-ui:latest
-          imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
+          image: {{ $.Values.engineSpec.uiSidecarImage.repository }}:{{ $.Values.engineSpec.uiSidecarImage.tag }}
+          imagePullPolicy: {{ $.Values.engineSpec.uiSidecarImage.pullPolicy }}
           env:
             - name: FIREBOLT_CORE_URL
               # The sidecar's nginx reverse proxy defaults proxy_ssl_verify to off, so
