@@ -131,6 +131,23 @@ run_query() {
   return 1
 }
 
+# Exercise the managed-table path against the configured object store. SELECT 1
+# proves the gateway and query listener work; this sequence proves the engine can
+# create table metadata, write table data, and read it back using the chart's
+# customEngineConfig.storage block.
+run_managed_table_smoke() {
+  local namespace="$1"
+  local gateway="$2"
+  local engine="$3"
+  local table="helm_storage_smoke"
+
+  run_query "${namespace}" "${gateway}" "${engine}" "DROP TABLE IF EXISTS ${table}" "OK"
+  run_query "${namespace}" "${gateway}" "${engine}" "CREATE TABLE ${table} (id INT, name TEXT)" "OK"
+  run_query "${namespace}" "${gateway}" "${engine}" "INSERT INTO ${table} (id, name) VALUES (1, 'floci'), (2, 'managed-storage')" "OK"
+  run_query "${namespace}" "${gateway}" "${engine}" "SELECT name FROM ${table} WHERE id = 2" "managed-storage"
+  run_query "${namespace}" "${gateway}" "${engine}" "DROP TABLE IF EXISTS ${table}" "OK"
+}
+
 # Current pipeline phase and the failure_reason to report if this phase fails.
 # Both helm-test.sh (human output) and scripts/agent/up.sh (JSON output) walk the same
 # phases via deploy_and_verify; scripts/agent/up.sh reads these globals in its EXIT trap
@@ -287,6 +304,11 @@ EOF
   # also absorbs the engine's post-rollout warm-up before the (optional) suite.
   set_phase query query_failed
   run_query "${namespace}" "${gateway}" "${engine}"
+
+  # The local quickstart config points managed-table storage at floci. A simple
+  # table write/read catches storage config regressions that SELECT 1 cannot.
+  set_phase managed_table managed_table_failed
+  run_managed_table_smoke "${namespace}" "${gateway}" "${engine}"
 
   # --- Thorough verification (opt-in) ---------------------------------------
   # THOROUGH=true additionally runs the chart's full helm test suite

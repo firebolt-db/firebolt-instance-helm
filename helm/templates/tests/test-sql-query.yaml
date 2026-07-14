@@ -61,19 +61,33 @@ spec:
           [ -n "$ACCESS_TOKEN" ] \
             || fail "did not receive access_token, response: $TOKEN_RESPONSE"
           {{- end }}
-          log "SQL: SELECT 1 via gateway (engine: $ENGINE)"
-          RESPONSE=$(curl --fail --silent $CURL_INSECURE \
-            --retry 10 --retry-delay 5 --retry-connrefused \
-            --max-time 30 \
-            -X POST "$GW/" \
-            -H "X-Firebolt-Engine: $ENGINE" \
-            {{- if $.Values.auth.enabled }}
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
-            {{- end }}
-            -H "Content-Type: text/plain" \
-            --data "SELECT 1")
-          echo "Response: $RESPONSE"
-          echo "$RESPONSE" | grep -q "1" || fail "unexpected response from gateway"
-          pass "SELECT 1 returned a result containing '1'"
+          sql_query() {
+            LABEL="$1"
+            QUERY="$2"
+            EXPECTED="$3"
+            log "SQL: $LABEL via gateway (engine: $ENGINE)"
+            RESPONSE=$(curl --fail --silent $CURL_INSECURE \
+              --retry 10 --retry-delay 5 --retry-connrefused \
+              --max-time 30 \
+              -X POST "$GW/" \
+              -H "X-Firebolt-Engine: $ENGINE" \
+              {{- if $.Values.auth.enabled }}
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              {{- end }}
+              -H "Content-Type: text/plain" \
+              --data "$QUERY")
+            echo "Response: $RESPONSE"
+            echo "$RESPONSE" | grep -q "$EXPECTED" || fail "unexpected response for $LABEL"
+          }
+
+          sql_query "SELECT 1" "SELECT 1" "1"
+
+          TABLE="helm_storage_smoke_$(printf '%s' "$ENGINE" | tr -c 'A-Za-z0-9_' '_')"
+          sql_query "managed table cleanup" "DROP TABLE IF EXISTS $TABLE" "OK"
+          sql_query "managed table create" "CREATE TABLE $TABLE (id INT, name TEXT)" "OK"
+          sql_query "managed table insert" "INSERT INTO $TABLE (id, name) VALUES (1, 'floci'), (2, 'managed-storage')" "OK"
+          sql_query "managed table select" "SELECT name FROM $TABLE WHERE id = 2" "managed-storage"
+          sql_query "managed table final cleanup" "DROP TABLE IF EXISTS $TABLE" "OK"
+          pass "SELECT 1 and managed-table read/write checks passed"
 {{- end }}
 {{- end }}
