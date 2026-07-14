@@ -9,8 +9,7 @@
 #   make install   # or make upgrade
 #
 # Floci is zero-auth: SigV4 still required but credentials aren't validated.
-# `type: minio` in the engine config hardcodes the access/secret to
-# `firebolt/firebolt`, which floci accepts.
+# Supply any AWS creds via engineSpec.extraEnv (see docs/quickstart.mdx).
 ---
 apiVersion: apps/v1
 kind: Deployment
