@@ -36,9 +36,12 @@ jobs:
       # and every step in helm-test no-ops on it, so the check completes green
       # without the 45-minute kind run. Skipped cases:
       #   - docs-only PRs (nothing the e2e suite covers changed);
-      #   - release-please's release PRs: they only bump Chart.yaml `version` +
-      #     CHANGELOG.md over templates that already passed e2e on the feature
-      #     PR, and a flake would needlessly block the release.
+      #   - release-please's chart release PRs: they only bump Chart.yaml
+      #     `version` + CHANGELOG.md over templates that already passed e2e on
+      #     the feature PR, and a flake would needlessly block the release.
+      #   Packdb image bumps use `engine-release/bump-packdb` instead — those
+      #     PRs must run the full e2e suite (see packdb API-release-flow /
+      #     promote-ghcr-latest).
       skip: ${{ steps.detect.outputs.docs_only == 'true' || startsWith(github.head_ref, 'release-please') }}
     steps:
       - name: Determine whether the PR changed only docs
@@ -92,8 +95,8 @@ jobs:
       - name: Explain the no-op
         if: needs.detect.outputs.skip == 'true'
         run: |
-          echo "Docs-only or release-please PR — skipping the e2e suite and" \
-            "reporting success so the required check passes."
+          echo "Docs-only or release-please chart-release PR — skipping the e2e" \
+            "suite and reporting success so the required check passes."
 
       - name: Free up disk space on the runner
         if: needs.detect.outputs.skip != 'true'
