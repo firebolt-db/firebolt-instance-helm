@@ -1,8 +1,11 @@
 # firebolt-instance-helm
 
+[![Downloads](https://scarf.sh/installs-badge/firebolt-db/firebolt-instance?package-type=docker)](https://scarf.sh/)
+[![Companies](https://scarf.sh/company-badge/firebolt-db/firebolt-instance?package-type=docker)](https://scarf.sh/)
+
 Helm chart for running a Firebolt instance on Kubernetes: Gateway (Envoy), Metadata Service, PostgreSQL and one or more Firebolt Engines.
 
-The chart is published as `firebolt-instance` to `oci://ghcr.io/firebolt-db/helm-charts` on every change to `helm/` merged to `main`.
+The chart is published as `firebolt-instance` on every change to `helm/` merged to `main`. Pull it through `oci://oci.firebolt.io/firebolt-db/helm-charts`, Firebolt's [Scarf](https://scarf.sh) gateway, which records anonymous download analytics and redirects to `oci://ghcr.io/firebolt-db/helm-charts`.
 
 ## Documentation
 For more detailed information checkout our [official documentation](https://docs.firebolt.io/self-managed/helm-chart/overview)
@@ -66,8 +69,16 @@ This is the fast path if you want the agent to drive the install for you. If you
 
 For a step-by-step walkthrough, follow the quickstart guide in our [official documentation](https://docs.firebolt.io/self-managed/helm-chart/quickstart) or using the documentation source file at [`docs/quickstart.mdx`](docs/quickstart.mdx).
 
+## Telemetry
+
+Published chart pulls through `oci.firebolt.io` record the requested chart version and platform so Firebolt can understand community adoption and prioritize improvements. The gateway does not receive chart values, application data, query data, schemas, secrets, or configuration. As with any network request, the source IP address is visible to Scarf; Scarf may use it to infer the company and does not store it.
+
+To bypass Scarf, pull the chart directly from GitHub Container Registry: `oci://ghcr.io/firebolt-db/helm-charts/firebolt-instance`.
+
 ## Where to go next
 - The full **configuration reference** is generated from `helm/values.yaml` and lives at [`helm/README.md`](./helm/README.md).
 - Changelog: [`helm/CHANGELOG.md`](./helm/CHANGELOG.md).
 - For **contributor** detail, conventions, and rules for making changes to this repo, see [`AGENTS.md`](AGENTS.md). Module-specific rules for the chart itself live in [`helm/AGENTS.md`](helm/AGENTS.md).
 - Security policy: [`SECURITY.md`](./SECURITY.md).
+
+<img referrerpolicy="no-referrer-when-downgrade" src="https://px.firebolt.io/a.png?x-pxid=44d8e5cd-a225-4212-8705-a7639ab30398&page=instance-helm-README" alt="" width="1" height="1" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;" />
