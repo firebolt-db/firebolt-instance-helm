@@ -35,6 +35,23 @@
               "enum": ["Always", "Never", "IfNotPresent"]
             }
           }
+        },
+        "uiSidecarImage": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "Never", "IfNotPresent"]
+            }
+          }
         }
       }
     },

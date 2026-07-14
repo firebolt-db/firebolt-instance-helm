@@ -82,6 +82,16 @@ engineSpec:
   # -- Deploy a Core UI sidecar for each engine pod.
   uiSidecar: false
 
+  uiSidecarImage:
+    # -- Container repository for the Core UI sidecar image.
+    repository: ghcr.io/firebolt-db/firebolt-core-ui
+    # -- Core UI sidecar image tag. A mutable alias tracking the latest published UI.
+    tag: latest
+    # -- Image pull policy for the Core UI sidecar. Defaults to `Always` (the
+    # Kubernetes default for `latest`-tagged images) so published UI fixes
+    # reach existing installs; nodes would otherwise pin the first cached copy.
+    pullPolicy: Always
+
   # -- Custom init containers injected into engine pods (supports templating).
   customInitContainersTemplate: []
   # Example:
