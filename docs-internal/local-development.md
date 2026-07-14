@@ -25,7 +25,7 @@ make test
 
 ## Why floci
 
-The metadata images shipped after 2026-05-13 refuse local-filesystem managed storage in dedicated-Pensieve mode. `values-dev.yaml` sets `customEngineConfig.storage` to `type: minio`, which hardcodes the S3 access/secret to `firebolt/firebolt` — floci (zero-auth) signs through without any env-var plumbing.
+The metadata images shipped after 2026-05-13 refuse local-filesystem managed storage in dedicated-Pensieve mode. `values-dev.yaml` points `customEngineConfig.storage` at floci (`managed_table_storage: s3` + `aws.endpoint`) and supplies dummy AWS credentials via `engineSpec.extraEnv` — floci is zero-auth, so any signed request passes.
 
 ## Reset floci
 
