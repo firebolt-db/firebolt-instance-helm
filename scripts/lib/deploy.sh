@@ -100,7 +100,7 @@ run_query() {
   local gateway="$2"
   local engine="$3"
   local query="${4:-SELECT 1}"
-  local expected="${5:-1}"
+  local expected="${5-1}"
   local attempts="${6:-24}"
   local sleep_seconds="${7:-5}"
 
