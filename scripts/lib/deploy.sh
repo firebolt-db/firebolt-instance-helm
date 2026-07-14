@@ -217,13 +217,20 @@ deploy_and_verify() {
   my_values="$(mktemp)"
   trap 'rm -f "'"${my_values}"'"' RETURN
   cat > "${my_values}" <<EOF
+engineSpec:
+  extraEnv:
+    - name: AWS_ACCESS_KEY_ID
+      value: firebolt
+    - name: AWS_SECRET_ACCESS_KEY
+      value: firebolt
+
 customEngineConfig:
   storage:
-    type: minio
-    api_scheme: "s3://"
-    bucket_name: firebolt-managed
-    minio:
+    managed_table_storage: s3
+    managed_table_bucket_name: firebolt-managed
+    aws:
       endpoint: http://floci.${namespace}.svc.cluster.local:4566
+      path_style_addressing: true
 EOF
 
   # Helm value args: the floci storage block (always), then each caller-supplied
