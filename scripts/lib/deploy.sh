@@ -217,13 +217,6 @@ deploy_and_verify() {
   my_values="$(mktemp)"
   trap 'rm -f "'"${my_values}"'"' RETURN
   cat > "${my_values}" <<EOF
-engineSpec:
-  extraEnv:
-    - name: AWS_ACCESS_KEY_ID
-      value: firebolt
-    - name: AWS_SECRET_ACCESS_KEY
-      value: firebolt
-
 customEngineConfig:
   storage:
     managed_table_storage: s3

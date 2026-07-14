@@ -10,12 +10,6 @@
 engineSpec:
   image:
     tag: dev
-  # floci is zero-auth; the engine still signs S3 requests, so supply any creds.
-  extraEnv:
-    - name: AWS_ACCESS_KEY_ID
-      value: firebolt
-    - name: AWS_SECRET_ACCESS_KEY
-      value: firebolt
 
 metadata:
   image:
@@ -23,8 +17,7 @@ metadata:
 
 # Point the engine's managed storage at the local floci S3 emulator. The engine
 # refuses to start in dedicated-Pensieve mode without managed storage on object
-# storage. floci is zero-auth, so any AWS creds work (set via engineSpec.extraEnv
-# above). Apply local-floci.yaml in the same namespace before `make install`.
+# storage. Apply local-floci.yaml in the same namespace before `make install`.
 customEngineConfig:
   storage:
     managed_table_storage: s3
