@@ -96,14 +96,6 @@ You MUST keep documentation in sync with code. When making changes:
 
 A pull request that changes structure or interfaces without a documentation update is incomplete.
 
-## Document resolved issues
-
-You MUST capture non-obvious problems you solve. When you encounter and fix a quirk, footgun, surprising framework behavior, environment trap, or anything that took meaningful debugging:
-
-- Add a short entry to `## Known issues` in the most-relevant `AGENTS.md` (root for project-wide; `helm/AGENTS.md` for chart-specific).
-- State the symptom, the cause, and the resolution in two or three sentences.
-- This prevents the next agent from rediscovering the same problem.
-
 ## Proactive harness
 
 Code is not done until it is covered by tests where tests are reasonable.
@@ -134,6 +126,12 @@ Linear specifics:
 - Any new Linear issue created in connection with this repo MUST be filed under team `Firebolt` AND project `Firebolt Instance Helm Chart`. Filing it in the team without the project leaves it unscoped.
 
 ## Known issues
+
+Ongoing limitations, framework footguns, and environment traps that still affect day-to-day work and need a **workaround** until the root cause is fixed.
+
+- Do **not** add entries for bugs you fix in the current PR. The code change and PR description are the record.
+- When you add an entry, put it in the most-relevant `AGENTS.md` (root for project-wide; `helm/AGENTS.md` for chart-specific). State the symptom, cause, and workaround in two or three sentences.
+- Remove the entry when the underlying issue is fixed — do not leave solved history behind.
 
 - Symptom: GitHub Actions workflows that use `azure/setup-helm` with `version: "latest"` can start failing or changing behavior unexpectedly. Cause: the action matches upstream Helm tarball names verbatim and `latest` can silently advance across major versions, including to Helm v4. Resolution: pin an explicit Helm v3 patch in both validation and release workflows until the v4 behavioral differences have been audited and adopted intentionally.
 

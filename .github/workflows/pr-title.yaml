@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
-    if: ${{ !startsWith(github.head_ref, 'dependabot') && !startsWith(github.head_ref, 'release-please') }}
+    if: ${{ !startsWith(github.head_ref, 'dependabot') && !startsWith(github.head_ref, 'release-please') && !startsWith(github.head_ref, 'engine-release') }}
     steps:
       - name: Validate PR title
         uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
