@@ -8,8 +8,7 @@
 #   kubectl -n firebolt rollout status deployment/floci --timeout=120s
 #   make install   # or make upgrade
 #
-# Floci is zero-auth: SigV4 still required but credentials aren't validated.
-# Supply any AWS creds via engineSpec.extraEnv (see docs/quickstart.mdx).
+# Floci is zero-auth and validates no object-storage credentials.
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -70,17 +70,10 @@ floci stores data in the pod's ephemeral filesystem and validates no credentials
 
 ## Configure the engine
 
-Create a values file that points the engine's storage at the floci endpoint. `managed_table_storage: s3` with `aws.endpoint` targets floci, and `managed_table_bucket_name` matches the bucket floci created. floci is zero-auth, so any AWS credentials work (set via `engineSpec.extraEnv`).
+Create a values file that points the engine's storage at the floci endpoint. `managed_table_storage: s3` with `aws.endpoint` targets floci, and `managed_table_bucket_name` matches the bucket floci created.
 
 ```yaml
 # my-values.yaml
-engineSpec:
-  extraEnv:
-    - name: AWS_ACCESS_KEY_ID
-      value: firebolt
-    - name: AWS_SECRET_ACCESS_KEY
-      value: firebolt
-
 customEngineConfig:
   storage:
     managed_table_storage: s3

@@ -334,8 +334,8 @@ spec:
                 - ALL
         {{- if $.Values.engineSpec.uiSidecar }}
         - name: core-ui
-          image: ghcr.io/firebolt-db/firebolt-core-ui:latest
-          imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
+          image: {{ $.Values.engineSpec.uiSidecarImage.repository }}:{{ $.Values.engineSpec.uiSidecarImage.tag }}
+          imagePullPolicy: {{ $.Values.engineSpec.uiSidecarImage.pullPolicy }}
           env:
             - name: FIREBOLT_CORE_URL
               # The sidecar's nginx reverse proxy defaults proxy_ssl_verify to off, so
@@ -346,6 +346,18 @@ spec:
             - containerPort: 9100
               name: web-ui
               protocol: TCP
+          # Pod Ready must mean the UI actually serves: without a probe the
+          # container counts ready the instant its process starts, so a
+          # crash-looping UI flaps Service endpoints and can slip through a
+          # rolling update on a transient ready window.
+          readinessProbe:
+            initialDelaySeconds: 1
+            periodSeconds: 3
+            timeoutSeconds: 2
+            failureThreshold: 3
+            httpGet:
+              path: /
+              port: 9100
           resources:
             limits:
               memory: 128Mi
