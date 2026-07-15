@@ -15,6 +15,10 @@ updates:
       default-days: 7
       exclude:
         - "firebolt-analytics/*"
+    groups:
+      actions:
+        patterns:
+          - "*"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
