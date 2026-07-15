@@ -134,6 +134,7 @@ Ongoing limitations, framework footguns, and environment traps that still affect
 - Remove the entry when the underlying issue is fixed — do not leave solved history behind.
 
 - Symptom: GitHub Actions workflows that use `azure/setup-helm` with `version: "latest"` can start failing or changing behavior unexpectedly. Cause: the action matches upstream Helm tarball names verbatim and `latest` can silently advance across major versions, including to Helm v4. Resolution: pin an explicit Helm v3 patch in both validation and release workflows until the v4 behavioral differences have been audited and adopted intentionally.
+- Symptom: release jobs that commit generated chart docs back to `main` can fail with `! [rejected] HEAD -> main (fetch first)` when another commit lands after checkout. Cause: a single push attempt from a stale local base, with checkout credentials disabled. Resolution: keep release checkouts at full history and wrap the push in a retry loop that fetches and rebases on the latest authenticated `main` between attempts, failing only after explicit retries are exhausted.
 
 ## Project-specific rules
 
