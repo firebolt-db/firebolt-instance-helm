@@ -24,8 +24,7 @@ make test
 | `make dev` | `make upgrade-dev` |
 
 ## Why floci
-
-The metadata images shipped after 2026-05-13 refuse local-filesystem managed storage in dedicated-Pensieve mode. `values-dev.yaml` points `customEngineConfig.storage` at floci (`managed_table_storage: s3` plus `aws.endpoint`) so local installs use object storage without cloud infrastructure.
+The metadata images shipped after 2026-05-13 refuse local-filesystem managed storage in dedicated-Pensieve mode. `values-dev.yaml` points `customEngineConfig.storage` at floci (`managed_table_storage: s3` plus `aws.endpoint`) so local installs use object storage without cloud infrastructure. floci is zero-auth, so any signed request passes without the need to set up (dummy) AWS credentials.
 
 ## Reset floci
 
