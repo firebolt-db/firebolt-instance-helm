@@ -71,9 +71,9 @@ For a step-by-step walkthrough, follow the quickstart guide in our [official doc
 
 ## Telemetry
 
-Published chart pulls through `oci.firebolt.io` record the requested chart version and platform so Firebolt can understand community adoption and prioritize improvements. The gateway does not receive chart values, application data, query data, schemas, secrets, or configuration. As with any network request, the source IP address is visible to Scarf; Scarf may use it to infer the company and does not store it.
+Published chart and default engine-image pulls through `oci.firebolt.io` record the requested version and platform so Firebolt can understand community adoption and prioritize improvements. The gateway does not receive chart values, application data, query data, schemas, secrets, or configuration. As with any network request, the source IP address is visible to Scarf; Scarf may use it to infer the company and does not store it.
 
-To bypass Scarf, pull the chart directly from GitHub Container Registry: `oci://ghcr.io/firebolt-db/helm-charts/firebolt-instance`.
+To bypass Scarf, pull the chart directly from `oci://ghcr.io/firebolt-db/helm-charts/firebolt-instance` and set `engineSpec.image.repository=ghcr.io/firebolt-db/engine`.
 
 ## Where to go next
 - The full **configuration reference** is generated from `helm/values.yaml` and lives at [`helm/README.md`](./helm/README.md).

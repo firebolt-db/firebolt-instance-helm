@@ -1,6 +1,6 @@
 # Local development
 
-`make dev` is the inner-loop install: it pins engine and metadata to the mutable `:dev` tag of their default `ghcr.io/firebolt-db` repositories (instead of the pinned `appVersion` that `make install` uses), with floci standing in for managed-storage S3. For a reproducible install at the chart's pinned `appVersion`, use plain [`make install`](../docs/usage/single-engine.mdx).
+`make dev` is the inner-loop install: it pins engine and metadata to the mutable `:dev` tag of their default repositories (instead of the pinned `appVersion` that `make install` uses), with floci standing in for managed-storage S3. The engine uses `oci.firebolt.io` and metadata uses GHCR. For a reproducible install at the chart's pinned `appVersion`, use plain [`make install`](../docs/usage/single-engine.mdx).
 
 ## Prerequisites
 

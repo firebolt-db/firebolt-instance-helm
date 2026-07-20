@@ -6,7 +6,13 @@ title: Image overrides
 
 This page shows how to override the default engine and metadata image tags.
 
-By default, the chart pulls engine and metadata from `ghcr.io/firebolt-db/{engine,metadata}` based on the `appVersion` in `Chart.yaml`.
+By default, the chart pulls the engine through Firebolt's Scarf gateway at `oci.firebolt.io/firebolt-db/engine` and metadata directly from `ghcr.io/firebolt-db/metadata`, using the `appVersion` in `Chart.yaml`. To bypass Scarf for engine pulls, set:
+
+```yaml
+engineSpec:
+  image:
+    repository: ghcr.io/firebolt-db/engine
+```
 
 ## Track 'dev' images
 

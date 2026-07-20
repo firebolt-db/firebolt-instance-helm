@@ -21,8 +21,9 @@ CONFIG="${SCRIPT_DIR}/kind-config.yaml"
 # too. Requires a recent kind (>= v0.31); an older kind cannot boot this image.
 NODE_IMAGE="${NODE_IMAGE:-kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f}"
 
-# Local OCI registry that the kind node uses as a transparent mirror for
-# ghcr.io / docker.io. Defaults match scripts/setup-local-registry.sh.
+# Local OCI registry that the kind node uses as a transparent mirror for the
+# registries referenced by chart defaults. Defaults match
+# scripts/setup-local-registry.sh.
 REGISTRY_NAME="${REGISTRY_NAME:-kind-registry}"
 # In-cluster endpoint the kind node uses to reach the registry, resolved
 # through Docker's embedded DNS on the "kind" network.
@@ -30,7 +31,7 @@ REGISTRY_ENDPOINT="http://${REGISTRY_NAME}:5000"
 # Upstreams we mirror. Every workload image is pushed into the local registry
 # under its upstream path (firebolt-db/engine, library/postgres,
 # envoyproxy/envoy, ...), so one hosts.toml per upstream makes pulls transparent.
-MIRRORED_HOSTS=("ghcr.io" "docker.io")
+MIRRORED_HOSTS=("ghcr.io" "docker.io" "oci.firebolt.io")
 
 # When "true" the ghcr.io/firebolt-db packages are public, so the kind nodes
 # pull every image directly from upstream and we skip both the local registry

@@ -9,7 +9,7 @@ apiVersion: kind.x-k8s.io/v1alpha4
 # `containerdConfigPatches` switches the node's containerd to look up per-host
 # pull configuration under /etc/containerd/certs.d/<host>/hosts.toml.
 # scripts/setup-kind-cluster.sh writes those files post-create to alias
-# ghcr.io / docker.io to the local OCI registry started by
+# ghcr.io, docker.io, and oci.firebolt.io to the local OCI registry started by
 # scripts/setup-local-registry.sh. The node then pulls every image (including
 # the private engine / metadata images) from the local registry instead of
 # doing an anonymous upstream pull.

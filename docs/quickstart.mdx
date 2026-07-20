@@ -95,7 +95,7 @@ helm install firebolt oci://oci.firebolt.io/firebolt-db/helm-charts/firebolt-ins
   -f my-values.yaml
 ```
 
-The `oci.firebolt.io` host is Firebolt's [Scarf](https://scarf.sh) gateway. It records the requested chart version and platform and redirects to GHCR; it does not receive chart values, application data, query data, schemas, secrets, or configuration. As with any network request, the source IP is visible to Scarf; Scarf may use it to infer the company and does not store it. To bypass the gateway, pull from `oci://ghcr.io/firebolt-db/helm-charts/firebolt-instance` instead.
+The `oci.firebolt.io` host is Firebolt's [Scarf](https://scarf.sh) gateway. Chart downloads and default engine-image pulls record the requested version and platform and redirect to GHCR; the gateway does not receive chart values, application data, query data, schemas, secrets, or configuration. As with any network request, the source IP is visible to Scarf; Scarf may use it to infer the company and does not store it. To bypass Scarf, pull the chart from `oci://ghcr.io/firebolt-db/helm-charts/firebolt-instance` and set `engineSpec.image.repository=ghcr.io/firebolt-db/engine`.
 
 ## Verify the install
 
