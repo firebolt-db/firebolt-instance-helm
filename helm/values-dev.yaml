@@ -1,7 +1,8 @@
 ---
 # Overlay for inner-loop development: pins engine and metadata to their mutable
 # `:dev` tags and points managed storage at the local floci S3 emulator. The
-# engine keeps the chart's Scarf gateway repository; metadata uses GHCR.
+# engine and metadata both use GHCR so local work does not generate Scarf
+# download analytics.
 # Not for reproducible installs.
 #
 #   make dev
@@ -9,6 +10,7 @@
 
 engineSpec:
   image:
+    repository: ghcr.io/firebolt-db/engine
     tag: dev
 
 metadata:
