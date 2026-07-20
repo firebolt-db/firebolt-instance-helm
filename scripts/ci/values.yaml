@@ -10,6 +10,10 @@
 #
 # Applied via: helm install ... -f my-values.yaml -f scripts/ci/values.yaml
 
+engineSpec:
+  image:
+    repository: ghcr.io/firebolt-db/engine
+
 # One gateway replica is enough to route queries; two does not fit the runner.
 gateway:
   replicas: 1

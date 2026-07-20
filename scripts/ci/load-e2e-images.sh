@@ -61,6 +61,7 @@ strip_image_line() {
 # Translate a Docker image reference to the path the kind-registry mirror
 # expects, matching Docker's implicit normalisation:
 #   ghcr.io/firebolt-db/engine:tag -> firebolt-db/engine:tag   (strip explicit host)
+#   oci.firebolt.io/firebolt-db/engine:tag -> firebolt-db/engine:tag
 #   envoyproxy/envoy:v1.37.2       -> envoyproxy/envoy:v1.37.2  (org/name; keep)
 #   postgres:16-alpine             -> library/postgres:16-alpine (official Docker Hub)
 to_registry_path() {
@@ -140,7 +141,7 @@ while IFS= read -r img; do
   docker pull "${img}"
 
   # Engine image is the only one with the foreign-arch SIGILL trap; guard it.
-  if [[ "${img}" == ghcr.io/firebolt-db/engine:* ]]; then
+  if [[ "${img}" == ghcr.io/firebolt-db/engine:* || "${img}" == oci.firebolt.io/firebolt-db/engine:* ]]; then
     img_arch="$(docker image inspect "${img}" --format '{{.Architecture}}' 2>/dev/null || echo unknown)"
     if [ "${img_arch}" != "${NODE_ARCH}" ]; then
       echo "Error: engine image arch '${img_arch}' does not match kind node arch '${NODE_ARCH}'." >&2

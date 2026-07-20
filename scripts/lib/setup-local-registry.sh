@@ -17,8 +17,9 @@ set -euo pipefail
 #     transfer changed layers.
 #
 # The kind nodes are wired to use this registry as a transparent mirror for
-# ghcr.io / docker.io via /etc/containerd/certs.d hosts.toml files written by
-# scripts/setup-kind-cluster.sh after the cluster comes up.
+# ghcr.io, docker.io, and oci.firebolt.io via /etc/containerd/certs.d
+# hosts.toml files written by scripts/setup-kind-cluster.sh after the cluster
+# comes up.
 #
 # Layout:
 #   - Container name: "kind-registry"

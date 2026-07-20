@@ -20,7 +20,7 @@ createNamespace: false
 engineSpec:
   image:
     # -- Container repository for the Firebolt engine image.
-    repository: ghcr.io/firebolt-db/engine
+    repository: oci.firebolt.io/firebolt-db/engine
     # -- Image tag. Defaults to `Chart.appVersion` when empty.
     tag: ""
     # -- Image pull policy.
