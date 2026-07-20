@@ -1,6 +1,6 @@
 # Local development
 
-`make dev` is the inner-loop install: it pins engine and metadata to the mutable `:dev` tag (instead of the pinned `appVersion` that `make install` uses), with floci standing in for managed-storage S3. Both images use GHCR so local development does not generate Scarf download analytics. For a reproducible install at the chart's pinned `appVersion`, use plain [`make install`](../docs/usage/single-engine.mdx).
+`make dev` is the inner-loop install: it pins engine and metadata to the mutable `:dev` tag (instead of the pinned `appVersion` that `make install` uses), pulls both images from GHCR, and uses floci for managed-storage S3. For a reproducible install at the chart's pinned `appVersion`, use plain [`make install`](../docs/usage/single-engine.mdx).
 
 ## Prerequisites
 

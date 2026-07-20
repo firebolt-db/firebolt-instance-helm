@@ -1,8 +1,7 @@
 ---
 # Overlay for inner-loop development: pins engine and metadata to their mutable
-# `:dev` tags and points managed storage at the local floci S3 emulator. The
-# engine and metadata both use GHCR so local work does not generate Scarf
-# download analytics.
+# `:dev` tags, uses GHCR directly, and points managed storage at the local floci
+# S3 emulator.
 # Not for reproducible installs.
 #
 #   make dev

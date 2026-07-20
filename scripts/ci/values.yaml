@@ -10,7 +10,6 @@
 #
 # Applied via: helm install ... -f my-values.yaml -f scripts/ci/values.yaml
 
-# CI must not generate Scarf download analytics.
 engineSpec:
   image:
     repository: ghcr.io/firebolt-db/engine
