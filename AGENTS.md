@@ -125,6 +125,27 @@ Linear specifics:
 - **Project:** `Firebolt Instance Helm Chart`.
 - Any new Linear issue created in connection with this repo MUST be filed under team `Firebolt` AND project `Firebolt Instance Helm Chart`. Filing it in the team without the project leaves it unscoped.
 
+### Commit conventions
+
+```
+<type>(<scope>): <description> (<issue-ref>)
+```
+
+Types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
+
+Scope is optional but encouraged.
+
+Rules:
+
+- Subject: imperative mood, lowercase, no trailing period; keep it under 100 characters.
+- Body: explain what changed and *why*.
+- An issue reference is required: either a Linear ticket (`FB-<number>`) or a GitHub issue (`#123`); take it from the branch name.
+- CI-only changes MUST use `ci:` with an optional scope (for example, `ci(test): ...`), never `fix(ci):`. A `fix:` conventional commit always triggers a patch release, which is not required for CI changes.
+
+Example: `fix(gateway): retry on X-Firebolt-Drained during cutover (#123)`
+
+**Staging**: always add files by explicit path (`git add file1 file2`). Never use `git add -A`, `git add .`, or `git add --all` — untracked files that are not meant to be versioned will be committed.
+
 ## Known issues
 
 Ongoing limitations, framework footguns, and environment traps that still affect day-to-day work and need a **workaround** until the root cause is fixed.
