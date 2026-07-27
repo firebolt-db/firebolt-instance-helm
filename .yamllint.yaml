@@ -7,6 +7,12 @@ rules:
     ## toYaml in Helm templates can produce indentation that yamllint considers incorrect
     ## but is actually valid YAML. 'whatever' allows both block and flow list styles.
     indent-sequences: whatever
+  brackets:
+    ## release-please rewrites helm/Chart.yaml with a style-preserving YAML
+    ## emitter that renders flow sequences as `[ "x" ]`. Tolerate that spacing
+    ## so the automated release PR is not blocked by a formatting-only diff.
+    min-spaces-inside: 0
+    max-spaces-inside: 1
   braces:
     forbid: non-empty
     min-spaces-inside: 0
