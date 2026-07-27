@@ -24,6 +24,8 @@ spec:
       # service-link env injection, DNS is the only service-discovery
       # channel needed.
       enableServiceLinks: false
+      # PostgreSQL never calls the Kubernetes API.
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 70

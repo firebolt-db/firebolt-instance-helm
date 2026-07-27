@@ -62,6 +62,11 @@ spec:
       # service-link env injection, DNS is the only service-discovery
       # channel needed.
       enableServiceLinks: false
+      # Envoy runs a fully static bootstrap (STRICT_DNS clusters, no xDS), so it
+      # never calls the Kubernetes API. A BYO serviceAccountName below gets no
+      # token either; webhook-injected projected tokens (IRSA, Pod Identity) are
+      # separate volumes and unaffected.
+      automountServiceAccountToken: false
       # 15s = 8s preStop /healthcheck/fail propagation + ~7s Envoy drain budget.
       terminationGracePeriodSeconds: 15
       {{- with .Values.gateway.podTemplate.serviceAccountName }}
