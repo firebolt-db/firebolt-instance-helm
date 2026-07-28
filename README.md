@@ -73,7 +73,21 @@ For a step-by-step walkthrough, follow the quickstart guide in our [official doc
 
 Published chart and default engine-image pulls through `oci.firebolt.io` record the requested version and platform so Firebolt can understand community adoption and prioritize improvements. The gateway does not receive chart values, application data, query data, schemas, secrets, or configuration. As with any network request, the source IP address is visible to Scarf; Scarf may use it to infer the company and does not store it.
 
-To bypass Scarf, pull the chart directly from `oci://ghcr.io/firebolt-db/helm-charts/firebolt-instance` and set `engineSpec.image.repository=ghcr.io/firebolt-db/engine`.
+Each deployed engine additionally sends one anonymous, aggregate usage event to [Scarf](https://scarf.sh) at most once per day, containing the engine version, operating system, and architecture — no names, stable identifiers, query data, or schemas.
+
+You can opt out in any of these ways:
+
+- Set `telemetry.enabled=false` in the chart values. This stamps `DO_NOT_TRACK=1`
+  on every engine container (disabling the engines' runtime events; a
+  `DO_NOT_TRACK` entry in `engineSpec.extraEnv` still wins) and, when
+  `engineSpec.image.repository` is still the default Scarf gateway, switches
+  engine pulls to `ghcr.io/firebolt-db/engine`. An explicitly configured
+  repository is preserved.
+- Install the chart from `oci://ghcr.io/firebolt-db/helm-charts/firebolt-instance`
+  to bypass Scarf for the chart download as well. Helm selects the chart
+  repository before it reads chart values.
+- Setting `telemetry.enabled: false` in the engine's own `config.yaml` (via
+  `customEngineConfig`) disables the runtime event only.
 
 ## Where to go next
 - The full **configuration reference** is generated from `helm/values.yaml` and lives at [`helm/README.md`](./helm/README.md).

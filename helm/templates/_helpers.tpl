@@ -101,6 +101,21 @@ needed for engine nodes to reach each other.
 {{- end }}
 
 {{/*
+Engine container image reference. When telemetry is disabled and the
+repository is still the chart's default Scarf gateway value, pulls fall back
+to GHCR directly so an opted-out install makes no requests to Scarf at all.
+A user-supplied repository is always used verbatim — opting out must never
+silently discard an explicit image choice (e.g. a private mirror).
+*/}}
+{{- define "fbinstance.engineImage" -}}
+{{- $repo := .Values.engineSpec.image.repository -}}
+{{- if and (eq .Values.telemetry.enabled false) (eq $repo "oci.firebolt.io/firebolt-db/engine") -}}
+{{- $repo = "ghcr.io/firebolt-db/engine" -}}
+{{- end -}}
+{{- printf "%s:%s" $repo (default .Chart.AppVersion .Values.engineSpec.image.tag) -}}
+{{- end -}}
+
+{{/*
 Engine config YAML helper.
 Produces the rendered engine config.yaml document following the
 Firebolt Core configuration schema (`schema_version: "1.0"`). The

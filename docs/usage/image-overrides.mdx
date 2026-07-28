@@ -14,6 +14,8 @@ engineSpec:
     repository: ghcr.io/firebolt-db/engine
 ```
 
+Setting `telemetry.enabled: false` has the same effect on the default engine repository — it switches pulls to `ghcr.io/firebolt-db/engine` (an explicitly configured repository is preserved) and additionally sets `DO_NOT_TRACK=1` on every engine container, disabling the engines' once-daily anonymous usage event.
+
 ## Track 'dev' images
 
 To follow current-of-mainline builds, you can use the `dev` tag.
