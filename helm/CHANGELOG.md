@@ -12,6 +12,32 @@ chore(deps): bump amazon/aws-cli from 2.35.2 to 2.35.3 (#1)
 
 # Changelog
 
+## [0.3.0](https://github.com/firebolt-db/firebolt-instance-helm/compare/0.2.0...0.3.0) (2026-07-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **storage:** migrate engine storage config to schema (FB-1684) ([#25](https://github.com/firebolt-db/firebolt-instance-helm/issues/25))
+
+### Features
+
+* **helm:** add engine authentication and TLS support (FB-1943) ([#23](https://github.com/firebolt-db/firebolt-instance-helm/issues/23)) ([a9a8aa2](https://github.com/firebolt-db/firebolt-instance-helm/commit/a9a8aa2508c6c3d77e92b33b35104cc010f9f8d8))
+* **storage:** migrate engine storage config to schema (FB-1684) ([#25](https://github.com/firebolt-db/firebolt-instance-helm/issues/25)) ([91f1f5d](https://github.com/firebolt-db/firebolt-instance-helm/commit/91f1f5ddde4eea2c0b26efe83dcd02c96dc503ec))
+
+
+### Bug Fixes
+
+* **agent:** remove floci AWS env credentials (FB-2197) ([#36](https://github.com/firebolt-db/firebolt-instance-helm/issues/36)) ([58b56d3](https://github.com/firebolt-db/firebolt-instance-helm/commit/58b56d3e29facec7f79e7b4fadeb5fe11522730a))
+* keep the Core UI sidecar image fresh and probe its readiness (FB-2179, FB-2180) ([#32](https://github.com/firebolt-db/firebolt-instance-helm/issues/32)) ([fb88c96](https://github.com/firebolt-db/firebolt-instance-helm/commit/fb88c9606feaad5dec3d8620913643e9829d3c15))
+* **security:** disable service account token automount on postgres and gateway ([#47](https://github.com/firebolt-db/firebolt-instance-helm/issues/47)) ([181ac91](https://github.com/firebolt-db/firebolt-instance-helm/commit/181ac91b439aaa139491db09cfcd6e76cffe02b3))
+
+
+### Dependencies
+
+* **deps:** bump packdb appVersion to release-5.0.1-0.20260709071413.53735f172429 ([#5](https://github.com/firebolt-db/firebolt-instance-helm/issues/5)) ([76ecd18](https://github.com/firebolt-db/firebolt-instance-helm/commit/76ecd18d1601dbad9f820201f49f63830f4f3466))
+* **deps:** bump packdb appVersion to release-5.0.1-0.20260713060957.513515666721 ([#29](https://github.com/firebolt-db/firebolt-instance-helm/issues/29)) ([1dd11b3](https://github.com/firebolt-db/firebolt-instance-helm/commit/1dd11b384083806da59e3590bc4e6ad0d45749a5))
+* **deps:** bump packdb appVersion to release-5.0.1-0.20260727005216.d09b51086f14 ([#38](https://github.com/firebolt-db/firebolt-instance-helm/issues/38)) ([69909db](https://github.com/firebolt-db/firebolt-instance-helm/commit/69909dbc1324f64b897f949a5f4682ae46605cb1))
+
 ## 0.1.0
 
 Initial public release. Consolidated changes from pre-release development:
