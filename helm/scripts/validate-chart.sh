@@ -96,10 +96,14 @@ else
     exit 1
 fi
 
+# Placeholder satisfying the schema's non-empty postgresql.password
+# requirement during template rendering; not a credential.
+DUMMY_PG_ARGS=(--set "postgresql.password=validation-dummy") # legit:ignore-secrets
+
 # Opt-out render: engine pulls fall back to GHCR and every engine container
 # carries DO_NOT_TRACK=1.
 helm template firebolt-instance "$HELM_DIR/" \
-    --set postgresql.password="validation-dummy" \
+    "${DUMMY_PG_ARGS[@]}" \
     --set telemetry.enabled=false > "$TEMP_DIR/helm-template-optout.yaml"
 if grep -q 'image: "ghcr.io/firebolt-db/engine:' "$TEMP_DIR/helm-template-optout.yaml" \
     && ! grep -q 'image: "oci.firebolt.io/firebolt-db/engine:' "$TEMP_DIR/helm-template-optout.yaml" \
@@ -112,7 +116,7 @@ fi
 
 # Opt-out must never override an explicitly configured repository.
 helm template firebolt-instance "$HELM_DIR/" \
-    --set postgresql.password="validation-dummy" \
+    "${DUMMY_PG_ARGS[@]}" \
     --set telemetry.enabled=false \
     --set engineSpec.image.repository=registry.example.com/mirror/engine > "$TEMP_DIR/helm-template-custom-repo.yaml"
 if grep -q 'image: "registry.example.com/mirror/engine:' "$TEMP_DIR/helm-template-custom-repo.yaml"; then
