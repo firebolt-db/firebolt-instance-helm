@@ -255,6 +255,14 @@
           }
         }
       }
+    },
+    "telemetry": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
     }
   },
   "definitions": {

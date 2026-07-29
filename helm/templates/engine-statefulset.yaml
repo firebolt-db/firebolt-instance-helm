@@ -136,7 +136,7 @@ spec:
       {{- end }}
       containers:
         - name: core
-          image: "{{ $.Values.engineSpec.image.repository }}:{{ default $.Chart.AppVersion $.Values.engineSpec.image.tag }}"
+          image: {{ include "fbinstance.engineImage" $ | quote }}
           imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
           env:
             - name: FIREBOLT_CORE_NODE
@@ -157,6 +157,13 @@ spec:
             # startup.
             - name: FIREBOLT_CORE_MODE
               value: "1"
+            {{- if eq $.Values.telemetry.enabled false }}
+            # The engine's telemetry SDK honors this as an opt-out. Stamped
+            # before extraEnv so a user-supplied value resolves last and wins
+            # under Kubernetes' duplicate-env resolution.
+            - name: DO_NOT_TRACK
+              value: "1"
+            {{- end }}
             {{- with $.Values.engineSpec.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
