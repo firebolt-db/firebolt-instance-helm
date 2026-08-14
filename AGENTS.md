@@ -150,6 +150,10 @@ Example: `fix(gateway): retry on X-Firebolt-Drained during cutover (#123)`
 
 Ongoing limitations, framework footguns, and environment traps that still affect day-to-day work and need a **workaround** until the root cause is fixed.
 
+- Do **not** add entries for bugs you fix in the current PR. The code change and PR description are the record.
+- When you are instructed to add content to AGENTS.md, put it in the most-relevant `AGENTS.md` (root for project-wide; `helm/AGENTS.md` for chart-specific). State the symptom, cause, and workaround in two or three sentences.
+- When you review known issues, remove the entry when the underlying issue is fixed — do not leave solved history behind.
+
 - Symptom: GitHub Actions workflows that use `azure/setup-helm` with `version: "latest"` can start failing or changing behavior unexpectedly. Cause: the action matches upstream Helm tarball names verbatim and `latest` can silently advance across major versions, including to Helm v4. Resolution: pin an explicit Helm v3 patch in both validation and release workflows until the v4 behavioral differences have been audited and adopted intentionally.
 - Symptom: release jobs that commit generated chart docs back to `main` can fail with `! [rejected] HEAD -> main (fetch first)` when another commit lands after checkout. Cause: a single push attempt from a stale local base, with checkout credentials disabled. Resolution: keep release checkouts at full history and wrap the push in a retry loop that fetches and rebases on the latest authenticated `main` between attempts, failing only after explicit retries are exhausted.
 
