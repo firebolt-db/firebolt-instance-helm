@@ -89,7 +89,6 @@ You MUST follow these collaboration rules on every task.
 
 You MUST keep documentation in sync with code. When making changes:
 
-- **AGENTS.md** — update the relevant `AGENTS.md` (root or `helm/AGENTS.md`) if you change structure, conventions, public surface, commands, or config formats. If your change makes existing AGENTS.md content wrong, fix it before finishing.
 - **`helm/values.yaml` annotations** — every value rendered into `helm/README.md` is documented inline via `# --` comments processed by `helm-docs`. When you add, rename, remove, or change the meaning of a value, update its annotation in the same change. Then regenerate `helm/README.md` via `make docs` (or let the pre-commit `helm-docs` hook do it on commit).
 - **`helm/CHANGELOG.md`** — release-please owns this file, prepending a section for each release from the conventional-commit history since the last release. You do not hand-edit it; you DO need conventional-commit PR titles (`feat:` / `fix:` / `chore(deps):` / etc.) so the version bump and changelog entry are correct.
 - **`README.md` (root)** — overview-only. Update when your change affects what a human reader needs to know about what the project is or how to run it. Implementation detail belongs in this file or `helm/AGENTS.md`, not the README.
@@ -152,8 +151,8 @@ Example: `fix(gateway): retry on X-Firebolt-Drained during cutover (#123)`
 Ongoing limitations, framework footguns, and environment traps that still affect day-to-day work and need a **workaround** until the root cause is fixed.
 
 - Do **not** add entries for bugs you fix in the current PR. The code change and PR description are the record.
-- When you add an entry, put it in the most-relevant `AGENTS.md` (root for project-wide; `helm/AGENTS.md` for chart-specific). State the symptom, cause, and workaround in two or three sentences.
-- Remove the entry when the underlying issue is fixed — do not leave solved history behind.
+- When you are instructed to add content to AGENTS.md, put it in the most-relevant `AGENTS.md` (root for project-wide; `helm/AGENTS.md` for chart-specific). State the symptom, cause, and workaround in two or three sentences.
+- When you review known issues, remove the entry when the underlying issue is fixed — do not leave solved history behind.
 
 - Symptom: GitHub Actions workflows that use `azure/setup-helm` with `version: "latest"` can start failing or changing behavior unexpectedly. Cause: the action matches upstream Helm tarball names verbatim and `latest` can silently advance across major versions, including to Helm v4. Resolution: pin an explicit Helm v3 patch in both validation and release workflows until the v4 behavioral differences have been audited and adopted intentionally.
 - Symptom: release jobs that commit generated chart docs back to `main` can fail with `! [rejected] HEAD -> main (fetch first)` when another commit lands after checkout. Cause: a single push attempt from a stale local base, with checkout credentials disabled. Resolution: keep release checkouts at full history and wrap the push in a retry loop that fetches and rebases on the latest authenticated `main` between attempts, failing only after explicit retries are exhausted.
