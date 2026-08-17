@@ -12,6 +12,13 @@ chore(deps): bump amazon/aws-cli from 2.35.2 to 2.35.3 (#1)
 
 # Changelog
 
+## [0.3.1](https://github.com/firebolt-db/firebolt-instance-helm/compare/0.3.0...0.3.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **metadata:** render metadata service config as YAML, not XML (FB-3110) ([#72](https://github.com/firebolt-db/firebolt-instance-helm/issues/72)) ([85995d8](https://github.com/firebolt-db/firebolt-instance-helm/commit/85995d810031f8d813b26a85a941ec779c79b1b9))
+
 ## [0.3.0](https://github.com/firebolt-db/firebolt-instance-helm/compare/0.2.0...0.3.0) (2026-07-27)
 
 
