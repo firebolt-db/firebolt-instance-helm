@@ -1,6 +1,6 @@
 # firebolt-instance
 
-![Version: 0.3.0](https://img.shields.io/badge/Version-0.3.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: release-5.0.0-pre.0.20260815074041.524de236b514](https://img.shields.io/badge/AppVersion-release--5.0.0--pre.0.20260815074041.524de236b514-informational?style=flat-square)
+![Version: 0.3.1](https://img.shields.io/badge/Version-0.3.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: release-5.0.0-pre.0.20260815074041.524de236b514](https://img.shields.io/badge/AppVersion-release--5.0.0--pre.0.20260815074041.524de236b514-informational?style=flat-square)
 
 Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 
