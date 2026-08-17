@@ -7,39 +7,35 @@ metadata:
     {{- include "fbinstance.labels" . | nindent 4 }}
     firebolt/component: metadata-service
 data:
-  config.xml: |
-    <?xml version="1.0"?>
-    <config>
-      <pensieve_lite>
-        <default_account_id>{{ include "fbinstance.xmlEscape" .Values.customEngineConfig.instance.id }}</default_account_id>
-        <host>{{ include "fbinstance.xmlEscape" .Values.metadata.server.host }}</host>
-        <port>{{ .Values.metadata.server.port }}</port>
-        <server_threads>{{ .Values.metadata.server.threads }}</server_threads>
-        <log_level>{{ include "fbinstance.xmlEscape" .Values.metadata.server.log_level }}</log_level>
-        <metadata_storage>
-          <postgresql>
-            {{- if .Values.postgresql.local_enabled }}
-            <host>{{ include "fbinstance.fullname" . }}-metadata-pg</host>
-            {{- else }}
-            <host>{{ include "fbinstance.xmlEscape" .Values.postgresql.host }}</host>
-            {{- end }}
-            <port>{{ .Values.postgresql.port }}</port>
-            <database>{{ include "fbinstance.xmlEscape" .Values.postgresql.database }}</database>
-            <schema>{{ include "fbinstance.xmlEscape" .Values.postgresql.schema }}</schema>
-
-            <keepalive>
-              <enabled>{{ .Values.postgresql.keepalive.enabled }}</enabled>
-              <idle_sec>{{ .Values.postgresql.keepalive.idle_sec }}</idle_sec>
-              <interval_sec>{{ .Values.postgresql.keepalive.interval_sec }}</interval_sec>
-              <count>{{ .Values.postgresql.keepalive.count }}</count>
-            </keepalive>
-            <connect_timeout_sec>{{ .Values.postgresql.connect_timeout_sec }}</connect_timeout_sec>
-          </postgresql>
-          <garbage_collection>
-            <enabled>true</enabled>
-            <interval_seconds>3600</interval_seconds>
-            <max_age_seconds>86400</max_age_seconds>
-          </garbage_collection>
-        </metadata_storage>
-      </pensieve_lite>
-    </config>
+  # The metadata service loads YAML config only; the document root must be
+  # a map (a scalar/sequence root is rejected at startup). User-controlled
+  # strings are rendered as quoted scalars so they cannot inject YAML keys.
+  config.yaml: |
+    pensieve_lite:
+      default_account_id: {{ .Values.customEngineConfig.instance.id | quote }}
+      host: {{ .Values.metadata.server.host | quote }}
+      port: {{ .Values.metadata.server.port }}
+      server_threads: {{ .Values.metadata.server.threads }}
+      log_level: {{ .Values.metadata.server.log_level | quote }}
+      metadata_storage:
+        postgresql:
+          {{- if .Values.postgresql.local_enabled }}
+          host: {{ printf "%s-metadata-pg" (include "fbinstance.fullname" .) | quote }}
+          {{- else }}
+          host: {{ .Values.postgresql.host | quote }}
+          {{- end }}
+          port: {{ .Values.postgresql.port }}
+          database: {{ .Values.postgresql.database | quote }}
+          schema: {{ .Values.postgresql.schema | quote }}
+          keepalive:
+            enabled: {{ .Values.postgresql.keepalive.enabled }}
+            idle_sec: {{ .Values.postgresql.keepalive.idle_sec }}
+            interval_sec: {{ .Values.postgresql.keepalive.interval_sec }}
+            count: {{ .Values.postgresql.keepalive.count }}
+          connect_timeout_sec: {{ .Values.postgresql.connect_timeout_sec }}
+        garbage_collection:
+          enabled: true
+          # The server reads interval_ms / time_horizon_sec; other spellings
+          # are silently ignored and the built-in defaults take over.
+          interval_ms: 3600000
+          time_horizon_sec: 86400
