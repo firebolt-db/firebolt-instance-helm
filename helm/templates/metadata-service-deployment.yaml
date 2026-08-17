@@ -85,7 +85,7 @@ spec:
         - name: metadata-service
           image: "{{ .Values.metadata.image.repository }}:{{ default .Chart.AppVersion .Values.metadata.image.tag }}"
           imagePullPolicy: {{ .Values.metadata.image.pullPolicy }}
-          command: ["/dedicated-pensieve", "--config", "/configs/config.xml"]
+          command: ["/dedicated-pensieve", "--config", "/configs/config.yaml"]
           ports:
             - name: grpc
               containerPort: {{ .Values.metadata.server.port }}

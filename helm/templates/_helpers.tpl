@@ -375,17 +375,6 @@ Usage: {{ include "fbinstance.engineTlsDnsNames" . }}
 {{- end -}}
 
 {{/*
-XML element-text escape for user-controlled strings interpolated into the
-rendered metadata config.xml. Replaces the three element-content
-metacharacters; the `&` substitution MUST run first so its entity
-reference isn't re-escaped. Defense-in-depth alongside the
-values.schema.json patterns.
-*/}}
-{{- define "fbinstance.xmlEscape" -}}
-{{- . | replace "&" "&amp;" | replace "<" "&lt;" | replace ">" "&gt;" -}}
-{{- end -}}
-
-{{/*
 Memlock setup sidecar script — loaded from files/memlock-setup.sh
 */}}
 {{- define "fbinstance.memlockSetupScript" -}}
