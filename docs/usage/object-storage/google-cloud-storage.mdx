@@ -145,6 +145,24 @@ By default, external access also uses the engine pod's own Google identity. That
 
 An intermediary service account gives external access a stable identity instead. When you set one, the engine impersonates the intermediary service account for external access rather than using its own pod identity. Because the service account is stable and known ahead of time, you can share it with third parties and reference it in bucket IAM policies, including on Google Cloud projects outside your own organization. Access to the object storage bucket always uses the engine pod's own identity, so the intermediary service account applies only to external locations.
 
+A `gs://` location that carries `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (a Google Cloud Storage HMAC key) is the exception: the query authenticates with that key through the S3-compatible XML API, bypassing both the pod identity and the intermediary service account.
+
+Where nothing provides Application Default Credentials to the engine pods, a credential-less `gs://` read is sent unauthenticated and reaches publicly readable objects only, and writing needs an identity and fails. That is the case on a cluster outside Google Cloud, and on GKE without Workload Identity and without `GOOGLE_APPLICATION_CREDENTIALS`.
+
+The pod identity is whatever Application Default Credentials resolve to inside the engine container. Google's libraries look for them in a fixed order, and the first match wins:
+
+1. `GOOGLE_APPLICATION_CREDENTIALS`, if it is set. The file it names is used as given, whether that is a mounted service account key or a credential configuration file for Workload Identity Federation.
+2. `$HOME/.config/gcloud/application_default_credentials.json`, if that file exists. This is where `gcloud auth application-default login` writes, so it is normally present only on a workstation.
+3. The instance metadata server, which is what Workload Identity Federation for GKE provides.
+
+Step 2 takes precedence over step 3, so an engine whose `HOME` holds a `gcloud` login authenticates as that person instead of as the pod identity. To pin the source, set `GOOGLE_APPLICATION_CREDENTIALS` on the engine container, or set `HOME` to a directory that only the engine writes to. The engine logs the source it resolved once per process, as `Using Google Cloud identity from <source>`.
+
+You can also keep external access off the pod identity altogether, with `customEngineConfig.storage.gcp.allow_engine_identity: false`. A credential-less `gs://` read is then sent unauthenticated and reaches publicly readable objects only, and a write fails with an error that asks for credentials, so an external `gs://` location needs either an HMAC key or an intermediary service account. The chart renders `true` for the engines it installs, because the pod identity belongs to this chart release and is your own; the engine itself refuses that identity until a deployment permits it, because it cannot tell whose identity it runs as. When an intermediary service account is set, that account is the principal, so the setting has no effect.
+
+Because a credential-less external location runs as the engine pod's identity, plan the identity's bucket access as the boundary. The engine rejects a credential-less URL that names the bucket in `managed_table_bucket_name`, so managed tablet data is not readable or writable that way. To use that bucket as an external location anyway, supply `CREDENTIALS` on the location: the query then authenticates as that principal rather than as the engine.
+
+Every other bucket the pod identity can reach stays reachable by URL. An inline `gs://` URL carries no location privileges, so any user who can run a query can read, overwrite, or delete objects in those buckets. Grant the pod identity object access only on the managed bucket, and set an intermediary service account for external data so the pod identity itself needs no access to it.
+
 Create the intermediary Google service account, grant the engine's identity `roles/iam.serviceAccountTokenCreator` on it, and grant the intermediary the permissions it needs to reach the external data.
 
 Set its ID under `customEngineConfig.storage.gcp.intermediary_service_account_id`:
@@ -158,7 +176,7 @@ customEngineConfig:
       intermediary_service_account_id: projects/my-project/serviceAccounts/firebolt-intermediary@my-project.iam.gserviceaccount.com
 ```
 
-The chart passes the `storage.gcp` block through unchanged. The block is valid only when `managed_table_storage` is `gcs`.
+The chart passes the `storage.gcp` block through unchanged, except for `allow_engine_identity`, which it renders as `true` unless you set it. The connection settings in the block apply to managed tables when `managed_table_storage` is `gcs`; `allow_engine_identity` governs external `gs://` locations, so it applies whatever backs managed tables.
 
 ## Storage scope
 

@@ -175,6 +175,10 @@ By default, external access also uses the engine pod's own AWS identity. That id
 
 An intermediary role gives external access a stable identity instead. When you set one, the engine assumes the intermediary role first, and then assumes the external role from there, rather than using its own pod identity. Because the intermediary role ARN is stable and known ahead of time, you can share it with third parties and reference it in S3 bucket policies, IAM role trust policies, and AWS accounts outside your own organization. Access to the object storage bucket always uses the engine pod's own identity, so the intermediary role applies only to external locations.
 
+Because a credential-less external location runs as the engine pod's identity, plan the identity's bucket access as the boundary. The engine rejects a credential-less URL that names the bucket in `managed_table_bucket_name`, so managed tablet data is not readable or writable that way. To use that bucket as an external location anyway, supply `CREDENTIALS` on the location: the query then authenticates as that principal rather than as the engine. Every other bucket the pod identity can reach stays reachable by URL, because an inline `s3://` URL carries no location privileges.
+
+The rejection does not apply when you set `default_s3_endpoint_override`, described under [Use an S3-compatible endpoint](#use-an-s3-compatible-endpoint). Managed storage and external locations then share one endpoint and one store, and reading the managed bucket by URL is part of that setup.
+
 Create the intermediary IAM role and grant the engine's identity permission to assume it. The intermediary role's trust policy must allow the engine ServiceAccount identity to assume it, and the role needs only `sts:AssumeRole` on the external roles it is allowed to reach.
 
 Set the intermediary role ARN under `customEngineConfig.storage.aws.intermediary_access_role`:
