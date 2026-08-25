@@ -4,10 +4,6 @@ description: Back Firebolt engines with a non-AWS S3-compatible object store (Ne
 sidebarTitle: S3-compatible
 ---
 
-<Warning>
-  **Breaking change.** Managed-table storage now uses `managed_table_storage` and `managed_table_bucket_name` with a per-cloud `storage.aws` / `gcp` / `azure` block. The former keys — `type`, `api_scheme`, `bucket_name`, and the `minio` / `azurite` types — are removed and are rejected by the engine at startup. This schema requires a recent engine image; keep the chart and engine on matching versions.
-</Warning>
-
 Besides Amazon S3, the engine can use any **S3-compatible** object store — for example [Nebius](https://nebius.com/) Object Storage, [CoreWeave](https://www.coreweave.com/) Object Storage, or a self-hosted [MinIO](https://min.io/). You point the engine at the store's endpoint and supply credentials through the engine container environment.
 
 ## How it differs from Amazon S3
@@ -68,6 +64,64 @@ customEngineConfig:
     aws:
       endpoint: https://<coreweave-object-storage-endpoint>
       path_style_addressing: false # CoreWeave supports virtual-hosted addressing only
+```
+
+## Tigris
+
+[Tigris](https://www.tigrisdata.com/) exposes a global S3 API endpoint at `https://t3.storage.dev` and supports path-style addressing (the default).
+
+Create a `Secret` from a Tigris access key:
+
+```bash
+kubectl -n firebolt create secret generic tigris-s3-credentials \
+  --from-literal=AWS_ACCESS_KEY_ID=<tigris-access-key-id> \
+  --from-literal=AWS_SECRET_ACCESS_KEY=<tigris-secret>
+```
+
+```yaml
+# my-values.yaml
+engineSpec:
+  extraEnvFrom:
+    - secretRef:
+        name: tigris-s3-credentials
+
+customEngineConfig:
+  storage:
+    managed_table_storage: s3
+    managed_table_bucket_name: my-firebolt-bucket
+    aws:
+      endpoint: https://t3.storage.dev
+      region: auto
+      path_style_addressing: true # non-AWS S3-compatible store; ignored for AWS S3
+```
+
+## Cloudflare R2
+
+[Cloudflare R2](https://developers.cloudflare.com/r2/) exposes an account-scoped S3 API endpoint at `https://<account-id>.r2.cloudflarestorage.com` and supports path-style addressing. R2 ignores the signing region, so set `region: auto`.
+
+Create a `Secret` from an R2 API token (S3 credentials):
+
+```bash
+kubectl -n firebolt create secret generic r2-s3-credentials \
+  --from-literal=AWS_ACCESS_KEY_ID=<r2-access-key-id> \
+  --from-literal=AWS_SECRET_ACCESS_KEY=<r2-secret>
+```
+
+```yaml
+# my-values.yaml
+engineSpec:
+  extraEnvFrom:
+    - secretRef:
+        name: r2-s3-credentials
+
+customEngineConfig:
+  storage:
+    managed_table_storage: s3
+    managed_table_bucket_name: my-firebolt-bucket
+    aws:
+      endpoint: https://<account-id>.r2.cloudflarestorage.com
+      region: auto
+      path_style_addressing: true
 ```
 
 ## Confirm that object storage works
