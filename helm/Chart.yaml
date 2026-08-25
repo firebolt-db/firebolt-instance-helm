@@ -12,4 +12,4 @@ sources:
   - "https://github.com/firebolt-db/firebolt-instance-helm"
 version: 0.3.1
 # Bumped by upstream image-release automation.
-appVersion: "release-5.0.0-pre.0.20260815074041.524de236b514"
+appVersion: "release-5.0.0-pre.0.20260822175432.75d37cc26c66"
