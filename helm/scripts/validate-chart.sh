@@ -85,6 +85,48 @@ else
 fi
 echo ""
 
+echo "Step 4: Verifying the telemetry toggle..."
+echo "-----------------------------------"
+# Default render: engine pulls through the Scarf gateway, no opt-out env.
+if grep -q 'image: "oci.firebolt.io/firebolt-db/engine:' "$TEMP_DIR/helm-template-output.yaml" \
+    && ! grep -q 'DO_NOT_TRACK' "$TEMP_DIR/helm-template-output.yaml"; then
+    echo "✓ Default render uses the Scarf gateway and injects no DO_NOT_TRACK"
+else
+    echo "✗ Default render: expected oci.firebolt.io engine image and no DO_NOT_TRACK"
+    exit 1
+fi
+
+# Placeholder satisfying the schema's non-empty postgresql.password
+# requirement during template rendering; not a credential.
+DUMMY_PG_ARGS=(--set "postgresql.password=validation-dummy") # legit:ignore-secrets
+
+# Opt-out render: engine pulls fall back to GHCR and every engine container
+# carries DO_NOT_TRACK=1.
+helm template firebolt-instance "$HELM_DIR/" \
+    "${DUMMY_PG_ARGS[@]}" \
+    --set telemetry.enabled=false > "$TEMP_DIR/helm-template-optout.yaml"
+if grep -q 'image: "ghcr.io/firebolt-db/engine:' "$TEMP_DIR/helm-template-optout.yaml" \
+    && ! grep -q 'image: "oci.firebolt.io/firebolt-db/engine:' "$TEMP_DIR/helm-template-optout.yaml" \
+    && grep -q 'DO_NOT_TRACK' "$TEMP_DIR/helm-template-optout.yaml"; then
+    echo "✓ telemetry.enabled=false falls back to GHCR and injects DO_NOT_TRACK=1"
+else
+    echo "✗ telemetry.enabled=false: expected ghcr.io engine image and DO_NOT_TRACK=1"
+    exit 1
+fi
+
+# Opt-out must never override an explicitly configured repository.
+helm template firebolt-instance "$HELM_DIR/" \
+    "${DUMMY_PG_ARGS[@]}" \
+    --set telemetry.enabled=false \
+    --set engineSpec.image.repository=registry.example.com/mirror/engine > "$TEMP_DIR/helm-template-custom-repo.yaml"
+if grep -q 'image: "registry.example.com/mirror/engine:' "$TEMP_DIR/helm-template-custom-repo.yaml"; then
+    echo "✓ telemetry.enabled=false preserves a user-supplied engine repository"
+else
+    echo "✗ telemetry.enabled=false rewrote a user-supplied engine repository"
+    exit 1
+fi
+echo ""
+
 echo "==================================="
 echo "✓ All validation checks passed!"
 echo "==================================="

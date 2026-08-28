@@ -636,6 +636,22 @@ engines:
 
 # @section -- Global
 
+# -- Anonymous usage telemetry.
+# @default -- {}
+telemetry:
+  # -- When true, each engine sends a once-daily anonymous aggregate usage
+  # event to Scarf (engine version, operating system, and architecture). The
+  # event contains no names, stable identifiers, query data, schemas, or
+  # configuration; the source IP is visible to Scarf for company inference
+  # but is not stored. Set false to disable: the chart stamps DO_NOT_TRACK=1
+  # on every engine container (a DO_NOT_TRACK entry in `engineSpec.extraEnv`
+  # still wins), and — when `engineSpec.image.repository` is still the
+  # default Scarf gateway — switches engine pulls to
+  # `ghcr.io/firebolt-db/engine`. A user-supplied repository is preserved.
+  # `customEngineConfig` with `telemetry.enabled: false` is the config-file
+  # equivalent for the runtime event only.
+  enabled: true
+
 # -- Custom engine configuration deep-merged into the rendered engine
 # config.yaml at the root. The rendered document follows the Firebolt
 # Core configuration schema (`schema_version: "1.0"`); user-supplied
