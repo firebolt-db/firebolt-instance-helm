@@ -85,6 +85,42 @@ else
 fi
 echo ""
 
+echo "Step 4: Validating customEngineConfig.instance.id schema..."
+echo "-----------------------------------"
+# Lowercase Crockford ULID: 26 chars, first char 0-7, no i/l/o/u.
+assert_instance_id() {
+    local id="$1"
+    local expect="$2"
+    if helm template firebolt-instance "$HELM_DIR/" \
+        --set postgresql.password="validation-dummy" \
+        --set customEngineConfig.instance.id="$id" \
+        >/dev/null 2>&1; then
+        if [ "$expect" = "accept" ]; then
+            echo "✓ instance.id $id accepted"
+        else
+            echo "✗ instance.id $id was accepted, expected reject"
+            exit 1
+        fi
+    else
+        if [ "$expect" = "reject" ]; then
+            echo "✓ instance.id $id rejected"
+        else
+            echo "✗ instance.id $id was rejected, expected accept"
+            helm template firebolt-instance "$HELM_DIR/" \
+                --set postgresql.password="validation-dummy" \
+                --set customEngineConfig.instance.id="$id" \
+                >/dev/null
+            exit 1
+        fi
+    fi
+}
+
+assert_instance_id "01kp98j0000000000000000000" accept
+assert_instance_id "01KP98J0000000000000000000" reject
+assert_instance_id "01kp98i0000000000000000000" reject
+assert_instance_id "01kp98j000000000000000000" reject
+echo ""
+
 echo "==================================="
 echo "✓ All validation checks passed!"
 echo "==================================="

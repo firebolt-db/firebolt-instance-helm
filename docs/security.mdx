@@ -25,7 +25,7 @@ When `engineSpec.memlockSetup: true` and `podSecurityContext.runAsNonRoot: true`
 
 ### Install-time validation
 
-The chart ships `helm/values.schema.json`. `helm install` and `helm upgrade` reject wrong types and pattern violations on selected known fields, including `postgresql.host`, `postgresql.database`, `postgresql.schema`, `customEngineConfig.instance.id`, and the engine name. The schema is intentionally permissive, so unknown value paths are not rejected. This is install-time validation, not an admission webhook. It runs only when the chart is being applied, not on subsequent edits to the rendered objects.
+The chart ships `helm/values.schema.json`. `helm install` and `helm upgrade` reject wrong types and pattern violations on selected known fields, including `postgresql.host`, `postgresql.database`, `postgresql.schema`, `customEngineConfig.instance.id`, and the engine name. `customEngineConfig.instance.id` must be a 26-character lowercase Crockford ULID (`^[0-7][0-9a-hjkmnp-tv-z]{25}$`). The schema is intentionally permissive, so unknown value paths are not rejected. This is install-time validation, not an admission webhook. It runs only when the chart is being applied, not on subsequent edits to the rendered objects.
 
 ## What the chart does not enforce
 
