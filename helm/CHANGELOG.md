@@ -12,6 +12,21 @@ chore(deps): bump amazon/aws-cli from 2.35.2 to 2.35.3 (#1)
 
 # Changelog
 
+## [0.4.0](https://github.com/firebolt-db/firebolt-instance-helm/compare/0.3.2...0.4.0) (2026-08-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **helm:** require lowercase instance.id ULIDs (FB-3520) ([#87](https://github.com/firebolt-db/firebolt-instance-helm/issues/87))
+* `customEngineConfig.instance.id` must now match `^[0-7][0-9a-hjkmnp-tv-z]{25}$`, a lowercase Crockford ULID. `values.schema.json` rejects uppercase and any character outside the Crockford alphabet, so `helm upgrade` with an unchanged uppercase id fails validation before anything is applied.
+* **Lowercase your existing id as part of this upgrade.** The chart passes `instance.id` straight through to the engine config and to the metadata service `default_account_id`. It does not rewrite case for you.
+* Requires an engine and metadata image that accept lowercase ids. This release's `appVersion` is `release-5.0.0-pre.0.20260828194119.d0f954993097`, which does. If you override the image, move it to that build in the same change. A lowercased id against an older metadata image fails account reconciliation at startup, and an uppercase id against this engine image fails YAML parse.
+* The shipped default `customEngineConfig.instance.id` is now `01kp98j0000000000000000000`.
+
+### Features
+
+* **helm:** require lowercase instance.id ULIDs (FB-3520) ([#87](https://github.com/firebolt-db/firebolt-instance-helm/issues/87)) ([74e592d](https://github.com/firebolt-db/firebolt-instance-helm/commit/74e592d6cdf4346a7b29f4c187e40e64afde357b))
+
 ## [0.3.2](https://github.com/firebolt-db/firebolt-instance-helm/compare/0.3.1...0.3.2) (2026-08-25)
 
 
