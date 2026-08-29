@@ -12,6 +12,17 @@ chore(deps): bump amazon/aws-cli from 2.35.2 to 2.35.3 (#1)
 
 # Changelog
 
+## [0.4.0](https://github.com/firebolt-db/firebolt-instance-helm/compare/0.3.2...0.4.0) (2026-08-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **helm:** require lowercase instance.id ULIDs (FB-3520) ([#87](https://github.com/firebolt-db/firebolt-instance-helm/issues/87))
+
+### Features
+
+* **helm:** require lowercase instance.id ULIDs (FB-3520) ([#87](https://github.com/firebolt-db/firebolt-instance-helm/issues/87)) ([74e592d](https://github.com/firebolt-db/firebolt-instance-helm/commit/74e592d6cdf4346a7b29f4c187e40e64afde357b))
+
 ## [0.3.2](https://github.com/firebolt-db/firebolt-instance-helm/compare/0.3.1...0.3.2) (2026-08-25)
 
 
