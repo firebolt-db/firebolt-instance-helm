@@ -85,6 +85,73 @@ else
 fi
 echo ""
 
+echo "Step 4: Validating customEngineConfig.instance.id schema..."
+echo "-----------------------------------"
+# Lowercase Crockford ULID: 26 chars, first char 0-7, no i/l/o/u.
+assert_instance_id() {
+    local id="$1"
+    local expect="$2"
+    if helm template firebolt-instance "$HELM_DIR/" \
+        --set postgresql.password="validation-dummy" \
+        --set customEngineConfig.instance.id="$id" \
+        >/dev/null 2>&1; then
+        if [ "$expect" = "accept" ]; then
+            echo "✓ instance.id $id accepted"
+        else
+            echo "✗ instance.id $id was accepted, expected reject"
+            exit 1
+        fi
+    else
+        if [ "$expect" = "reject" ]; then
+            echo "✓ instance.id $id rejected"
+        else
+            echo "✗ instance.id $id was rejected, expected accept"
+            helm template firebolt-instance "$HELM_DIR/" \
+                --set postgresql.password="validation-dummy" \
+                --set customEngineConfig.instance.id="$id" \
+                >/dev/null
+            exit 1
+        fi
+    fi
+}
+
+assert_instance_id "01kp98j0000000000000000000" accept
+assert_instance_id "01KP98J0000000000000000000" reject
+assert_instance_id "01kp98i0000000000000000000" reject
+assert_instance_id "01kp98j000000000000000000" reject
+assert_instance_id "81kp98j0000000000000000000" reject
+assert_instance_id "01kP98j0000000000000000000" reject
+echo ""
+
+echo "Step 5: Verifying instance.id reaches both consumers unchanged..."
+echo "-----------------------------------"
+# The chart must not rewrite case. The engine reads `instance.id` from its
+# rendered config.yaml, and the metadata service reads the same value as
+# pensieve_lite `default_account_id`. A `lower`/`upper` filter creeping into
+# _helpers.tpl would desync the two, or desync both from the account the
+# metadata service reconciles at startup. Use an id distinct from the shipped
+# default so a template that ignores the override is caught too.
+PASSTHROUGH_ID="01hzx3k7ab0cd9efgh2jmnpqrs"
+if ! helm template firebolt-instance "$HELM_DIR/" \
+    --set postgresql.password="validation-dummy" \
+    --set customEngineConfig.instance.id="$PASSTHROUGH_ID" \
+    > "$TEMP_DIR/passthrough.yaml"; then
+    echo "✗ Failed to render template with instance.id $PASSTHROUGH_ID"
+    exit 1
+fi
+
+# The engine config renders the value unquoted, the metadata configmap quoted,
+# so each pattern matches exactly one of the two consumers.
+for expected in "id: $PASSTHROUGH_ID" "default_account_id: \"$PASSTHROUGH_ID\""; do
+    if grep -qF -- "$expected" "$TEMP_DIR/passthrough.yaml"; then
+        echo "✓ rendered output carries $expected"
+    else
+        echo "✗ rendered output is missing $expected"
+        exit 1
+    fi
+done
+echo ""
+
 echo "==================================="
 echo "✓ All validation checks passed!"
 echo "==================================="

@@ -661,9 +661,11 @@ customEngineConfig:
   # chart only needs to set the ULID once.
   # @default -- {}
   instance:
-    # -- ULID for the Firebolt instance. Must match the account
-    # reconciled by the metadata service at startup.
-    id: "01KP98J0000000000000000000"
+    # -- Lowercase Crockford ULID for the Firebolt instance. Must
+    # match the account reconciled by the metadata service at
+    # startup. `values.schema.json` rejects uppercase and any
+    # character outside the Crockford alphabet.
+    id: "01kp98j0000000000000000000"
 
 # -- PodMonitor configuration for Prometheus metrics scraping.
 # Requires the Prometheus Operator CRDs to be installed.

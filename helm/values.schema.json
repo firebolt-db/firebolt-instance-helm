@@ -229,7 +229,7 @@
           "properties": {
             "id": {
               "type": "string",
-              "pattern": "^[0-9A-Z]{26}$"
+              "pattern": "^[0-7][0-9a-hjkmnp-tv-z]{25}$"
             }
           }
         }
