@@ -330,6 +330,8 @@ postgresql:
 # the upstream to `{engine}-service:3473` via dynamic forward proxy.
 # @default -- {}
 gateway:
+  # -- Total pod shutdown budget in seconds, including a 5s endpoint-propagation wait and explicit connection draining. Requests still active at the deadline can be interrupted.
+  terminationGracePeriodSeconds: 15
   # -- Set to true to deploy the Envoy gateway proxy.
   enabled: true
   # -- Number of gateway replicas.

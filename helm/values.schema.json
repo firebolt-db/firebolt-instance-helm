@@ -176,6 +176,10 @@
               ]
             }
           }
+        },
+        "terminationGracePeriodSeconds": {
+          "type": "integer",
+          "minimum": 10
         }
       }
     },

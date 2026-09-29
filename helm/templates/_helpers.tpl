@@ -366,6 +366,7 @@ Usage: {{ include "fbinstance.engineTlsDnsNames" . }}
 {{- range $engine := $root.Values.engines -}}
 {{-   $baseName := printf "%s-engine-%s" (include "fbinstance.fullname" $root) $engine.name -}}
 {{-   $svcName := printf "%s-hl" $baseName -}}
+{{-   $names = append $names (printf "%s-ready.%s.svc.cluster.local" $baseName $ns) -}}
 {{-   $names = append $names (printf "%s.%s.svc%s" $svcName $ns $root.Values.engineSpec.nodeHostSuffix) -}}
 {{-   range $i := until (int $engine.replicas) -}}
 {{-     $names = append $names (printf "%s-node-%d-0.%s.%s.svc%s" $baseName $i $svcName $ns $root.Values.engineSpec.nodeHostSuffix) -}}

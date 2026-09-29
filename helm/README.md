@@ -107,6 +107,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.service | object | {} | Gateway Service configuration. |
 | gateway.service.port | int | `80` | External service port proxied to `containerPort`. |
 | gateway.service.type | string | `"ClusterIP"` | Service type. One of `ClusterIP`, `LoadBalancer`, or `NodePort`. |
+| gateway.terminationGracePeriodSeconds | int | `15` | Total pod shutdown budget in seconds, including a 5s endpoint-propagation wait and explicit connection draining. Requests still active at the deadline can be interrupted. |
 | imagePullSecrets | list | `[]` | Registry credentials. Must be a pre-created docker-registry Secret in the deployment namespace. Leave empty if nodes have ambient registry access (e.g. node IAM role). |
 | metadata | object | {} | Metadata service configuration. |
 | metadata.deployment | object | {} | Deployment-level settings for the metadata service. |

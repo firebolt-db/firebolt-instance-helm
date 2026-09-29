@@ -12,6 +12,7 @@ data:
     static_resources:
       listeners:
         - name: listener
+          traffic_direction: INBOUND
           # per_connection_buffer_limit_bytes caps both downstream-receive
           # and upstream-send buffering on this listener AND is the budget
           # the router uses when deciding whether to BUFFER a request body
@@ -106,9 +107,9 @@ data:
                                 else
                                   handle:headers():replace(":path", path .. "?advanced_mode=true")
                                 end
-                                -- Route to the engine's headless Service so Envoy resolves
+                                -- Route to the engine's ready-only Service so Envoy resolves
                                 -- per-pod IPs and load-balances across them itself.
-                                handle:headers():replace(":authority", "{{ include "fbinstance.fullname" . }}-engine-" .. engine .. "-hl.{{ .Release.Namespace }}.svc.cluster.local:3473")
+                                handle:headers():replace(":authority", "{{ include "fbinstance.fullname" . }}-engine-" .. engine .. "-ready.{{ .Release.Namespace }}.svc.cluster.local:3473")
                               end
                       - name: envoy.filters.http.dynamic_forward_proxy
                         typed_config:
@@ -202,6 +203,14 @@ data:
                               route:
                                 cluster: admin_stats
                     http_filters:
+                      - name: envoy.filters.http.health_check
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+                          pass_through_mode: false
+                          headers:
+                            - name: ":path"
+                              string_match:
+                                exact: "/healthz"
                       - name: envoy.filters.http.router
                         typed_config:
                           "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -275,6 +284,13 @@ data:
               unhealthy_threshold: 1
               http_health_check:
                 path: /health/ready
+          # Authorities are already fully qualified; do not search infrastructure domains.
+          typed_dns_resolver_config:
+            name: envoy.network.dns_resolver.cares
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+              dns_resolver_options:
+                no_default_search_domain: true
           cluster_type:
             name: envoy.clusters.dynamic_forward_proxy
             typed_config:
