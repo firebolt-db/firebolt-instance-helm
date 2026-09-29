@@ -17,7 +17,9 @@
             "minLength": 1
           }
         },
-        "required": ["name"]
+        "required": [
+          "name"
+        ]
       }
     },
     "engineSpec": {
@@ -32,7 +34,11 @@
             },
             "pullPolicy": {
               "type": "string",
-              "enum": ["Always", "Never", "IfNotPresent"]
+              "enum": [
+                "Always",
+                "Never",
+                "IfNotPresent"
+              ]
             }
           }
         },
@@ -49,7 +55,11 @@
             },
             "pullPolicy": {
               "type": "string",
-              "enum": ["Always", "Never", "IfNotPresent"]
+              "enum": [
+                "Always",
+                "Never",
+                "IfNotPresent"
+              ]
             }
           }
         }
@@ -67,7 +77,11 @@
             },
             "pullPolicy": {
               "type": "string",
-              "enum": ["Always", "Never", "IfNotPresent"]
+              "enum": [
+                "Always",
+                "Never",
+                "IfNotPresent"
+              ]
             }
           }
         },
@@ -92,6 +106,9 @@
               "pattern": "^[A-Za-z]+$"
             }
           }
+        },
+        "restartToken": {
+          "type": "string"
         }
       }
     },
@@ -139,7 +156,11 @@
           "properties": {
             "pullPolicy": {
               "type": "string",
-              "enum": ["Always", "Never", "IfNotPresent"]
+              "enum": [
+                "Always",
+                "Never",
+                "IfNotPresent"
+              ]
             }
           }
         },
@@ -148,7 +169,11 @@
           "properties": {
             "type": {
               "type": "string",
-              "enum": ["ClusterIP", "LoadBalancer", "NodePort"]
+              "enum": [
+                "ClusterIP",
+                "LoadBalancer",
+                "NodePort"
+              ]
             }
           }
         }
@@ -218,7 +243,10 @@
             "minimum": 1
           }
         },
-        "required": ["name"]
+        "required": [
+          "name",
+          "replicas"
+        ]
       }
     },
     "customEngineConfig": {
@@ -263,7 +291,10 @@
       "properties": {
         "algorithm": {
           "type": "string",
-          "enum": ["RSA", "ECDSA"]
+          "enum": [
+            "RSA",
+            "ECDSA"
+          ]
         },
         "size": {
           "type": "integer",
@@ -284,7 +315,10 @@
             },
             "kind": {
               "type": "string",
-              "enum": ["Issuer", "ClusterIssuer"]
+              "enum": [
+                "Issuer",
+                "ClusterIssuer"
+              ]
             }
           }
         }
@@ -328,7 +362,9 @@
           "$ref": "#/definitions/certManagerSource"
         }
       },
-      "required": ["id"]
+      "required": [
+        "id"
+      ]
     }
   }
 }

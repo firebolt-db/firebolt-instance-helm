@@ -395,3 +395,8 @@ log()  { printf '\n\033[1;36m=== %s ===\033[0m\n' "$*"; }
 pass() { printf '\033[1;32mPASS:\033[0m %s\n' "$*"; }
 fail() { printf '\033[1;31mFAIL:\033[0m %s\n' "$*" >&2; exit 1; }
 {{- end }}
+
+{{/* One credential source for both the database and Metadata Service. */}}
+{{- define "fbinstance.postgresSecretName" -}}
+{{- .Values.postgresql.credentials.existingSecret | default (printf "%s-metadata-postgres-creds" (include "fbinstance.fullname" .)) -}}
+{{- end -}}

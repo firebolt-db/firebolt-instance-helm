@@ -68,7 +68,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engines[0].priorityClassName | string | `""` | Priority class name for engine pods. |
 | engines[0].replicas | int | `1` | Number of nodes in this engine group (one StatefulSet replica per node). |
 | engines[0].resources | object | `{"limits":{"memory":"4Gi"},"requests":{"cpu":"1","memory":"4Gi"}}` | Resource requests and limits for engine containers. Firebolt Core is memory-bound: more RAM directly improves cache hit rates and query throughput. CPU governs parallel query execution threads.  Typical sizing guidance:   Development / functional testing:  2 vCPU  /  8 Gi  (request)   Small production workload:         4 vCPU  / 32 Gi   Medium production workload:        8 vCPU  / 64 Gi   Large production workload:        16 vCPU  / 128 Gi  Storage I/O is also significant — use an SSD-backed StorageClass and size the PVC to hold your working dataset plus ~30 % headroom. |
-| engines[0].storage | object | `{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"100Gi"}}}` | PVC storage configuration for this engine. Falls back to `engineSpec.defaultStorage` if omitted. |
+| engines[0].storage | object | `{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"100Gi"}}}` | PVC storage configuration for this engine. Falls back to `engineSpec.defaultStorage` if omitted. Set `storageClassName` to select a class, or an empty string to disable dynamic provisioning. Existing claim templates cannot be resized or switched by a normal Helm upgrade. |
 | engines[0].tolerations | list | `[]` | Tolerations for engine pod scheduling. |
 | engines[0].topologySpreadConstraints | list | `[]` | Topology spread constraints for engine pod scheduling. Overrides `engineSpec.topologySpreadConstraints` for this engine when set. |
 | extraLabels | object | `{"firebolt/product":"core"}` | Extra labels applied to all resources and pods. |
@@ -134,6 +134,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | metadata.podTemplate.volumeMounts | list | `[]` | Extra volume mounts added to the metadata container, merged with the chart-managed mounts. |
 | metadata.podTemplate.volumes | list | `[]` | Extra volumes added to the metadata pod, merged with the chart-managed volumes. Mount them on the metadata container via `volumeMounts` below. |
 | metadata.resources | object | `{"limits":{"memory":"1Gi"},"requests":{"cpu":"100m","memory":"512Mi"}}` | Resource requests and limits for the metadata service container. The metadata service is a lightweight gRPC service; increase memory if you run many engines. |
+| metadata.restartToken | string | `""` | Change after rotating external database credentials to restart the Metadata Service, including offline/GitOps rendering. This does not change the database password itself. |
 | metadata.server | object | {} | gRPC server configuration for the metadata service. |
 | metadata.server.host | string | `"0.0.0.0"` | gRPC server listen address. |
 | metadata.server.log_level | string | `"information"` | Log level for the metadata service. |
@@ -145,7 +146,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | postgresql | object | {} | PostgreSQL configuration. When `local_enabled: true` the chart deploys a single-replica `postgres:16-alpine` StatefulSet. Set `local_enabled: false` and supply connection details for an external database. |
 | postgresql.connect_timeout_sec | int | `5` | Connection timeout in seconds. |
 | postgresql.credentials | object | {} | PostgreSQL credentials Secret configuration. |
-| postgresql.credentials.existingSecret | string | `""` | Reference an externally-managed Secret (e.g. via ESO). When set, the chart will not create its own Secret. Ignored when `postgresql.local_enabled` is true. |
+| postgresql.credentials.existingSecret | string | `""` | Reference an externally-managed Secret (e.g. via ESO). When set, the chart will not create its own Secret. Both bundled PostgreSQL and the Metadata Service use it. Require username/password keys, plus database for bundled PostgreSQL; username/database must match the corresponding postgresql values. Changing Secret data does not alter an already-initialized PostgreSQL role password. |
 | postgresql.credentials.mountPath | string | `"/secrets/postgres"` | Mount path for the credentials Secret inside the metadata service container. |
 | postgresql.database | string | `"firebolt_metadata"` | Database name. |
 | postgresql.host | string | `""` | PostgreSQL host. Auto-derived when `local_enabled` is true; must be set explicitly for external databases. |

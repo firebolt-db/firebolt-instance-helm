@@ -47,6 +47,7 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 
 - `Chart.yaml` — chart and app version, name, icon, sources. `version` is owned by release-please; `appVersion` is bumped by the upstream image-release automation (see project-specific rules in the root `AGENTS.md`).
 - `values.yaml` — configuration surface AND the source for the generated `README.md`. Annotate every value with `# --` for `helm-docs`.
+- `templates/_validation.tpl` — cross-field/name and chart-owned-field checks; online upgrade identity guard. `templates/validate.yaml` invokes these checks without rendering a resource.
 - `values.schema.json` — JSON Schema validating the value surface at `helm install`/`helm lint` time. Permissive by design (unknown keys pass); constrains only enums, ranges, and patterns. See "Adding a new value".
 - `values-dev.yaml` — committed overlay used by `make dev`: pins engine/metadata to the mutable `:dev` tag (instead of the chart's pinned `appVersion`) and points `customEngineConfig.storage` at the floci S3 emulator (so the dedicated-Pensieve managed-storage check is satisfied). The pinned `appVersion` stays the default for reproducible installs via plain `make install`.
 - `README.md` — **generated.** Do not hand-edit. Run `make docs` from the repo root.

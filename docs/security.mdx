@@ -122,3 +122,9 @@ When engine query-listener TLS is enabled (`tls.engine.enabled`), the gateway's 
 - [Monitoring](./monitoring): metrics surface and Prometheus Operator integration.
 - [Operator upgrade path](./operator-upgrade-path): when continuous admission, drift correction, and CR-status surfaces are required.
 - [`SECURITY.md`](https://github.com/firebolt-db/firebolt-instance-helm/blob/main/SECURITY.md): vulnerability reporting policy for this repository.
+
+## Render-time safeguards
+
+The chart rejects duplicate Engine names and signing key IDs, generated pod or Service names longer than 63 characters, and custom environment variables, volumes, mounts, or annotations that collide with chart-owned fields. Annotations under `checksum/` and `firebolt.io/` are reserved for rollout tracking. Contents of `envFrom` Secrets are not inspected at render time.
+
+Treat `customEngineConfig.instance.id` as installation identity. Online Helm upgrades reject changing an existing identity. Offline/GitOps rendering cannot inspect the installed ConfigMap, so your deployment process must preserve the value. Changing the ID is not an account migration procedure.
