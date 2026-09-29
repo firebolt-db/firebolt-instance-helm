@@ -33,6 +33,7 @@ spec:
   template:
     metadata:
       annotations:
+        firebolt.io/restart-token: {{ .Values.gateway.restartToken | quote }}
         checksum/config: {{ include (print $.Template.BasePath "/gateway-configmap.yaml") . | sha256sum }}
         {{- /*
         See the equivalent comment in engine-statefulset.yaml: these Secrets

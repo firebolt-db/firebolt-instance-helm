@@ -58,6 +58,7 @@ spec:
   template:
     metadata:
       annotations:
+        firebolt.io/restart-token: {{ $.Values.engineSpec.restartToken | quote }}
         # Roll this engine's pods when its own config.yaml changes. The
         # config hash is scoped to this engine so a change to one engine
         # doesn't restart the others.

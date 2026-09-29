@@ -86,3 +86,5 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 ## Known issues
 
 - Symptom: `make test` (i.e. `helm test --logs`) prints `Phase: Succeeded` for every suite and then exits 1 with `unable to get pod logs ... pods "<release>-test-<name>" not found`. Cause: a `helm.sh/hook-delete-policy` of `before-hook-creation,hook-succeeded` on the test pod tells helm to delete the pod the moment the hook succeeds, so by the time `helm test --logs` iterates the pods to fetch their logs they are already gone (helm/helm#8949). Resolution: test pods MUST set `helm.sh/hook-delete-policy: before-hook-creation` only — never include `hook-succeeded`. Stale pods are still cleaned up on the next `helm test` run by `before-hook-creation`, and `make test-cleanup` deletes them on demand.
+
+Auth/TLS Secret hashes are evaluated only during online Helm rendering. For offline/GitOps rendering, change the component restart token after new Secret material exists. `tests/test-tls.yaml` verifies every Engine node with the CA and optionally verifies the Gateway using `tls.gateway.verification`; it never disables certificate verification.

@@ -48,6 +48,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.podSecurityContext.fsGroupChangePolicy | string | `"OnRootMismatch"` | When to re-apply `fsGroup` ownership. `OnRootMismatch` skips the chown when already correct — much faster on large PVCs. |
 | engineSpec.podSecurityContext.runAsNonRoot | bool | `true` | Reject the pod if any container runs as UID 0. Also gates the chart's container-level `runAs*` defaults, memlock init, and the entrypoint UID check. |
 | engineSpec.readiness | bool | `true` | When true, a readiness probe is added to the core container. |
+| engineSpec.restartToken | string | `""` | Change after Secret rotation to restart Engines, including offline/GitOps rendering. Wait for replacement Secret material before upgrading. |
 | engineSpec.serviceAccount | string | `""` | ServiceAccount used by engine pods.  Empty (the default): the chart creates `<release>-engine` with `automountServiceAccountToken: false`, so a code-execution exploit in the engine container has no SA token to talk to the apiserver with. Engines do not call the Kubernetes API; the dedicated SA replaces the namespace `default` SA, which automounts a token and inherits any RoleBindings accumulated on `default` from unrelated installs.  Non-empty: the chart references the named SA verbatim and does NOT create one — bring your own (the documented IRSA / Pod Identity flow at docs/usage/object-storage/amazon-s3.mdx works this way). The chart cannot influence `automountServiceAccountToken` on a SA it does not own; set it explicitly in your SA manifest if you want the same hardening. |
 | engineSpec.storageHostPath | object | {} | Host path configuration used when `hostPathStorageEnabled` is true. |
 | engineSpec.storageHostPath.path | string | `"/var/lib/firebolt-core"` | Host path for engine data. |
@@ -104,6 +105,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.podTemplate.volumes | list | `[]` | Extra volumes added to the gateway pod, merged with the chart-managed volumes. Mount them on the Envoy container via `volumeMounts` below. |
 | gateway.replicas | int | `2` | Number of gateway replicas. |
 | gateway.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the Envoy container. |
+| gateway.restartToken | string | `""` | Change after certificate or trust-bundle rotation to restart the Gateway, including offline/GitOps rendering. |
 | gateway.service | object | {} | Gateway Service configuration. |
 | gateway.service.port | int | `80` | External service port proxied to `containerPort`. |
 | gateway.service.type | string | `"ClusterIP"` | Service type. One of `ClusterIP`, `LoadBalancer`, or `NodePort`. |
@@ -187,6 +189,9 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | tls.gateway.enabled | bool | `false` | Enable TLS on the gateway's client-facing listener. |
 | tls.gateway.existingSecret | object | {} | Existing `kubernetes.io/tls` Secret (`tls.crt` / `tls.key`). |
 | tls.gateway.existingSecret.secretRef | string | `""` | Secret name. |
+| tls.gateway.verification | object | {} | Optional verified Gateway TLS Helm test. Set serverName to a certificate SAN; caSecret is optional for publicly trusted certificates. |
+| tls.gateway.verification.caSecret | string | `""` | Optional Secret containing ca.crt for the Gateway verification hook. Only the CA key is projected. |
+| tls.gateway.verification.serverName | string | `""` | Hostname to verify while connecting to the in-cluster Gateway Service. Empty skips the Gateway verification hook; Engine TLS verification remains automatic. |
 | utilitiesImage | string | `"debian:stable-slim@sha256:5012d0517aa0075a7150a45aae67586641e898913b7af3b08228108565b5f90c"` | Image used for utility init/sidecar containers (e.g. the memlock-setup sidecar). Pinned to an immutable digest so a registry-side tag override cannot silently change what runs in production. Bump the digest together with the tag when upgrading. |
 
 ----------------------------------------------

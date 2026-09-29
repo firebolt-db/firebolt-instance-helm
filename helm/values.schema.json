@@ -62,6 +62,9 @@
               ]
             }
           }
+        },
+        "restartToken": {
+          "type": "string"
         }
       }
     },
@@ -180,6 +183,9 @@
         "terminationGracePeriodSeconds": {
           "type": "integer",
           "minimum": 10
+        },
+        "restartToken": {
+          "type": "string"
         }
       }
     },
@@ -344,6 +350,18 @@
         },
         "certManager": {
           "$ref": "#/definitions/certManagerSource"
+        },
+        "verification": {
+          "type": "object",
+          "properties": {
+            "serverName": {
+              "type": "string",
+              "pattern": "^([A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?)?$"
+            },
+            "caSecret": {
+              "type": "string"
+            }
+          }
         }
       }
     },

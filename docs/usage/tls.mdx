@@ -81,6 +81,49 @@ The engine's certificate's DNS names are derived automatically from every engine
 The issuer behind `tls.engine.certManager` must populate `ca.crt` in the Certificate's Secret, not just `tls.crt`/`tls.key`. CA and Vault issuers do this; a bare self-signed or ACME issuer may not. The chart's `tls-chain-setup` init container needs `ca.crt` to build the engine's own health-check trust bundle and fails the pod at startup if it's missing.
 </Note>
 
+### Renewal and restart procedure
+
+Secret updates do not independently trigger Helm upgrades. Engines load serving certificates at startup, and their full certificate chain is assembled by an init container. Treat certificate replacement and workload restart as separate steps:
+
+1. Renew or replace the certificate Secret, preserving its required keys and SANs. For cert-manager, wait for the replacement Certificate revision to be issued and its Secret to contain the new certificate. Merely observing an old `Ready=True` condition does not establish that renewal finished.
+2. For a same-CA Engine renewal, change `engineSpec.restartToken`. For a Gateway certificate or upstream trust change, change `gateway.restartToken`. Upgrade with the full deployment values and wait for every affected workload to finish rolling out.
+3. Run the verified TLS hooks described below and confirm the served certificate is the renewed certificate before its predecessor expires.
+
+Use a new arbitrary, non-secret token for each restart:
+
+```yaml
+engineSpec:
+  restartToken: certificate-renewal-2
+gateway:
+  restartToken: certificate-renewal-2
+```
+
+Online Helm rendering hashes the current auth/TLS Secrets as an additional restart trigger. It cannot hash a future Secret that cert-manager has not issued yet. Offline and GitOps rendering cannot read live Secrets at all; use the explicit restart tokens after issuance in either deployment mode. The chart does not install a reload controller.
+
+A CA change requires overlapping trust and coordinated restarts. Do not replace the only trusted CA and both leaf certificates in a single upgrade. The chart does not automatically stage trust bundles or gate traffic cutover. Plan a maintenance window, or manage a separately validated staged migration outside the chart.
+
+Enabling TLS on an existing plaintext release does not immediately close old plaintext listeners. During a rolling update, old Gateway pods can continue serving while replacement pods wait for certificates. Restrict external access during a security-posture change and verify that all old pods have terminated before restoring it. Engine TLS protocol changes also require a maintenance window because Engine and Gateway updates are independent.
+
+### Verify certificate trust
+
+When Engine TLS is enabled, `helm test` checks the CA chain and hostname of every Engine node without disabling certificate verification. To verify the Gateway as well, supply a certificate SAN as `serverName`. The test connects to the internal Service while verifying that hostname. For a private CA, supply a Secret containing `ca.crt`:
+
+```yaml
+tls:
+  gateway:
+    verification:
+      serverName: firebolt.example.com
+      caSecret: gateway-test-ca
+```
+
+Run all chart hooks after the rollout:
+
+```bash
+helm test firebolt --namespace firebolt --logs
+```
+
+An empty Gateway `serverName` skips its verified handshake test. Existing readiness and SQL hooks test functionality and do not establish Gateway certificate trust. The verified TLS hook projects only CA material and never mounts signing keys or TLS private keys.
+
 ### Caveats
 
 - The `core-ui` sidecar (`engineSpec.uiSidecar`) follows `tls.engine.enabled` automatically, proxying to the engine over HTTPS without verifying its certificate — the connection is over loopback within the pod, so this doesn't need a trusted CA.

@@ -125,5 +125,38 @@ class ConfigurationTests(unittest.TestCase):
                 self.assertIn(message, render(values, expect_error=True))
 
 
+class CertificateLifecycleTests(unittest.TestCase):
+    def test_restart_tokens_are_component_scoped(self):
+        baseline = render()
+        def pod(docs, kind, name):
+            return resource(docs, kind, name)["spec"]["template"]
+        cases = [("engineSpec", "StatefulSet", "audit-engine-default-node-0"),
+                 ("gateway", "Deployment", "audit-gateway"),
+                 ("metadata", "Deployment", "audit-metadata-service")]
+        for component, kind, name in cases:
+            docs = render({component: {"restartToken": "rotation-2"}})
+            self.assertNotEqual(pod(baseline, kind, name), pod(docs, kind, name))
+            for other, other_kind, other_name in cases:
+                if other != component:
+                    self.assertEqual(pod(baseline, other_kind, other_name), pod(docs, other_kind, other_name))
+
+    def test_tls_hook_verifies_hosts_and_projects_only_ca_keys(self):
+        values = {"tls": {
+            "engine": {"enabled": True, "existingSecret": {"secretRef": "engine-tls"}},
+            "gateway": {"enabled": True, "existingSecret": {"secretRef": "gateway-tls"},
+                        "verification": {"serverName": "firebolt.example.com", "caSecret": "gateway-ca"}},
+        }}
+        hook = resource(render(values), "Pod", "audit-test-tls")["spec"]
+        script = hook["containers"][0]["command"][-1]
+        self.assertNotIn(" -k", script)
+        self.assertNotIn("--insecure", script)
+        self.assertIn("--cacert /trust/engine/ca.crt", script)
+        self.assertIn("--connect-to", script)
+        self.assertIn("firebolt.example.com", script)
+        for volume in hook["volumes"]:
+            self.assertEqual(volume["secret"]["items"], [{"key": "ca.crt", "path": "ca.crt"}])
+        self.assertFalse(any(d["metadata"]["name"] == "audit-test-tls" for d in render()))
+
+
 if __name__ == "__main__":
     unittest.main()
