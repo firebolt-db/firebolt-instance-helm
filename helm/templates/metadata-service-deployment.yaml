@@ -23,6 +23,9 @@ spec:
       annotations:
         checksum/config: {{ (include (print $.Template.BasePath "/metadata-service-configmap.yaml") . | fromYaml).data | toYaml | sha256sum }}
         checksum/secret: {{ toYaml .Values.postgresql | sha256sum }}
+        {{- if .Values.postgresql.tls.enabled }}
+        checksum/postgres-ca-version: {{ (lookup "v1" "Secret" .Release.Namespace .Values.postgresql.tls.caSecret).metadata | default dict | dig "resourceVersion" "" | sha256sum }}
+        {{- end }}
         firebolt.io/restart-token: {{ .Values.metadata.restartToken | quote }}
         {{- if .Values.postgresql.credentials.existingSecret }}
         checksum/credentials-version: {{ (lookup "v1" "Secret" .Release.Namespace $pgSecretName).metadata | default dict | dig "resourceVersion" "" | sha256sum }}
@@ -114,6 +117,11 @@ spec:
             - name: postgres-creds
               mountPath: {{ .Values.postgresql.credentials.mountPath }}
               readOnly: true
+            {{- if .Values.postgresql.tls.enabled }}
+            - name: postgres-ca
+              mountPath: /secrets/postgres-ca
+              readOnly: true
+            {{- end }}
             # Scratch space outside the read-only root filesystem.
             - name: tmp
               mountPath: /tmp
@@ -143,6 +151,12 @@ spec:
               value: {{ .Values.postgresql.credentials.mountPath }}/username
             - name: POSTGRES_PASSWORD_FILE
               value: {{ .Values.postgresql.credentials.mountPath }}/password
+            {{- if .Values.postgresql.tls.enabled }}
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /secrets/postgres-ca/ca.crt
+            {{- end }}
           {{- with .Values.metadata.podTemplate.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -160,6 +174,14 @@ spec:
         - name: postgres-creds
           secret:
             secretName: {{ $pgSecretName }}
+        {{- if .Values.postgresql.tls.enabled }}
+        - name: postgres-ca
+          secret:
+            secretName: {{ .Values.postgresql.tls.caSecret }}
+            items:
+              - key: {{ .Values.postgresql.tls.caKey }}
+                path: ca.crt
+        {{- end }}
         - name: tmp
           emptyDir: {}
         {{- with .Values.metadata.podTemplate.volumes }}

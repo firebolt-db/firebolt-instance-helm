@@ -1,10 +1,11 @@
 """Run the chart's Envoy retry policy against a deliberately disconnecting backend.
 
 Requires Docker, Helm, and PyYAML. Only the created test container is removed.
-The fixture substitutes the upstream address and removes routing/discovery filters;
+The fixture substitutes the upstream address and removes the discovery filter;
 the chart's route and retry policy are exercised unmodified.
 """
 import http.client
+from urllib.parse import urlsplit
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,7 +22,8 @@ from test_render import envoy_config, render, resource
 
 class RetryRuntimeTests(unittest.TestCase):
     def test_delivered_reset_is_not_replayed_but_drained_response_is(self):
-        calls = {"/reset": 0, "/drained": 0, "/hold": 0}
+        calls = {"/reset": 0, "/drained": 0, "/hold": 0, "/echo": 0}
+        observed = []
         accepted = threading.Event()
         release = threading.Event()
 
@@ -31,15 +33,17 @@ class RetryRuntimeTests(unittest.TestCase):
 
             def do_POST(self):
                 self.rfile.read(int(self.headers.get("Content-Length", 0)))
-                calls[self.path] += 1
-                if self.path == "/reset":
+                observed.append((self.path, self.headers.get("Host")))
+                path = urlsplit(self.path).path
+                calls[path] += 1
+                if path == "/reset":
                     # The mutation has happened. Close before response headers.
                     self.close_connection = True
                     return
-                if self.path == "/hold":
+                if path == "/hold":
                     accepted.set()
                     release.wait(15)
-                drained = self.path == "/drained" and calls[self.path] == 1
+                drained = path == "/drained" and calls[path] == 1
                 self.send_response(503 if drained else 200)
                 if drained:
                     self.send_header("X-Firebolt-Drained", "true")
@@ -52,7 +56,7 @@ class RetryRuntimeTests(unittest.TestCase):
         listener = config["static_resources"]["listeners"][0]
         hcm = listener["filter_chains"][0]["filters"][0]["typed_config"]
         hcm["http_filters"] = [f for f in hcm["http_filters"] if f["name"] in {
-            "envoy.filters.http.health_check", "envoy.filters.http.router",
+            "envoy.filters.http.health_check", "envoy.filters.http.router", "envoy.filters.http.lua",
         }]
         admin_cluster = config["static_resources"]["clusters"][-1]
         config["static_resources"]["clusters"] = [{
@@ -82,10 +86,10 @@ class RetryRuntimeTests(unittest.TestCase):
 
                 metrics_port = int(subprocess.check_output(["docker", "port", container, "9090/tcp"], text=True).strip().rsplit(":", 1)[1])
 
-                def request(method, path, body=None, target_port=None):
+                def request(method, path, body=None, target_port=None, headers=None):
                     conn = http.client.HTTPConnection("127.0.0.1", target_port or port, timeout=20)
                     try:
-                        conn.request(method, path, body=body)
+                        conn.request(method, path, body=body, headers={"X-Firebolt-Engine": "default"} if headers is None else headers)
                         response = conn.getresponse()
                         response.read()
                         return response.status
@@ -106,6 +110,18 @@ class RetryRuntimeTests(unittest.TestCase):
                 self.assertEqual(calls["/reset"], 1, subprocess.check_output(["docker", "logs", container], text=True, stderr=subprocess.STDOUT))
                 self.assertEqual(request("POST", "/drained", "mutation"), 200)
                 self.assertEqual(calls["/drained"], 2, "the pre-work fence should be retried")
+                for path, headers, expected in [
+                    ("/echo?engine=default&x=hello%20there", {}, 200),
+                    ("/echo?%65ngine=def%61ult", {}, 200),
+                    ("/echo?engine=other", {"X-Firebolt-Engine": "default"}, 400),
+                    ("/echo?engine=default&engine=default", {}, 400),
+                    ("/echo?engine=bad%2Fname", {}, 400),
+                    ("/echo?engine=%ZZ", {}, 400),
+                    ("/echo", {}, 400),
+                ]:
+                    self.assertEqual(request("POST", path, "query", headers=headers), expected, path)
+                self.assertIn(("/echo?x=hello%20there&advanced_mode=true", "audit-engine-default-ready.audit.svc.cluster.local:3473"), observed)
+                self.assertEqual(calls["/echo"], 2, "invalid selectors must not reach upstream")
                 # Run the actual chart preStop while a request is active. It must
                 # retain the connection, close query admission, and leave probes up.
                 with ThreadPoolExecutor(max_workers=1) as pool:

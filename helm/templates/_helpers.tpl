@@ -60,18 +60,6 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
-Engine ServiceAccount name. Empty `engineSpec.serviceAccount` ->
-`<fullname>-engine` (chart-managed; the SA template renders it).
-Non-empty `engineSpec.serviceAccount` -> verbatim, and the chart does
-not render a SA manifest (bring your own — IRSA / Pod Identity flow).
-Both the SA template and the engine StatefulSet podSpec MUST resolve
-the name through this helper so a single value drives both sides.
-*/}}
-{{- define "fbinstance.engineServiceAccountName" -}}
-{{- default (printf "%s-engine" (include "fbinstance.fullname" .)) .Values.engineSpec.serviceAccount -}}
-{{- end -}}
-
-{{/*
 Engine Service ports. Only externally-meaningful endpoints are declared:
 http-query (SQL), health (probe / Envoy active health check), metrics
 (Prometheus scrape), and optionally web-ui (sidecar). The intra-engine
@@ -159,13 +147,14 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
 {{- define "fbinstance.engineConfig" -}}
 {{- $root := .root -}}
 {{- $engine := .engine -}}
+{{- $effective := include "fbinstance.effectiveEngine" . | fromYaml -}}
 {{- $baseName := printf "%s-engine-%s" (include "fbinstance.fullname" $root) $engine.name -}}
 {{- $svcName := printf "%s-hl" $baseName -}}
 {{- $ns := $root.Release.Namespace -}}
 {{- $pensieveSvc := printf "%s-metadata-service" (include "fbinstance.fullname" $root) -}}
 {{- $nodes := list -}}
 {{- range $i := until (int $engine.replicas) -}}
-{{-   $fqdn := printf "%s-node-%d-0.%s.%s.svc%s" $baseName $i $svcName $ns $root.Values.engineSpec.nodeHostSuffix -}}
+{{-   $fqdn := printf "%s-node-%d-0.%s.%s.svc%s" $baseName $i $svcName $ns $effective.nodeHostSuffix -}}
 {{-   $nodes = append $nodes (dict "host" $fqdn) -}}
 {{- end -}}
 {{- $metadataEndpoint := printf "%s.%s.svc.cluster.local:%d" $pensieveSvc $ns (int $root.Values.metadata.server.port) -}}
@@ -175,11 +164,16 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
   the kubelet escalates to SIGKILL, floored at 1s. A single clamp keeps the
   budget monotonic non-decreasing in the grace period.
 */}}
-{{- $gracePeriod := int $root.Values.engineSpec.terminationGracePeriodSeconds -}}
+{{- $gracePeriod := int $effective.terminationGracePeriodSeconds -}}
 {{- $shutdownWait := sub $gracePeriod 5 -}}
 {{- if lt $shutdownWait 1 -}}{{- $shutdownWait = 1 -}}{{- end -}}
 
 {{- $user := deepCopy (default (dict) $root.Values.customEngineConfig) -}}
+{{- $overlay := deepCopy ($engine.customEngineConfig | default dict) -}}
+{{- if and (hasKey $overlay "instance") (kindIs "map" $overlay.instance) -}}
+  {{- $_ := unset $overlay.instance "id" -}}
+{{- end -}}
+{{- $user = mergeOverwrite $user $overlay -}}
 {{- $_ := unset $user "schema_version" -}}
 {{/*
   When user.engine / user.instance is not a map (string, number, list…) drop
@@ -364,12 +358,13 @@ Usage: {{ include "fbinstance.engineTlsDnsNames" . }}
 {{- $ns := $root.Release.Namespace -}}
 {{- $names := list "localhost" -}}
 {{- range $engine := $root.Values.engines -}}
+{{-   $effective := include "fbinstance.effectiveEngine" (dict "root" $root "engine" $engine) | fromYaml -}}
 {{-   $baseName := printf "%s-engine-%s" (include "fbinstance.fullname" $root) $engine.name -}}
 {{-   $svcName := printf "%s-hl" $baseName -}}
 {{-   $names = append $names (printf "%s-ready.%s.svc.cluster.local" $baseName $ns) -}}
-{{-   $names = append $names (printf "%s.%s.svc%s" $svcName $ns $root.Values.engineSpec.nodeHostSuffix) -}}
+{{-   $names = append $names (printf "%s.%s.svc%s" $svcName $ns $effective.nodeHostSuffix) -}}
 {{-   range $i := until (int $engine.replicas) -}}
-{{-     $names = append $names (printf "%s-node-%d-0.%s.%s.svc%s" $baseName $i $svcName $ns $root.Values.engineSpec.nodeHostSuffix) -}}
+{{-     $names = append $names (printf "%s-node-%d-0.%s.%s.svc%s" $baseName $i $svcName $ns $effective.nodeHostSuffix) -}}
 {{-   end -}}
 {{- end -}}
 {{- toYaml $names -}}
@@ -400,4 +395,22 @@ fail() { printf '\033[1;31mFAIL:\033[0m %s\n' "$*" >&2; exit 1; }
 {{/* One credential source for both the database and Metadata Service. */}}
 {{- define "fbinstance.postgresSecretName" -}}
 {{- .Values.postgresql.credentials.existingSecret | default (printf "%s-metadata-postgres-creds" (include "fbinstance.fullname" .)) -}}
+{{- end -}}
+
+{{/* Images and PVC specs inherit individual fields; other explicit engine keys replace defaults, including empty maps/lists and false. */}}
+{{- define "fbinstance.effectiveEngine" -}}
+{{- $out := deepCopy .root.Values.engineSpec -}}
+{{- range $key, $value := .engine -}}
+  {{- if and (has $key (list "image" "uiSidecarImage")) (kindIs "map" $value) -}}
+    {{- $_ := set $out $key (mergeOverwrite (deepCopy (index $out $key | default dict)) $value) -}}
+  {{- else -}}
+    {{- $_ := set $out $key (deepCopy $value) -}}
+  {{- end -}}
+{{- end -}}
+{{- $_ := set $out "storage" (mergeOverwrite (deepCopy .root.Values.engineSpec.defaultStorage) (.engine.storage | default dict)) -}}
+{{- if $out.hostPathStorageEnabled -}}
+  {{- if eq $out.storageType "emptyDir" -}}{{- fail "hostPathStorageEnabled and storageType=emptyDir are mutually exclusive" -}}{{- end -}}
+  {{- $_ := set $out "storageType" "hostPath" -}}
+{{- end -}}
+{{- toYaml $out -}}
 {{- end -}}
