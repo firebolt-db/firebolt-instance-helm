@@ -119,7 +119,7 @@ Enabling TLS on an existing plaintext release does not immediately close old pla
 
 ### Verify certificate trust
 
-When Engine TLS is enabled, `helm test` checks the CA chain and hostname of every Engine node without disabling certificate verification. To verify the Gateway as well, supply a certificate SAN as `serverName`. The test connects to the internal Service while verifying that hostname. For a private CA, supply a Secret containing `ca.crt`:
+When Engine TLS is enabled, `helm test` checks each Engine node against its node hostname and, when the Gateway is enabled, its ready-only serving hostname. These checks never disable certificate verification. To verify the Gateway as well, supply a certificate SAN as `serverName`. The test connects to the internal Service while verifying that hostname. For a private CA, supply a Secret containing `ca.crt`:
 
 ```yaml
 tls:

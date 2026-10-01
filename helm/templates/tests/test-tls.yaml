@@ -60,6 +60,15 @@ spec:
           curl --fail --silent --show-error --max-time 30 \
             --cacert /trust/engine/ca.crt "https://$HOST:3473/health/ready"
           pass "Engine TLS verified: $HOST"
+          {{- if $.Values.gateway.enabled }}
+          # Check the Gateway's serving identity against every node, not just
+          # the node identity. Old certificates may cover only the latter.
+          SERVING="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-ready.{{ $.Release.Namespace }}.svc.cluster.local"
+          curl --fail --silent --show-error --max-time 30 \
+            --cacert /trust/engine/ca.crt \
+            --connect-to "$SERVING:3473:$HOST:3473" "https://$SERVING:3473/health/ready"
+          pass "Engine serving identity verified: $SERVING on $HOST"
+          {{- end }}
           {{- end }}
           {{- end }}
           {{- end }}
