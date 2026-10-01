@@ -15,8 +15,21 @@
   {{- end -}}
   {{- $_ := set $seen .name true -}}
 {{- end -}}
+{{- $mountPaths := dict -}}
 {{- range .mounts -}}
-  {{- if or (has .name $.reservedVolumes) (hasPrefix "auth-signing-" .name) (has .mountPath $.reservedPaths) -}}
+  {{- $path := clean .mountPath -}}
+  {{- if hasKey $mountPaths $path -}}
+    {{- fail (printf "%s: duplicate volume mount path: %s" $context $path) -}}
+  {{- end -}}
+  {{- $_ := set $mountPaths $path true -}}
+  {{- $collision := or (has .name $.reservedVolumes) (hasPrefix "auth-signing-" .name) -}}
+  {{- range $reserved := $.reservedPaths -}}
+    {{- $reserved = clean $reserved -}}
+    {{- if or (eq $path $reserved) (and (ne $reserved "/") (or (hasPrefix (printf "%s/" $reserved) $path) (hasPrefix (printf "%s/" $path) $reserved))) -}}
+      {{- $collision = true -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if $collision -}}
     {{- fail (printf "%s: volume mount collides with a chart-owned mount: %s" $context .mountPath) -}}
   {{- end -}}
 {{- end -}}
