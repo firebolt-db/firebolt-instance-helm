@@ -109,6 +109,20 @@ class ConfigurationTests(unittest.TestCase):
         self.assertNotEqual(baseline, restarted)
         self.assertEqual(baseline["checksum/config"], restarted["checksum/config"])
 
+    def test_mounts_cannot_shadow_owned_paths_or_duplicate_destinations(self):
+        for path in ("/secrets/auth/admin", "/var", "/var/lib/firebolt/../firebolt", "/etc/envoy/tls/gateway"):
+            component = "gateway" if path.startswith("/etc/envoy") else "engineSpec"
+            extras = {"customVolumes": [{"name": "custom", "emptyDir": {}}],
+                      "customVolumeMounts": [{"name": "custom", "mountPath": path}]}
+            values = {component: extras} if component == "engineSpec" else {
+                component: {"podTemplate": {"volumes": extras["customVolumes"], "volumeMounts": extras["customVolumeMounts"]}}}
+            self.assertIn("chart-owned mount", render(values, expect_error=True))
+        self.assertIn("duplicate volume mount", render({"engineSpec": {
+            "customVolumeMounts": [{"name": "custom", "mountPath": "/custom"},
+                                   {"name": "other", "mountPath": "/custom/"}]}}, expect_error=True))
+        render({"engineSpec": {"customVolumes": [{"name": "custom", "emptyDir": {}}],
+                             "customVolumeMounts": [{"name": "custom", "mountPath": "/custom"}]}})
+
     def test_reject_invalid_combinations(self):
         cases = [
             ({"engines": [{"name": "same", "replicas": 1}] * 2}, "duplicate engine"),
