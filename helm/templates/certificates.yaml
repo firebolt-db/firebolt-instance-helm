@@ -84,8 +84,9 @@ spec:
     size: {{ $key.certManager.size | default 2048 }}
     # Signing keys must never be silently rotated by cert-manager's renewal timer — a
     # rotated key that vanishes from the active `signing_keys[0]` slot invalidates every
-    # token signed under it. Rotation is a deliberate chart-value change (prepend a new
-    # signingKeys entry), not a cert-manager renewal.
+    # token signed under it. Rotate through separate chart upgrades: append a verifier,
+    # complete every Engine rollout, promote it to signer, then retire the old key
+    # only after its tokens expire. Certificate renewal must preserve the key.
     rotationPolicy: Never
   issuerRef:
     name: {{ $key.certManager.issuerRef.name }}
