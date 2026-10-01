@@ -2,3 +2,7 @@ value_67A867BC754C44390E7B54969C75EEE8 # Example Kubernetes Secret name "firebol
 value_8FAFF5AF6AA62BB96EAF8C4A1C3ED99F # Example Kubernetes Secret name "firebolt-signing-key-2026-01" in docs/usage/authentication.mdx — a resource reference, not a credential value.
 value_0BAC68E67DA5B3BED13A4A58E76B535A # Dummy postgresql.password used by helm/scripts/validate-chart.sh to satisfy the values schema during template rendering — not a credential.
 value_01kp98j0000000000000000000 # Dummy customEngineConfig.instance.id (lowercase Crockford ULID placeholder in values.yaml / helm-docs / schema tests) — not a credential.
+
+# Historical documentation examples: public rollout markers, never credentials.
+instance_D0360DAADFA20D225333000C4486F464 # docs/usage/tls.mdx:96 in afafe63
+instance_84F2094DD13F984A9CD7224F6E08C27E # docs/usage/tls.mdx:98 in afafe63
