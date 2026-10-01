@@ -155,7 +155,7 @@ class CertificateLifecycleTests(unittest.TestCase):
                     self.assertEqual(pod(baseline, other_kind, other_name), pod(docs, other_kind, other_name))
 
     def test_tls_hook_verifies_hosts_and_projects_only_ca_keys(self):
-        values = {"tls": {
+        values = {"engines": [{"name": "default", "replicas": 2}], "tls": {
             "engine": {"enabled": True, "existingSecret": {"secretRef": "engine-tls"}},
             "gateway": {"enabled": True, "existingSecret": {"secretRef": "gateway-tls"},
                         "verification": {"serverName": "firebolt.example.com", "caSecret": "gateway-ca"}},
@@ -165,11 +165,16 @@ class CertificateLifecycleTests(unittest.TestCase):
         self.assertNotIn(" -k", script)
         self.assertNotIn("--insecure", script)
         self.assertIn("--cacert /trust/engine/ca.crt", script)
+        self.assertEqual(script.count('--connect-to "$SERVING:3473:$HOST:3473"'), 2)
+        self.assertIn("audit-engine-default-ready.audit.svc.cluster.local", script)
         self.assertIn("--connect-to", script)
         self.assertIn("firebolt.example.com", script)
         for volume in hook["volumes"]:
             self.assertEqual(volume["secret"]["items"], [{"key": "ca.crt", "path": "ca.crt"}])
         self.assertFalse(any(d["metadata"]["name"] == "audit-test-tls" for d in render()))
+        values["gateway"] = {"enabled": False}
+        direct = resource(render(values), "Pod", "audit-test-tls")["spec"]["containers"][0]["command"][-1]
+        self.assertNotIn("SERVING=", direct)
 
 
 class EngineOptionsTests(unittest.TestCase):
