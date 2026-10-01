@@ -89,7 +89,7 @@ When `postgresql.credentials.existingSecret` is empty, the chart generates a Sec
 - The Metadata Service Deployment loads the credentials by mounting the Secret at `postgresql.credentials.mountPath`.
 - When `postgresql.local_enabled: true`, the bundled PostgreSQL StatefulSet also reads this generated Secret.
 
-To use a Secret you create yourself, use an external PostgreSQL database and set `postgresql.local_enabled: false` with `postgresql.credentials.existingSecret`.
+For either bundled or external PostgreSQL, set `postgresql.credentials.existingSecret` to use a Secret you create yourself. The bundled database requires `username`, `password`, and `database` keys, with username and database matching the chart values. Updating the Secret does not change credentials inside an already-initialized database.
 
 ### External PostgreSQL
 
