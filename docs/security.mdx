@@ -105,9 +105,9 @@ Object-storage credentials for engines are not represented as Helm values. The c
 
 The chart never sees those cloud provider credentials. For an S3-compatible endpoint (`managed_table_storage: s3` with `aws.endpoint`), the engine authenticates with the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` you inject via `engineSpec.extraEnv` (from a Secret in production); see [S3-compatible storage](./usage/object-storage/s3-compatible).
 
-### TLS to PostgreSQL is not exposed
+### TLS to external PostgreSQL
 
-The chart does not currently expose `sslmode` or a CA-bundle mount for the Metadata Service's PostgreSQL connection. Encrypt the PostgreSQL connection at the network layer (VPC peering, sidecar TLS proxy, or service-mesh mTLS) until the chart grows native support.
+Set `postgresql.tls.enabled: true` and `postgresql.tls.caSecret` to require certificate-chain and hostname verification (`verify-full`). The CA bundle key defaults to `ca.crt` and can be changed with `postgresql.tls.caKey`. The certificate must cover `postgresql.host`. The bundled database does not provide a TLS listener. See [External PostgreSQL](./usage/external-postgres) for setup and CA rotation.
 
 ### Authentication and TLS
 

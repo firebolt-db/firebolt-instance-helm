@@ -83,12 +83,11 @@ engineSpec:
   # inherits any RoleBindings accumulated on `default` from unrelated
   # installs.
   #
-  # Non-empty: the chart references the named SA verbatim and does NOT
-  # create one — bring your own (the documented IRSA / Pod Identity
-  # flow at docs/usage/object-storage/amazon-s3.mdx works this way). The chart
-  # cannot influence `automountServiceAccountToken` on a SA it does
-  # not own; set it explicitly in your SA manifest if you want the
-  # same hardening.
+  # Non-empty: this Engine references the named SA verbatim (bring your own).
+  # A managed SA is still created if another Engine needs it. Every Engine
+  # pod sets automountServiceAccountToken: false, including with a supplied SA.
+  # Webhook-injected workload-identity tokens remain supported; see
+  # docs/usage/object-storage/amazon-s3.mdx.
   serviceAccount: ""
   # -- Tolerations for engine pod scheduling.
   tolerations: []

@@ -20,8 +20,9 @@ spec:
           set -e
           {{- include "fbinstance.testShellHelpers" $ | nindent 10 }}
           {{- range $engine := .Values.engines }}
+          {{- $effective := include "fbinstance.effectiveEngine" (dict "root" $ "engine" $engine) | fromYaml }}
           {{- range $i := until (int $engine.replicas) }}
-          HOST="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl.{{ $.Release.Namespace }}.svc.cluster.local"
+          HOST="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl.{{ $.Release.Namespace }}.svc{{ $effective.nodeHostSuffix }}"
           log "Readiness: engine {{ $engine.name }} node-{{ $i }} (GET http://$HOST:8122/health/ready)"
           HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
             --retry 12 --retry-delay 5 --retry-connrefused \

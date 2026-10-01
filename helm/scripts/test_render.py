@@ -204,6 +204,16 @@ class EngineOptionsTests(unittest.TestCase):
         self.assertNotIn("level", other["logging"])
         self.assertNotIn("web-ui", [p["name"] for p in resource(docs, "Service", "audit-engine-first-ready")["spec"]["ports"]])
 
+    def test_node_hooks_use_effective_host_suffix_for_each_engine(self):
+        docs = render({"engineSpec": {"nodeHostSuffix": ".shared.example"}, "engines": [
+            {"name": "first", "replicas": 1, "nodeHostSuffix": ".specific.example"},
+            {"name": "second", "replicas": 1}]})
+        for hook in ("dns", "pods", "ready"):
+            script = resource(docs, "Pod", "audit-test-engine-" + hook)["spec"]["containers"][0]["command"][-1]
+            self.assertIn("audit-engine-first-hl.audit.svc.specific.example", script)
+            self.assertIn("audit-engine-second-hl.audit.svc.shared.example", script)
+            self.assertNotIn(".svc.cluster.local", script)
+
     def test_default_engine_inherits_shared_scheduling_and_resources(self):
         docs = render({"engineSpec": {"nodeSelector": {"pool": "shared"}, "resources": {"limits": {"memory": "8Gi"}}}})
         spec = resource(docs, "StatefulSet", "audit-engine-default-node-0")["spec"]["template"]["spec"]
