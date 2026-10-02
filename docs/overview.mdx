@@ -45,3 +45,11 @@ For day-2 operational capabilities such as zero-downtime engine rollouts, autosc
 - [Security](./security) records the chart's pod-hardening baseline and the responsibilities it leaves to the platform team.
 
 For a value-by-value reference, see the helm-docs-generated [`helm/README.md`](https://github.com/firebolt-db/firebolt-instance-helm/blob/main/helm/README.md).
+
+## Upgrade behavior
+
+The Gateway stops advertising readiness, waits five seconds for endpoint propagation, then closes query admission and waits for active connections. `gateway.terminationGracePeriodSeconds` bounds the whole shutdown (15 seconds by default). Requests still active at that deadline can be interrupted. A custom `gateway.podTemplate.lifecycle` replaces this default drain behavior.
+
+Engine peer discovery uses a headless Service that publishes not-ready pods for bootstrap. The Gateway uses a separate `-ready` headless Service containing ready pods only, with active health checks in addition to Kubernetes readiness. Neither this filtering nor the Gateway's rolling update strategy coordinates Engine StatefulSet replacements. Engine upgrades and replica changes can interrupt queries.
+
+When upgrading an existing TLS deployment, ensure your Engine certificate includes `<release>-engine-<name>-ready.<namespace>.svc.cluster.local` for every Engine before the Gateway switches to ready-only routing. Chart-managed Certificates include these SANs, but issuance and process restarts are separate operations. Use a maintenance window for the first transition, or pre-provision compatible certificate material and restart Engines before upgrading the Gateway.

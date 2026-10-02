@@ -44,6 +44,40 @@ class GatewaySafetyTests(unittest.TestCase):
         self.assertEqual(policy["retriable_headers"], [{"name": "X-Firebolt-Drained", "present_match": True}])
 
 
+class GatewayLifecycleTests(unittest.TestCase):
+    def test_discovery_and_serving_endpoints_are_separate(self):
+        docs = render()
+        discovery = resource(docs, "Service", "audit-engine-default-hl")["spec"]
+        serving = resource(docs, "Service", "audit-engine-default-ready")["spec"]
+        self.assertTrue(discovery["publishNotReadyAddresses"])
+        self.assertFalse(serving["publishNotReadyAddresses"])
+        self.assertEqual(serving["clusterIP"], "None")
+        self.assertEqual(discovery["selector"], serving["selector"])
+        config = resource(docs, "ConfigMap", "audit-gateway")["data"]["envoy.yaml"]
+        self.assertIn('-ready.audit.svc.cluster.local:3473', config)
+        self.assertIn('no_default_search_domain: true', config)
+
+    def test_gateway_drain_and_probes_match_listener_names(self):
+        docs = render()
+        pod = resource(docs, "Deployment", "audit-gateway")["spec"]["template"]["spec"]
+        envoy = pod["containers"][0]
+        self.assertEqual(envoy["livenessProbe"]["httpGet"]["port"], "metrics")
+        self.assertEqual(envoy["readinessProbe"]["httpGet"]["port"], "metrics")
+        self.assertIn("--drain-time-s", envoy["args"])
+        script = envoy["lifecycle"]["preStop"]["exec"]["command"][-1]
+        self.assertIn("http.gateway.downstream_cx_active", script)
+        self.assertIn("/drain_listeners?inboundonly&graceful", script)
+        config = envoy_config()
+        self.assertEqual(config["static_resources"]["listeners"][0]["traffic_direction"], "INBOUND")
+        self.assertNotIn("traffic_direction", config["static_resources"]["listeners"][1])
+
+    def test_engine_certificate_covers_serving_service(self):
+        docs = render({"tls": {"engine": {"enabled": True, "certManager": {"issuerRef": {"name": "ca"}}}}})
+        names = resource(docs, "Certificate", "audit-tls-engine")["spec"]["dnsNames"]
+        self.assertIn("audit-engine-default-ready.audit.svc.cluster.local", names)
+        self.assertIn("audit-engine-default-node-0-0.audit-engine-default-hl.audit.svc.cluster.local", names)
+
+
 class ConfigurationTests(unittest.TestCase):
     def test_existing_database_secret_reaches_both_consumers(self):
         docs = render({"postgresql": {"credentials": {"existingSecret": "database-creds"}}})

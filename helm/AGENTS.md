@@ -14,7 +14,7 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
   - Envoy gateway: `Deployment` + `Service` (configurable type) + `ConfigMap` + optional `PodDisruptionBudget` (`gateway-pdb.yaml`). Routes by `X-Firebolt-Engine` header. Optionally terminates client TLS (`tls.gateway.enabled`) and/or speaks TLS upstream to engines (`tls.engine.enabled`).
   - Pensieve metadata: `Deployment` + `Service` + `ConfigMap` + `Secret`.
   - PostgreSQL: bundled `StatefulSet` + `Service` when `postgresql.local_enabled: true`; otherwise the chart consumes external connection details / `existingSecret`.
-  - Engines: **one 1-replica `StatefulSet` per node per engine** (i.e. `engines[i].replicas` separate StatefulSets named `<release>-engine-<name>-node-<i>`), plus a shared headless Service, ClusterIP Service, and ConfigMap. Optionally authenticated (`auth.enabled`) and/or TLS-terminated on the query listener (`tls.engine.enabled`).
+  - Engines: **one 1-replica `StatefulSet` per node per engine** (i.e. `engines[i].replicas` separate StatefulSets named `<release>-engine-<name>-node-<i>`), plus a bootstrap headless Service, a ready-only serving headless Service, a ClusterIP Service, and ConfigMap. Optionally authenticated (`auth.enabled`) and/or TLS-terminated on the query listener (`tls.engine.enabled`).
   - Optional cert-manager `Certificate` resources (`certificates.yaml`) — one per `auth.signingKeys[]` entry, `tls.gateway`, or `tls.engine` that requests a `certManager` block instead of an `existingSecret`. Requires cert-manager and its CRDs in-cluster; absent entirely when every artifact uses `existingSecret`.
   - Optional `PodMonitor`s — separate ones for engines (`podmonitor.yaml`) and the gateway (`podmonitor-gateway.yaml`), each gated by `podMonitor.engines.enabled` / `podMonitor.gateway.enabled`. Both require the Prometheus Operator CRDs.
   - Optional `Namespace` (`createNamespace: true`).
@@ -55,7 +55,7 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 - `.helmignore` — excludes docs and scripts from the packaged chart.
 - `templates/_helpers.tpl` — naming, label, port, engine-config (incl. `instance.auth` / engine TLS `endpoints`), secret-source resolution (`fbinstance.secretSourceName` / `fbinstance.usesCertManager`), engine TLS SAN list (`fbinstance.engineTlsDnsNames`), memlock-script, and test-shell-helper templates.
 - `templates/certificates.yaml` — optional cert-manager `Certificate` resources for `auth.signingKeys[]` / `tls.gateway` / `tls.engine` entries that request `certManager` instead of `existingSecret`.
-- `templates/gateway-*.yaml` — Envoy Deployment, Service, ConfigMap, PodDisruptionBudget.
+- `templates/gateway-*.yaml` — Envoy Deployment, Service, ConfigMap, PodDisruptionBudget. `files/gateway-prestop.sh` drains the INBOUND query listener; probes use the independent metrics listener.
 - `templates/metadata-service-*.yaml` — Pensieve Deployment, Service, ConfigMap, Secret.
 - `templates/postgresql-*.yaml` — bundled PostgreSQL StatefulSet and Service (rendered only when `postgresql.local_enabled: true`).
 - `templates/engine-*.yaml` — per-engine StatefulSet(s), headless Service, ClusterIP Service, ConfigMap. The StatefulSet also mounts auth/TLS secrets and (when `tls.engine.enabled`) runs the `tls-chain-setup` init container.
