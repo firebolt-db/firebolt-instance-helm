@@ -83,6 +83,19 @@ spec:
 
           sql_query "SELECT 1" "SELECT 1" "1"
 
+          log "SQL: query-parameter Engine selector"
+          RESPONSE=$(curl --fail --silent $CURL_INSECURE --max-time 30 \
+            "$GW/?engine=$ENGINE" \
+            {{- if $.Values.auth.enabled }}
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            {{- end }}
+            --data "SELECT 1")
+          echo "$RESPONSE" | grep -q "1" || fail "query selector did not return SELECT 1"
+          STATUS=$(curl --silent $CURL_INSECURE --max-time 30 -o /dev/null -w '%{http_code}' \
+            "$GW/?engine=$ENGINE&engine=$ENGINE" --data "SELECT 1")
+          [ "$STATUS" = "400" ] || fail "duplicate selectors returned $STATUS"
+          pass "query selector accepted and duplicate selectors rejected"
+
           TABLE="helm_storage_smoke_$(printf '%s' "$ENGINE" | tr -c 'A-Za-z0-9_' '_')"
           sql_query "managed table cleanup" "DROP TABLE IF EXISTS $TABLE" ""
           sql_query "managed table create" "CREATE TABLE $TABLE (id INT, name TEXT)" ""

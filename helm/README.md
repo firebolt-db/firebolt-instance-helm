@@ -28,30 +28,37 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | customEngineConfig.instance.id | string | `"01kp98j0000000000000000000"` | Lowercase Crockford ULID for the Firebolt instance. Must match the account reconciled by the metadata service at startup. `values.schema.json` rejects uppercase and any character outside the Crockford alphabet. |
 | engineSpec | object | {} | Shared engine pod defaults applied to all engines unless overridden per-engine. |
 | engineSpec.affinity | object | `{}` | Affinity rules for engine pod scheduling. |
+| engineSpec.annotations | object | {} | Default annotations on Engine StatefulSets, replaced as a whole by engines[].annotations (an empty map clears them). These do not annotate pods. |
 | engineSpec.customInitContainersTemplate | list | `[]` | Custom init containers injected into engine pods (supports templating). |
 | engineSpec.customVolumeMounts | list | `[]` | Custom volume mounts injected into the engine `core` container, paired with `customVolumes` above — a volume declared there is inert until also mounted here. |
 | engineSpec.customVolumes | list | `[]` | Custom volumes injected into engine pods. |
 | engineSpec.defaultStorage | object | {} | Default PVC storage spec for engines. `storageClassName` is intentionally absent — the cluster default storage class is used. Override here or per-engine to specify a class (e.g. `storageClassName: gp3`). |
 | engineSpec.defaultStorage.accessModes | list | `["ReadWriteOnce"]` | Access modes for the default PVC. |
 | engineSpec.defaultStorage.resources.requests.storage | string | `"100Gi"` | Default storage size for engine PVCs. |
+| engineSpec.emptyDir | object | {} | Options for storageType=emptyDir, such as sizeLimit or medium: Memory. Local cache is lost when the pod is removed; metadata and object storage remain authoritative. |
 | engineSpec.extraEnv | list | [] | Extra environment variables for the engine container. Use this to inject AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (for example via `valueFrom.secretKeyRef`) for a custom S3-compatible store (`managed_table_storage: s3` + `aws.endpoint`). |
 | engineSpec.extraEnvFrom | list | [] | Extra `envFrom` sources for the engine container. Use a `secretRef` to load a Secret holding AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for a custom S3-compatible store. |
-| engineSpec.hostPathStorageEnabled | bool | `false` | When true, uses hostPath instead of PVC for engine data. |
+| engineSpec.hostPathStorageEnabled | bool | `false` | Legacy alias for storageType=hostPath. Cannot be combined with storageType=emptyDir. |
 | engineSpec.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | engineSpec.image.repository | string | `"oci.firebolt.io/firebolt-db/engine"` | Container repository for the Firebolt engine image. |
 | engineSpec.image.tag | string | `""` | Image tag. Defaults to `Chart.appVersion` when empty. |
 | engineSpec.memlockSetup | bool | `false` | When true, a memlock-setup init container is added to configure memory locking limits. |
 | engineSpec.nodeHostSuffix | string | `".cluster.local"` | Suffix appended after `.svc` in node FQDNs in `config.yaml`. |
 | engineSpec.nodeSelector | object | `{}` | Node selector for engine pod scheduling. |
+| engineSpec.podAnnotations | object | {} | Default custom pod annotations. checksum/ and firebolt.io/ are reserved. |
+| engineSpec.podLabels | object | {} | Default extra pod labels. Chart selector labels remain authoritative. |
 | engineSpec.podSecurityContext | object | {} | Pod-level security context for engine pods. |
 | engineSpec.podSecurityContext.fsGroup | int | `3473` | Group applied to mounted volumes. Matches the engine UID/GID so the data PVC is chowned on mount. |
 | engineSpec.podSecurityContext.fsGroupChangePolicy | string | `"OnRootMismatch"` | When to re-apply `fsGroup` ownership. `OnRootMismatch` skips the chown when already correct — much faster on large PVCs. |
 | engineSpec.podSecurityContext.runAsNonRoot | bool | `true` | Reject the pod if any container runs as UID 0. Also gates the chart's container-level `runAs*` defaults, memlock init, and the entrypoint UID check. |
+| engineSpec.priorityClassName | string | `""` | Default priority class, overridden per Engine (an empty override clears it). |
 | engineSpec.readiness | bool | `true` | When true, a readiness probe is added to the core container. |
-| engineSpec.serviceAccount | string | `""` | ServiceAccount used by engine pods.  Empty (the default): the chart creates `<release>-engine` with `automountServiceAccountToken: false`, so a code-execution exploit in the engine container has no SA token to talk to the apiserver with. Engines do not call the Kubernetes API; the dedicated SA replaces the namespace `default` SA, which automounts a token and inherits any RoleBindings accumulated on `default` from unrelated installs.  Non-empty: the chart references the named SA verbatim and does NOT create one — bring your own (the documented IRSA / Pod Identity flow at docs/usage/object-storage/amazon-s3.mdx works this way). The chart cannot influence `automountServiceAccountToken` on a SA it does not own; set it explicitly in your SA manifest if you want the same hardening. |
-| engineSpec.storageHostPath | object | {} | Host path configuration used when `hostPathStorageEnabled` is true. |
+| engineSpec.resources | object | {} | Shared container resource requests and limits, overridden as a whole by engines[].resources. |
+| engineSpec.serviceAccount | string | `""` | ServiceAccount used by engine pods.  Empty (the default): the chart creates `<release>-engine` with `automountServiceAccountToken: false`, so a code-execution exploit in the engine container has no SA token to talk to the apiserver with. Engines do not call the Kubernetes API; the dedicated SA replaces the namespace `default` SA, which automounts a token and inherits any RoleBindings accumulated on `default` from unrelated installs.  Non-empty: this Engine references the named SA verbatim (bring your own). A managed SA is still created if another Engine needs it. Every Engine pod sets automountServiceAccountToken: false, including with a supplied SA. Webhook-injected workload-identity tokens remain supported; see docs/usage/object-storage/amazon-s3.mdx. |
+| engineSpec.storageHostPath | object | {} | Host path configuration used with storageType=hostPath or the legacy hostPathStorageEnabled alias. |
 | engineSpec.storageHostPath.path | string | `"/var/lib/firebolt-core"` | Host path for engine data. |
 | engineSpec.storageHostPath.type | string | `"DirectoryOrCreate"` | Host path type. |
+| engineSpec.storageType | string | `"pvc"` | Engine-local cache backend: pvc (retained by default), emptyDir (ephemeral), or hostPath. Changing backend on an existing StatefulSet requires a migration. |
 | engineSpec.terminationGracePeriodSeconds | int | `60` | Termination grace period in seconds for engine pods. Sized to give in-flight queries time to drain before SIGKILL during rolling updates and node drains. Also rendered into the engine `config.yaml` as `engine.termination_grace_period` with a 5s safety margin (floored at 1s), so the engine's own in-flight-query wait stays below this value. |
 | engineSpec.tolerations | list | `[]` | Tolerations for engine pod scheduling. |
 | engineSpec.topologySpreadConstraints | list | `[]` | Topology spread constraints for engine pod scheduling. Set this to force zone or node spread across an engine's nodes so a single zone or node failure cannot take down the whole engine. Overridable per-engine via `engines[].topologySpreadConstraints`. |
@@ -59,21 +66,14 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.uiSidecarImage.pullPolicy | string | `"Always"` | Image pull policy for the Core UI sidecar. Defaults to `Always` (the Kubernetes default for `latest`-tagged images) so published UI fixes reach existing installs; nodes would otherwise pin the first cached copy. |
 | engineSpec.uiSidecarImage.repository | string | `"ghcr.io/firebolt-db/firebolt-core-ui"` | Container repository for the Core UI sidecar image. |
 | engineSpec.uiSidecarImage.tag | string | `"latest"` | Core UI sidecar image tag. A mutable alias tracking the latest published UI. |
-| engines | list | [] | Engine definitions. Each entry produces one StatefulSet per node (`replicas` controls node count), plus a shared headless Service, ClusterIP Service, and ConfigMap. Per-engine values override the shared `engineSpec` defaults. |
-| engines[0].affinity | object | `{}` | Affinity rules for engine pod scheduling. |
-| engines[0].name | string | `"default"` | Engine name. Used to derive resource names across the chart. |
-| engines[0].nodeSelector | object | `{}` | Node selector for engine pod scheduling. |
-| engines[0].podAnnotations | object | `{}` | Annotations applied to engine pods. |
-| engines[0].podLabels | object | `{}` | Extra labels applied to this engine's pod template. Chart-reserved keys (`app.kubernetes.io/{name,instance,managed-by}` and `firebolt/{component,engine,node}`) are silently dropped from user input so the StatefulSet selector cannot be detached by a typo. |
-| engines[0].priorityClassName | string | `""` | Priority class name for engine pods. |
-| engines[0].replicas | int | `1` | Number of nodes in this engine group (one StatefulSet replica per node). |
-| engines[0].resources | object | `{"limits":{"memory":"4Gi"},"requests":{"cpu":"1","memory":"4Gi"}}` | Resource requests and limits for engine containers. Firebolt Core is memory-bound: more RAM directly improves cache hit rates and query throughput. CPU governs parallel query execution threads.  Typical sizing guidance:   Development / functional testing:  2 vCPU  /  8 Gi  (request)   Small production workload:         4 vCPU  / 32 Gi   Medium production workload:        8 vCPU  / 64 Gi   Large production workload:        16 vCPU  / 128 Gi  Storage I/O is also significant — use an SSD-backed StorageClass and size the PVC to hold your working dataset plus ~30 % headroom. |
-| engines[0].storage | object | `{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"100Gi"}}}` | PVC storage configuration for this engine. Falls back to `engineSpec.defaultStorage` if omitted. |
-| engines[0].tolerations | list | `[]` | Tolerations for engine pod scheduling. |
-| engines[0].topologySpreadConstraints | list | `[]` | Topology spread constraints for engine pod scheduling. Overrides `engineSpec.topologySpreadConstraints` for this engine when set. |
+| engines | list | [] | Engine definitions. Each entry produces one StatefulSet per node (`replicas` controls node count), plus a shared headless Service, ClusterIP Service, and ConfigMap. Per-engine values replace shared `engineSpec` defaults, including explicit false and empty maps/lists. Image fields and storage fields inherit individually; use per-engine storage for engineSpec.defaultStorage. |
+| engines[0].customEngineConfig | object | {} | Optional per-Engine config overlay, merged over customEngineConfig. Installation identity and chart-managed topology/auth/TLS fields cannot be overridden. |
+| engines[0].name | string | `"default"` | Engine name. Generated pod and Service names must fit in 63 characters together with the release prefix and node suffix. |
+| engines[0].replicas | int | `1` | Number of nodes (one single-replica StatefulSet per node). Upgrades and topology changes can interrupt queries. |
 | extraLabels | object | `{"firebolt/product":"core"}` | Extra labels applied to all resources and pods. |
 | gateway | object | {} | Envoy gateway proxy configuration. Routes queries to engine Services based on the `X-Firebolt-Engine` HTTP header. A Lua filter extracts the engine name and rewrites the upstream to `{engine}-service:3473` via dynamic forward proxy. |
 | gateway.adminPort | int | `9901` | Envoy admin interface port (used for health checks). |
+| gateway.annotations | object | {} | Annotations on the Gateway Deployment, for example to opt into an externally installed Secret reload controller. These do not annotate pods. |
 | gateway.containerPort | int | `8080` | Envoy listener port for client traffic. |
 | gateway.enabled | bool | `true` | Set to true to deploy the Envoy gateway proxy. |
 | gateway.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
@@ -107,8 +107,10 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.service | object | {} | Gateway Service configuration. |
 | gateway.service.port | int | `80` | External service port proxied to `containerPort`. |
 | gateway.service.type | string | `"ClusterIP"` | Service type. One of `ClusterIP`, `LoadBalancer`, or `NodePort`. |
+| gateway.terminationGracePeriodSeconds | int | `15` | Total pod shutdown budget in seconds, including a 5s endpoint-propagation wait and explicit connection draining. Requests still active at the deadline can be interrupted. |
 | imagePullSecrets | list | `[]` | Registry credentials. Must be a pre-created docker-registry Secret in the deployment namespace. Leave empty if nodes have ambient registry access (e.g. node IAM role). |
 | metadata | object | {} | Metadata service configuration. |
+| metadata.annotations | object | {} | Annotations on the Metadata Service Deployment, for example to opt into an externally installed Secret reload controller. These do not annotate pods. |
 | metadata.deployment | object | {} | Deployment-level settings for the metadata service. |
 | metadata.deployment.terminationGracePeriodSeconds | int | `30` | Termination grace period in seconds. |
 | metadata.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
@@ -145,7 +147,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | postgresql | object | {} | PostgreSQL configuration. When `local_enabled: true` the chart deploys a single-replica `postgres:16-alpine` StatefulSet. Set `local_enabled: false` and supply connection details for an external database. |
 | postgresql.connect_timeout_sec | int | `5` | Connection timeout in seconds. |
 | postgresql.credentials | object | {} | PostgreSQL credentials Secret configuration. |
-| postgresql.credentials.existingSecret | string | `""` | Reference an externally-managed Secret (e.g. via ESO). When set, the chart will not create its own Secret. Ignored when `postgresql.local_enabled` is true. |
+| postgresql.credentials.existingSecret | string | `""` | Reference an externally-managed Secret (e.g. via ESO). When set, the chart will not create its own Secret. Both bundled PostgreSQL and the Metadata Service use it. Require username/password keys, plus database for bundled PostgreSQL; username/database must match the corresponding postgresql values. Changing Secret data does not alter an already-initialized PostgreSQL role password. |
 | postgresql.credentials.mountPath | string | `"/secrets/postgres"` | Mount path for the credentials Secret inside the metadata service container. |
 | postgresql.database | string | `"firebolt_metadata"` | Database name. |
 | postgresql.host | string | `""` | PostgreSQL host. Auto-derived when `local_enabled` is true; must be set explicitly for external databases. |
@@ -162,6 +164,10 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | postgresql.port | int | `5432` | PostgreSQL port. |
 | postgresql.resources | object | `{"limits":{"cpu":"250m","memory":"256Mi"},"requests":{"cpu":"25m","memory":"64Mi"}}` | Resource requests and limits for the bundled PostgreSQL container. |
 | postgresql.schema | string | `"public"` | PostgreSQL schema. |
+| postgresql.tls | object | {} | TLS to external PostgreSQL. The bundled database does not provide a TLS listener. |
+| postgresql.tls.caKey | string | `"ca.crt"` | Key containing the PEM CA bundle in caSecret. |
+| postgresql.tls.caSecret | string | `""` | Secret containing the PostgreSQL server CA bundle, mounted read-only into the Metadata Service. |
+| postgresql.tls.enabled | bool | `false` | Require certificate-chain and hostname verification (verify-full). |
 | postgresql.username | string | `"firebolt"` | Database username. |
 | tls | object | {} | TLS configuration for the Envoy gateway's client-facing listener and the engine's query listener. Each of `gateway` / `engine` is provisioned by exactly one of `existingSecret` (a `kubernetes.io/tls` Secret) or `certManager` (a chart-rendered cert-manager `Certificate`); setting both or neither on an enabled block fails the render. |
 | tls.engine | object | {} | TLS on the engine's query listener (port 3473) and, correspondingly, the gateway's upstream connection to engines (including the active engine health check, which runs over the same connection). |
@@ -185,6 +191,9 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | tls.gateway.enabled | bool | `false` | Enable TLS on the gateway's client-facing listener. |
 | tls.gateway.existingSecret | object | {} | Existing `kubernetes.io/tls` Secret (`tls.crt` / `tls.key`). |
 | tls.gateway.existingSecret.secretRef | string | `""` | Secret name. |
+| tls.gateway.verification | object | {} | Optional verified Gateway TLS Helm test. Set serverName to a certificate SAN; caSecret is optional for publicly trusted certificates. |
+| tls.gateway.verification.caSecret | string | `""` | Optional Secret containing ca.crt for the Gateway verification hook. Only the CA key is projected. |
+| tls.gateway.verification.serverName | string | `""` | Hostname to verify while connecting to the in-cluster Gateway Service. Empty skips the Gateway verification hook; Engine TLS verification remains automatic. |
 | utilitiesImage | string | `"debian:stable-slim@sha256:5012d0517aa0075a7150a45aae67586641e898913b7af3b08228108565b5f90c"` | Image used for utility init/sidecar containers (e.g. the memlock-setup sidecar). Pinned to an immutable digest so a registry-side tag override cannot silently change what runs in production. Bump the digest together with the tag when upgrading. |
 
 ----------------------------------------------

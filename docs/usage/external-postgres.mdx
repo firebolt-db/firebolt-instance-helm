@@ -60,6 +60,24 @@ kubectl -n firebolt logs deployment/firebolt-metadata-service | grep -i postgres
 
 ## Caveats
 
-- TLS to PostgreSQL is not currently exposed. There is no `sslmode` value or CA-bundle mount.
-- `host`, `database`, and `schema` are pattern-restricted by `values.schema.json` and XML-escaped at render time. User input cannot break the rendered Metadata Service config.
+- Enable `postgresql.tls.enabled` for verified TLS. Set `postgresql.tls.caSecret` to a Secret in the release namespace and `postgresql.tls.caKey` to its CA bundle key (default `ca.crt`). The chart sets `PGSSLMODE=verify-full` and mounts only the CA bundle. The database certificate must cover `postgresql.host`. This option requires `local_enabled: false`.
+- `host`, `database`, and `schema` are pattern-restricted by `values.schema.json` and quoted as YAML scalars at render time. User input cannot break the rendered Metadata Service config.
 - The Metadata Service creates its schema on first connect and migrates the schema in place when pointed at a database from an older Metadata Service version. No manual migration step is required.
+
+## Credential changes
+
+Update the PostgreSQL role password and its Secret as a coordinated database operation. After the new credentials are available, restart the Metadata Service and wait for its rollout. Updating a Secret alone does not restart the workload or rerun Helm.
+
+For the `firebolt` release in the `firebolt` namespace, restart the Metadata Service:
+
+```bash
+kubectl rollout restart deployment/firebolt-metadata-service --namespace firebolt
+kubectl rollout status deployment/firebolt-metadata-service --namespace firebolt --timeout=10m
+```
+
+Online Helm upgrades also track the existing credential Secret's resource version. Offline rendering cannot read live Secrets. You can instead configure an externally installed Secret reload controller through `metadata.annotations`. Such a controller restarts the workload but does not coordinate the database password change.
+
+
+The bundled PostgreSQL path accepts `credentials.existingSecret` too. Supply `username`, `password`, and `database` keys, with username and database matching the chart values. Updating that Secret does not change a password inside an already-initialized database.
+
+After changing the database CA Secret, restart the Metadata Service using the commands above, or use your configured external reload controller. Online Helm rendering also tracks the CA Secret resource version. Coordinate CA rotation with the database server.

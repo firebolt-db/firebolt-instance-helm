@@ -1,0 +1,86 @@
+{{- $gatewayTest := and .Values.gateway.enabled .Values.tls.gateway.enabled .Values.tls.gateway.verification.serverName -}}
+{{- if or .Values.tls.engine.enabled $gatewayTest }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "fbinstance.fullname" . }}-test-tls
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  {{- if or .Values.tls.engine.enabled (and $gatewayTest .Values.tls.gateway.verification.caSecret) }}
+  volumes:
+    {{- if .Values.tls.engine.enabled }}
+    - name: engine-ca
+      secret:
+        secretName: {{ include "fbinstance.secretSourceName" (dict "source" .Values.tls.engine "certManagerSecretName" (printf "%s-tls-engine" (include "fbinstance.fullname" .)) "context" "tls.engine") }}
+        items:
+          - key: ca.crt
+            path: ca.crt
+    {{- end }}
+    {{- if and $gatewayTest .Values.tls.gateway.verification.caSecret }}
+    - name: gateway-ca
+      secret:
+        secretName: {{ .Values.tls.gateway.verification.caSecret }}
+        items:
+          - key: ca.crt
+            path: ca.crt
+    {{- end }}
+  {{- end }}
+  containers:
+    - name: check
+      image: curlimages/curl:latest
+      {{- if or .Values.tls.engine.enabled (and $gatewayTest .Values.tls.gateway.verification.caSecret) }}
+      volumeMounts:
+        {{- if .Values.tls.engine.enabled }}
+        - name: engine-ca
+          mountPath: /trust/engine
+          readOnly: true
+        {{- end }}
+        {{- if and $gatewayTest .Values.tls.gateway.verification.caSecret }}
+        - name: gateway-ca
+          mountPath: /trust/gateway
+          readOnly: true
+        {{- end }}
+      {{- end }}
+      command:
+        - sh
+        - -c
+        - |
+          set -eu
+          {{- include "fbinstance.testShellHelpers" . | nindent 10 }}
+          {{- if .Values.tls.engine.enabled }}
+          {{- range $engine := .Values.engines }}
+          {{- $effective := include "fbinstance.effectiveEngine" (dict "root" $ "engine" $engine) | fromYaml }}
+          {{- range $i := until (int $engine.replicas) }}
+          HOST="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl.{{ $.Release.Namespace }}.svc{{ $effective.nodeHostSuffix }}"
+          log "Verify Engine TLS chain and hostname: $HOST"
+          curl --fail --silent --show-error --max-time 30 \
+            --cacert /trust/engine/ca.crt "https://$HOST:3473/health/ready"
+          pass "Engine TLS verified: $HOST"
+          {{- if $.Values.gateway.enabled }}
+          # Check the Gateway's serving identity against every node, not just
+          # the node identity. Old certificates may cover only the latter.
+          SERVING="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-ready.{{ $.Release.Namespace }}.svc.cluster.local"
+          curl --fail --silent --show-error --max-time 30 \
+            --cacert /trust/engine/ca.crt \
+            --connect-to "$SERVING:3473:$HOST:3473" "https://$SERVING:3473/health/ready"
+          pass "Engine serving identity verified: $SERVING on $HOST"
+          {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- if $gatewayTest }}
+          log "Verify Gateway TLS chain and hostname"
+          curl --fail --silent --show-error --max-time 30 \
+            {{- if .Values.tls.gateway.verification.caSecret }}
+            --cacert /trust/gateway/ca.crt \
+            {{- end }}
+            --connect-to "{{ .Values.tls.gateway.verification.serverName }}:{{ .Values.gateway.service.port }}:{{ include "fbinstance.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.gateway.service.port }}" \
+            "https://{{ .Values.tls.gateway.verification.serverName }}:{{ .Values.gateway.service.port }}/healthz"
+          pass "Gateway TLS verified"
+          {{- end }}
+{{- end }}

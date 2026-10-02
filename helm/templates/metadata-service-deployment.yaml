@@ -1,9 +1,13 @@
-{{- $pgSecretName := .Values.postgresql.credentials.existingSecret | default (printf "%s-metadata-postgres-creds" (include "fbinstance.fullname" .)) }}
+{{- $pgSecretName := include "fbinstance.postgresSecretName" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "fbinstance.fullname" . }}-metadata-service
   namespace: {{ .Release.Namespace }}
+  {{- with .Values.metadata.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "fbinstance.labels" . | nindent 4 }}
     firebolt/component: metadata-service
@@ -21,8 +25,14 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: {{ toYaml .Values.metadata.server | sha256sum }}
+        checksum/config: {{ (include (print $.Template.BasePath "/metadata-service-configmap.yaml") . | fromYaml).data | toYaml | sha256sum }}
         checksum/secret: {{ toYaml .Values.postgresql | sha256sum }}
+        {{- if .Values.postgresql.tls.enabled }}
+        checksum/postgres-ca-version: {{ (lookup "v1" "Secret" .Release.Namespace .Values.postgresql.tls.caSecret).metadata | default dict | dig "resourceVersion" "" | sha256sum }}
+        {{- end }}
+        {{- if .Values.postgresql.credentials.existingSecret }}
+        checksum/credentials-version: {{ (lookup "v1" "Secret" .Release.Namespace $pgSecretName).metadata | default dict | dig "resourceVersion" "" | sha256sum }}
+        {{- end }}
         {{- with .Values.metadata.podTemplate.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -110,6 +120,11 @@ spec:
             - name: postgres-creds
               mountPath: {{ .Values.postgresql.credentials.mountPath }}
               readOnly: true
+            {{- if .Values.postgresql.tls.enabled }}
+            - name: postgres-ca
+              mountPath: /secrets/postgres-ca
+              readOnly: true
+            {{- end }}
             # Scratch space outside the read-only root filesystem.
             - name: tmp
               mountPath: /tmp
@@ -139,6 +154,12 @@ spec:
               value: {{ .Values.postgresql.credentials.mountPath }}/username
             - name: POSTGRES_PASSWORD_FILE
               value: {{ .Values.postgresql.credentials.mountPath }}/password
+            {{- if .Values.postgresql.tls.enabled }}
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /secrets/postgres-ca/ca.crt
+            {{- end }}
           {{- with .Values.metadata.podTemplate.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -156,6 +177,14 @@ spec:
         - name: postgres-creds
           secret:
             secretName: {{ $pgSecretName }}
+        {{- if .Values.postgresql.tls.enabled }}
+        - name: postgres-ca
+          secret:
+            secretName: {{ .Values.postgresql.tls.caSecret }}
+            items:
+              - key: {{ .Values.postgresql.tls.caKey }}
+                path: ca.crt
+        {{- end }}
         - name: tmp
           emptyDir: {}
         {{- with .Values.metadata.podTemplate.volumes }}

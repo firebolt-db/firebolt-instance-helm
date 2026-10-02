@@ -5,7 +5,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl
+  name: {{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-ready
   namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "fbinstance.labels" $ | nindent 4 }}
@@ -13,7 +13,7 @@ metadata:
     firebolt/engine: {{ $engine.name }}
 spec:
   clusterIP: None
-  publishNotReadyAddresses: true
+  publishNotReadyAddresses: false
   selector:
     {{- include "fbinstance.selectorLabels" $ | nindent 4 }}
     firebolt/engine: {{ $engine.name }}

@@ -40,6 +40,8 @@ THOROUGH ?= false
 	docs \
 	docs-check \
 	lint \
+	test-render \
+	test-gateway-runtime \
 	create \
 	delete \
 	floci \
@@ -109,6 +111,12 @@ lint: ## Lint and template-render the helm chart
 	helm lint --strict $(CHART)
 	helm template $(RELEASE) $(CHART) > /dev/null
 	@echo "All helm checks passed."
+
+test-render: ## Run deterministic chart regression tests (Python + PyYAML)
+	$(or $(PYTHON),python3) helm/scripts/test_render.py
+
+test-gateway-runtime: ## Exercise Envoy retries against a fault-injecting backend (Docker + PyYAML)
+	$(or $(PYTHON),python3) helm/scripts/test_gateway_runtime.py
 
 ##@ Local kind cluster (single-node dev)
 

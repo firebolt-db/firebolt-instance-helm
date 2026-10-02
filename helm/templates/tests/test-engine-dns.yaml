@@ -18,8 +18,9 @@ spec:
           set -e
           {{- include "fbinstance.testShellHelpers" $ | nindent 10 }}
           {{- range $engine := .Values.engines }}
+          {{- $effective := include "fbinstance.effectiveEngine" (dict "root" $ "engine" $engine) | fromYaml }}
           {{- range $i := until (int $engine.replicas) }}
-          FQDN="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl.{{ $.Release.Namespace }}.svc.cluster.local"
+          FQDN="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl.{{ $.Release.Namespace }}.svc{{ $effective.nodeHostSuffix }}"
           log "DNS: engine {{ $engine.name }} node-{{ $i }}"
           nslookup "$FQDN" >/dev/null 2>&1 || fail "$FQDN did not resolve"
           pass "{{ $engine.name }} node-{{ $i }} DNS resolves"

@@ -16,6 +16,10 @@ kind: Deployment
 metadata:
   name: {{ include "fbinstance.fullname" . }}-gateway
   namespace: {{ .Release.Namespace }}
+  {{- with .Values.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "fbinstance.labels" . | nindent 4 }}
     firebolt/component: gateway
@@ -67,8 +71,8 @@ spec:
       # token either; webhook-injected projected tokens (IRSA, Pod Identity) are
       # separate volumes and unaffected.
       automountServiceAccountToken: false
-      # 15s = 8s preStop /healthcheck/fail propagation + ~7s Envoy drain budget.
-      terminationGracePeriodSeconds: 15
+      # Includes the 5s endpoint propagation floor and bounded connection drain.
+      terminationGracePeriodSeconds: {{ .Values.gateway.terminationGracePeriodSeconds }}
       {{- with .Values.gateway.podTemplate.serviceAccountName }}
       serviceAccountName: {{ . }}
       {{- end }}
@@ -111,6 +115,10 @@ spec:
             - envoy
             - -c
             - /etc/envoy/envoy.yaml
+            - --drain-time-s
+            - "0"
+            - --drain-strategy
+            - immediate
           ports:
             - name: http
               containerPort: {{ .Values.gateway.containerPort }}
@@ -124,44 +132,25 @@ spec:
             {{- else }}
             preStop:
               exec:
-                # Flip Envoy's health filter to 503 via /dev/tcp (no curl in the
-                # image), then sleep so Cilium drops the pod from Service
-                # endpoints before SIGTERM. New SYNs stop landing here while
-                # in-flight streams keep draining.
                 command:
                   - bash
                   - -c
                   - |
-                    exec 3<>/dev/tcp/127.0.0.1/{{ .Values.gateway.adminPort }}
-                    printf 'POST /healthcheck/fail HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n' >&3
-                    cat <&3 >/dev/null
-                    exec 3<&- 3>&-
-                    sleep 8
+                    {{- tpl (.Files.Get "files/gateway-prestop.sh") . | nindent 20 }}
             {{- end }}
+          # Keep probes reachable when the query listener is draining or uses TLS.
           livenessProbe:
             httpGet:
               path: /healthz
-              port: http
-              {{- if .Values.tls.gateway.enabled }}
-              # kubelet HTTPS probes don't verify the server certificate
-              # chain, so a self-signed/internal-CA cert needs no extra
-              # trust configuration here.
-              scheme: HTTPS
-              {{- end }}
+              port: metrics
             initialDelaySeconds: 1
             periodSeconds: 15
             timeoutSeconds: 3
           readinessProbe:
             httpGet:
               path: /healthz
-              port: http
-              {{- if .Values.tls.gateway.enabled }}
-              scheme: HTTPS
-              {{- end }}
+              port: metrics
             initialDelaySeconds: 1
-            # ~4s worst-case detection (period × failureThreshold) fits inside
-            # the 8s preStop window while still requiring two consecutive bad
-            # probes so a single hiccup does not flap the pod out of Service.
             periodSeconds: 2
             timeoutSeconds: 2
             failureThreshold: 2

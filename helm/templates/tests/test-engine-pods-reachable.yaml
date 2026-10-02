@@ -18,8 +18,9 @@ spec:
           set -e
           {{- include "fbinstance.testShellHelpers" $ | nindent 10 }}
           {{- range $engine := .Values.engines }}
+          {{- $effective := include "fbinstance.effectiveEngine" (dict "root" $ "engine" $engine) | fromYaml }}
           {{- range $i := until (int $engine.replicas) }}
-          HOST="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl.{{ $.Release.Namespace }}.svc.cluster.local"
+          HOST="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl.{{ $.Release.Namespace }}.svc{{ $effective.nodeHostSuffix }}"
           log "Reachability: engine {{ $engine.name }} node-{{ $i }} ($HOST:8122)"
           nc -z -w 5 "$HOST" 8122 || fail "{{ $engine.name }} node-{{ $i }} health port unreachable"
           pass "{{ $engine.name }} node-{{ $i }} health port reachable"

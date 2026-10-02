@@ -17,7 +17,9 @@
             "minLength": 1
           }
         },
-        "required": ["name"]
+        "required": [
+          "name"
+        ]
       }
     },
     "engineSpec": {
@@ -32,7 +34,11 @@
             },
             "pullPolicy": {
               "type": "string",
-              "enum": ["Always", "Never", "IfNotPresent"]
+              "enum": [
+                "Always",
+                "Never",
+                "IfNotPresent"
+              ]
             }
           }
         },
@@ -49,8 +55,102 @@
             },
             "pullPolicy": {
               "type": "string",
-              "enum": ["Always", "Never", "IfNotPresent"]
+              "enum": [
+                "Always",
+                "Never",
+                "IfNotPresent"
+              ]
             }
+          }
+        },
+        "storageType": {
+          "type": "string",
+          "enum": [
+            "pvc",
+            "emptyDir",
+            "hostPath"
+          ]
+        },
+        "emptyDir": {
+          "type": "object",
+          "properties": {
+            "medium": {
+              "type": "string",
+              "enum": [
+                "",
+                "Memory"
+              ]
+            },
+            "sizeLimit": {
+              "type": "string"
+            }
+          }
+        },
+        "terminationGracePeriodSeconds": {
+          "type": "integer",
+          "minimum": 6
+        },
+        "readiness": {
+          "type": "boolean"
+        },
+        "uiSidecar": {
+          "type": "boolean"
+        },
+        "serviceAccount": {
+          "type": "string"
+        },
+        "hostPathStorageEnabled": {
+          "type": "boolean"
+        },
+        "memlockSetup": {
+          "type": "boolean"
+        },
+        "podAnnotations": {
+          "type": "object"
+        },
+        "podLabels": {
+          "type": "object"
+        },
+        "resources": {
+          "type": "object"
+        },
+        "nodeSelector": {
+          "type": "object"
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "podSecurityContext": {
+          "type": "object"
+        },
+        "defaultStorage": {
+          "type": "object"
+        },
+        "extraEnv": {
+          "type": "array"
+        },
+        "extraEnvFrom": {
+          "type": "array"
+        },
+        "customVolumes": {
+          "type": "array"
+        },
+        "customVolumeMounts": {
+          "type": "array"
+        },
+        "customInitContainersTemplate": {
+          "type": "array"
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "topologySpreadConstraints": {
+          "type": "array"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
           }
         }
       }
@@ -67,7 +167,11 @@
             },
             "pullPolicy": {
               "type": "string",
-              "enum": ["Always", "Never", "IfNotPresent"]
+              "enum": [
+                "Always",
+                "Never",
+                "IfNotPresent"
+              ]
             }
           }
         },
@@ -91,6 +195,12 @@
               "type": "string",
               "pattern": "^[A-Za-z]+$"
             }
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
           }
         }
       }
@@ -121,6 +231,21 @@
         "schema": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "caSecret": {
+              "type": "string"
+            },
+            "caKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },
@@ -139,7 +264,11 @@
           "properties": {
             "pullPolicy": {
               "type": "string",
-              "enum": ["Always", "Never", "IfNotPresent"]
+              "enum": [
+                "Always",
+                "Never",
+                "IfNotPresent"
+              ]
             }
           }
         },
@@ -148,8 +277,22 @@
           "properties": {
             "type": {
               "type": "string",
-              "enum": ["ClusterIP", "LoadBalancer", "NodePort"]
+              "enum": [
+                "ClusterIP",
+                "LoadBalancer",
+                "NodePort"
+              ]
             }
+          }
+        },
+        "terminationGracePeriodSeconds": {
+          "type": "integer",
+          "minimum": 10
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
           }
         }
       }
@@ -216,9 +359,28 @@
           "replicas": {
             "type": "integer",
             "minimum": 1
+          },
+          "customEngineConfig": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "object"
+              }
+            }
+          },
+          "storage": {
+            "type": "object"
           }
         },
-        "required": ["name"]
+        "required": [
+          "name",
+          "replicas"
+        ],
+        "allOf": [
+          {
+            "$ref": "#/definitions/engineOverrides"
+          }
+        ]
       }
     },
     "customEngineConfig": {
@@ -263,7 +425,10 @@
       "properties": {
         "algorithm": {
           "type": "string",
-          "enum": ["RSA", "ECDSA"]
+          "enum": [
+            "RSA",
+            "ECDSA"
+          ]
         },
         "size": {
           "type": "integer",
@@ -284,7 +449,10 @@
             },
             "kind": {
               "type": "string",
-              "enum": ["Issuer", "ClusterIssuer"]
+              "enum": [
+                "Issuer",
+                "ClusterIssuer"
+              ]
             }
           }
         }
@@ -306,6 +474,18 @@
         },
         "certManager": {
           "$ref": "#/definitions/certManagerSource"
+        },
+        "verification": {
+          "type": "object",
+          "properties": {
+            "serverName": {
+              "type": "string",
+              "pattern": "^([A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?)?$"
+            },
+            "caSecret": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -328,7 +508,139 @@
           "$ref": "#/definitions/certManagerSource"
         }
       },
-      "required": ["id"]
+      "required": [
+        "id"
+      ]
+    },
+    "engineOverrides": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": [
+                "Always",
+                "Never",
+                "IfNotPresent"
+              ]
+            }
+          }
+        },
+        "uiSidecarImage": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": [
+                "Always",
+                "Never",
+                "IfNotPresent"
+              ]
+            }
+          }
+        },
+        "storageType": {
+          "type": "string",
+          "enum": [
+            "pvc",
+            "emptyDir",
+            "hostPath"
+          ]
+        },
+        "emptyDir": {
+          "type": "object",
+          "properties": {
+            "medium": {
+              "type": "string",
+              "enum": [
+                "",
+                "Memory"
+              ]
+            },
+            "sizeLimit": {
+              "type": "string"
+            }
+          }
+        },
+        "terminationGracePeriodSeconds": {
+          "type": "integer",
+          "minimum": 6
+        },
+        "readiness": {
+          "type": "boolean"
+        },
+        "uiSidecar": {
+          "type": "boolean"
+        },
+        "serviceAccount": {
+          "type": "string"
+        },
+        "hostPathStorageEnabled": {
+          "type": "boolean"
+        },
+        "memlockSetup": {
+          "type": "boolean"
+        },
+        "podAnnotations": {
+          "type": "object"
+        },
+        "podLabels": {
+          "type": "object"
+        },
+        "resources": {
+          "type": "object"
+        },
+        "nodeSelector": {
+          "type": "object"
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "podSecurityContext": {
+          "type": "object"
+        },
+        "extraEnv": {
+          "type": "array"
+        },
+        "extraEnvFrom": {
+          "type": "array"
+        },
+        "customVolumes": {
+          "type": "array"
+        },
+        "customVolumeMounts": {
+          "type": "array"
+        },
+        "customInitContainersTemplate": {
+          "type": "array"
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "topologySpreadConstraints": {
+          "type": "array"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
     }
   }
 }
