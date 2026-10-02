@@ -141,7 +141,7 @@ engineSpec:
   #     mountPath: /etc/custom-config
   #     readOnly: true
 
-  # -- Legacy alias for storageType=hostPath. Cannot be combined with storageType=emptyDir.
+  # -- Legacy alias for storageType=hostPath. An explicit engines[].storageType overrides the inherited alias. Setting both hostPathStorageEnabled=true and storageType=emptyDir on the same Engine is invalid.
   hostPathStorageEnabled: false
   # -- Host path configuration used with storageType=hostPath or the legacy hostPathStorageEnabled alias.
   # @default -- {}

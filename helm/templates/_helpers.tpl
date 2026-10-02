@@ -408,7 +408,8 @@ fail() { printf '\033[1;31mFAIL:\033[0m %s\n' "$*" >&2; exit 1; }
   {{- end -}}
 {{- end -}}
 {{- $_ := set $out "storage" (mergeOverwrite (deepCopy .root.Values.engineSpec.defaultStorage) (.engine.storage | default dict)) -}}
-{{- if $out.hostPathStorageEnabled -}}
+{{/* An explicit per-engine storage type supersedes an inherited legacy alias. */}}
+{{- if and $out.hostPathStorageEnabled (or (not (hasKey .engine "storageType")) (hasKey .engine "hostPathStorageEnabled")) -}}
   {{- if eq $out.storageType "emptyDir" -}}{{- fail "hostPathStorageEnabled and storageType=emptyDir are mutually exclusive" -}}{{- end -}}
   {{- $_ := set $out "storageType" "hostPath" -}}
 {{- end -}}
