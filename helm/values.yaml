@@ -159,8 +159,9 @@ engineSpec:
 # -- Metadata service configuration.
 # @default -- {}
 metadata:
-  # -- Change after rotating external database credentials to restart the Metadata Service, including offline/GitOps rendering. This does not change the database password itself.
-  restartToken: ""
+  # -- Annotations on the Metadata Service Deployment, for example to opt into an externally installed Secret reload controller. These do not annotate pods.
+  # @default -- {}
+  annotations: {}
   image:
     # -- Container repository for the metadata service image.
     repository: ghcr.io/firebolt-db/metadata

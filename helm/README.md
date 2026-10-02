@@ -109,6 +109,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.service.type | string | `"ClusterIP"` | Service type. One of `ClusterIP`, `LoadBalancer`, or `NodePort`. |
 | imagePullSecrets | list | `[]` | Registry credentials. Must be a pre-created docker-registry Secret in the deployment namespace. Leave empty if nodes have ambient registry access (e.g. node IAM role). |
 | metadata | object | {} | Metadata service configuration. |
+| metadata.annotations | object | {} | Annotations on the Metadata Service Deployment, for example to opt into an externally installed Secret reload controller. These do not annotate pods. |
 | metadata.deployment | object | {} | Deployment-level settings for the metadata service. |
 | metadata.deployment.terminationGracePeriodSeconds | int | `30` | Termination grace period in seconds. |
 | metadata.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
@@ -134,7 +135,6 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | metadata.podTemplate.volumeMounts | list | `[]` | Extra volume mounts added to the metadata container, merged with the chart-managed mounts. |
 | metadata.podTemplate.volumes | list | `[]` | Extra volumes added to the metadata pod, merged with the chart-managed volumes. Mount them on the metadata container via `volumeMounts` below. |
 | metadata.resources | object | `{"limits":{"memory":"1Gi"},"requests":{"cpu":"100m","memory":"512Mi"}}` | Resource requests and limits for the metadata service container. The metadata service is a lightweight gRPC service; increase memory if you run many engines. |
-| metadata.restartToken | string | `""` | Change after rotating external database credentials to restart the Metadata Service, including offline/GitOps rendering. This does not change the database password itself. |
 | metadata.server | object | {} | gRPC server configuration for the metadata service. |
 | metadata.server.host | string | `"0.0.0.0"` | gRPC server listen address. |
 | metadata.server.log_level | string | `"information"` | Log level for the metadata service. |
