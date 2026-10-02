@@ -128,9 +128,9 @@ Online Helm rendering hashes current auth/TLS Secrets as an additional rollout t
 
 ### Optional automatic restarts
 
-If your platform already runs [Stakater Reloader](https://github.com/stakater/Reloader), you can opt workloads into Secret-triggered rollouts. The chart does not install Reloader. Its annotations belong on Deployment or StatefulSet metadata, not on pod metadata.
+After replacing a Secret, restart affected workloads explicitly or use your platform's Secret-change automation. The chart does not install or require a reload controller.
 
-For example, enable Secret-triggered Gateway restarts through workload annotations:
+The following example configures Secret-triggered Gateway restarts with [Stakater Reloader](https://github.com/stakater/Reloader). Its annotations belong on Deployment or StatefulSet metadata, not on pod metadata:
 
 ```yaml
 gateway:
