@@ -65,6 +65,19 @@ For routine rotation while preserving existing tokens, use separate chart upgrad
 
 This gives the sequence `[old]` → `[old, new]` → `[new, old]` → `[new]`. Promoting the new key before all nodes have loaded it can break token validation. Engine restarts can still interrupt queries.
 
+After distributing the new key to every node, configure it as the active signer while retaining the old key for verification:
+
+```yaml
+auth:
+  signingKeys:
+    - id: key-2026-02 # Active: signs new tokens
+      existingSecret:
+        secretRef: firebolt-signing-key-2026-02
+    - id: key-2026-01 # Retiring: verifies old tokens until they expire
+      existingSecret:
+        secretRef: firebolt-signing-key-2026-01
+```
+
 During a maintenance window with authentication and query traffic stopped, you can skip the initial distribution upgrade and switch directly to `[new, old]`. Complete all Engine rollouts before restoring traffic.
 
 ### cert-manager as a signing-key source
