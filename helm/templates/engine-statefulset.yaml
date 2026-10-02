@@ -531,6 +531,9 @@ spec:
         name: data
       spec:
         {{- $storage := $engine.storage | default $.Values.engineSpec.defaultStorage }}
+        {{- if hasKey $storage "storageClassName" }}
+        storageClassName: {{ $storage.storageClassName | quote }}
+        {{- end }}
         accessModes: {{ toYaml $storage.accessModes | nindent 10 }}
         resources:
           requests:

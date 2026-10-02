@@ -1,9 +1,13 @@
-{{- $pgSecretName := .Values.postgresql.credentials.existingSecret | default (printf "%s-metadata-postgres-creds" (include "fbinstance.fullname" .)) }}
+{{- $pgSecretName := include "fbinstance.postgresSecretName" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "fbinstance.fullname" . }}-metadata-service
   namespace: {{ .Release.Namespace }}
+  {{- with .Values.metadata.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "fbinstance.labels" . | nindent 4 }}
     firebolt/component: metadata-service
@@ -21,8 +25,11 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: {{ toYaml .Values.metadata.server | sha256sum }}
+        checksum/config: {{ (include (print $.Template.BasePath "/metadata-service-configmap.yaml") . | fromYaml).data | toYaml | sha256sum }}
         checksum/secret: {{ toYaml .Values.postgresql | sha256sum }}
+        {{- if .Values.postgresql.credentials.existingSecret }}
+        checksum/credentials-version: {{ (lookup "v1" "Secret" .Release.Namespace $pgSecretName).metadata | default dict | dig "resourceVersion" "" | sha256sum }}
+        {{- end }}
         {{- with .Values.metadata.podTemplate.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

@@ -159,6 +159,9 @@ engineSpec:
 # -- Metadata service configuration.
 # @default -- {}
 metadata:
+  # -- Annotations on the Metadata Service Deployment, for example to opt into an externally installed Secret reload controller. These do not annotate pods.
+  # @default -- {}
+  annotations: {}
   image:
     # -- Container repository for the metadata service image.
     repository: ghcr.io/firebolt-db/metadata
@@ -311,7 +314,10 @@ postgresql:
     # -- Mount path for the credentials Secret inside the metadata service container.
     mountPath: /secrets/postgres
     # -- Reference an externally-managed Secret (e.g. via ESO). When set, the chart will
-    # not create its own Secret. Ignored when `postgresql.local_enabled` is true.
+    # not create its own Secret. Both bundled PostgreSQL and the Metadata Service
+    # use it. Require username/password keys, plus database for bundled PostgreSQL;
+    # username/database must match the corresponding postgresql values. Changing
+    # Secret data does not alter an already-initialized PostgreSQL role password.
     existingSecret: ""
   # -- Persistence configuration for the bundled PostgreSQL StatefulSet.
   # @default -- {}
@@ -609,7 +615,7 @@ engines:
         memory: "4Gi"
       limits:
         memory: "4Gi"
-    # -- PVC storage configuration for this engine. Falls back to `engineSpec.defaultStorage` if omitted.
+    # -- PVC storage configuration for this engine. Falls back to `engineSpec.defaultStorage` if omitted. Set `storageClassName` to select a class, or an empty string to disable dynamic provisioning. Existing claim templates cannot be resized or switched by a normal Helm upgrade.
     storage:
       accessModes: [ReadWriteOnce]
       resources:

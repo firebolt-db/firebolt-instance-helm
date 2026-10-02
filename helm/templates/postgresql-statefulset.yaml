@@ -49,17 +49,17 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fbinstance.fullname" . }}-metadata-postgres-creds
+                  name: {{ include "fbinstance.postgresSecretName" . }}
                   key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fbinstance.fullname" . }}-metadata-postgres-creds
+                  name: {{ include "fbinstance.postgresSecretName" . }}
                   key: password
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fbinstance.fullname" . }}-metadata-postgres-creds
+                  name: {{ include "fbinstance.postgresSecretName" . }}
                   key: database
             # A sub-dir of the mounted PVC, created and owned by the postgres
             # process. Required because the kubelet's fsGroup chgrp does not

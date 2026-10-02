@@ -11,7 +11,23 @@ spec:
   restartPolicy: Never
   containers:
     - name: check
-      image: postgres:16
+      image: {{ .Values.postgresql.image }}
+      env:
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "fbinstance.postgresSecretName" . }}
+              key: username
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "fbinstance.postgresSecretName" . }}
+              key: password
+        - name: PGDATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "fbinstance.postgresSecretName" . }}
+              key: database
       command:
         - sh
         - -c
@@ -23,4 +39,7 @@ spec:
           pg_isready -h "$HOST" -p 5432 -U {{ .Values.postgresql.username }} -d {{ .Values.postgresql.database }} \
             || fail "PostgreSQL not ready"
           pass "PostgreSQL is accepting connections"
+          RESULT=$(psql -h "$HOST" -p 5432 -At -v ON_ERROR_STOP=1 -c "SELECT 1")
+          [ "$RESULT" = "1" ] || fail "credential Secret could not execute SELECT 1"
+          pass "configured credentials authenticate to PostgreSQL"
 {{- end }}
