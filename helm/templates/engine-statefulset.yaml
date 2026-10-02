@@ -37,6 +37,10 @@ kind: StatefulSet
 metadata:
   namespace: {{ $.Release.Namespace }}
   name: {{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}
+  {{- with $.Values.engineSpec.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "fbinstance.labels" $ | nindent 4 }}
     firebolt/component: engine

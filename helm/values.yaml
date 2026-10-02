@@ -18,6 +18,9 @@ createNamespace: false
 # -- Shared engine pod defaults applied to all engines unless overridden per-engine.
 # @default -- {}
 engineSpec:
+  # -- Annotations on Engine StatefulSets, for example to opt into an externally installed Secret reload controller. These do not annotate pods.
+  # @default -- {}
+  annotations: {}
   image:
     # -- Container repository for the Firebolt engine image.
     repository: oci.firebolt.io/firebolt-db/engine
@@ -331,6 +334,9 @@ postgresql:
 # the upstream to `{engine}-service:3473` via dynamic forward proxy.
 # @default -- {}
 gateway:
+  # -- Annotations on the Gateway Deployment, for example to opt into an externally installed Secret reload controller. These do not annotate pods.
+  # @default -- {}
+  annotations: {}
   # -- Total pod shutdown budget in seconds, including a 5s endpoint-propagation wait and explicit connection draining. Requests still active at the deadline can be interrupted.
   terminationGracePeriodSeconds: 15
   # -- Set to true to deploy the Envoy gateway proxy.
@@ -528,6 +534,13 @@ tls:
   # -- TLS termination at the Envoy gateway (client → gateway).
   # @default -- {}
   gateway:
+    # -- Optional verified Gateway TLS Helm test. Set serverName to a certificate SAN; caSecret is optional for publicly trusted certificates.
+    # @default -- {}
+    verification:
+      # -- Hostname to verify while connecting to the in-cluster Gateway Service. Empty skips the Gateway verification hook; Engine TLS verification remains automatic.
+      serverName: ""
+      # -- Optional Secret containing ca.crt for the Gateway verification hook. Only the CA key is projected.
+      caSecret: ""
     # -- Enable TLS on the gateway's client-facing listener.
     enabled: false
     # -- Existing `kubernetes.io/tls` Secret (`tls.crt` / `tls.key`).

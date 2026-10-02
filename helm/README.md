@@ -28,6 +28,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | customEngineConfig.instance.id | string | `"01kp98j0000000000000000000"` | Lowercase Crockford ULID for the Firebolt instance. Must match the account reconciled by the metadata service at startup. `values.schema.json` rejects uppercase and any character outside the Crockford alphabet. |
 | engineSpec | object | {} | Shared engine pod defaults applied to all engines unless overridden per-engine. |
 | engineSpec.affinity | object | `{}` | Affinity rules for engine pod scheduling. |
+| engineSpec.annotations | object | {} | Annotations on Engine StatefulSets, for example to opt into an externally installed Secret reload controller. These do not annotate pods. |
 | engineSpec.customInitContainersTemplate | list | `[]` | Custom init containers injected into engine pods (supports templating). |
 | engineSpec.customVolumeMounts | list | `[]` | Custom volume mounts injected into the engine `core` container, paired with `customVolumes` above — a volume declared there is inert until also mounted here. |
 | engineSpec.customVolumes | list | `[]` | Custom volumes injected into engine pods. |
@@ -74,6 +75,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | extraLabels | object | `{"firebolt/product":"core"}` | Extra labels applied to all resources and pods. |
 | gateway | object | {} | Envoy gateway proxy configuration. Routes queries to engine Services based on the `X-Firebolt-Engine` HTTP header. A Lua filter extracts the engine name and rewrites the upstream to `{engine}-service:3473` via dynamic forward proxy. |
 | gateway.adminPort | int | `9901` | Envoy admin interface port (used for health checks). |
+| gateway.annotations | object | {} | Annotations on the Gateway Deployment, for example to opt into an externally installed Secret reload controller. These do not annotate pods. |
 | gateway.containerPort | int | `8080` | Envoy listener port for client traffic. |
 | gateway.enabled | bool | `true` | Set to true to deploy the Envoy gateway proxy. |
 | gateway.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
@@ -187,6 +189,9 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | tls.gateway.enabled | bool | `false` | Enable TLS on the gateway's client-facing listener. |
 | tls.gateway.existingSecret | object | {} | Existing `kubernetes.io/tls` Secret (`tls.crt` / `tls.key`). |
 | tls.gateway.existingSecret.secretRef | string | `""` | Secret name. |
+| tls.gateway.verification | object | {} | Optional verified Gateway TLS Helm test. Set serverName to a certificate SAN; caSecret is optional for publicly trusted certificates. |
+| tls.gateway.verification.caSecret | string | `""` | Optional Secret containing ca.crt for the Gateway verification hook. Only the CA key is projected. |
+| tls.gateway.verification.serverName | string | `""` | Hostname to verify while connecting to the in-cluster Gateway Service. Empty skips the Gateway verification hook; Engine TLS verification remains automatic. |
 | utilitiesImage | string | `"debian:stable-slim@sha256:5012d0517aa0075a7150a45aae67586641e898913b7af3b08228108565b5f90c"` | Image used for utility init/sidecar containers (e.g. the memlock-setup sidecar). Pinned to an immutable digest so a registry-side tag override cannot silently change what runs in production. Bump the digest together with the tag when upgrading. |
 
 ----------------------------------------------

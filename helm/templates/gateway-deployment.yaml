@@ -16,6 +16,10 @@ kind: Deployment
 metadata:
   name: {{ include "fbinstance.fullname" . }}-gateway
   namespace: {{ .Release.Namespace }}
+  {{- with .Values.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "fbinstance.labels" . | nindent 4 }}
     firebolt/component: gateway

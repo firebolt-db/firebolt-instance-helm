@@ -62,6 +62,12 @@
               ]
             }
           }
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
@@ -183,6 +189,12 @@
         "terminationGracePeriodSeconds": {
           "type": "integer",
           "minimum": 10
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
@@ -347,6 +359,18 @@
         },
         "certManager": {
           "$ref": "#/definitions/certManagerSource"
+        },
+        "verification": {
+          "type": "object",
+          "properties": {
+            "serverName": {
+              "type": "string",
+              "pattern": "^([A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?)?$"
+            },
+            "caSecret": {
+              "type": "string"
+            }
+          }
         }
       }
     },
