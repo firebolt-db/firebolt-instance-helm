@@ -259,6 +259,25 @@ class EngineOptionsTests(unittest.TestCase):
         self.assertNotIn("persistentVolumeClaimRetentionPolicy", persistent)
         self.assertIn("mutually exclusive", render({"engineSpec": {"storageType": "emptyDir", "hostPathStorageEnabled": True}}, expect_error=True))
 
+    def test_explicit_storage_type_overrides_inherited_legacy_hostpath(self):
+        docs = render({"engineSpec": {"hostPathStorageEnabled": True}, "engines": [
+            {"name": "legacy", "replicas": 1},
+            {"name": "persistent", "replicas": 1, "storageType": "pvc"},
+            {"name": "ephemeral", "replicas": 1, "storageType": "emptyDir"},
+            {"name": "disabled", "replicas": 1, "hostPathStorageEnabled": False},
+        ]})
+        for name, backend in [("legacy", "hostPath"), ("persistent", "pvc"),
+                              ("ephemeral", "emptyDir"), ("disabled", "pvc")]:
+            spec = resource(docs, "StatefulSet", f"audit-engine-{name}-node-0")["spec"]
+            self.assertEqual("volumeClaimTemplates" in spec, backend == "pvc")
+            volumes = spec["template"]["spec"]["volumes"]
+            data = next((v for v in volumes if v["name"] == "data"), {})
+            self.assertEqual("hostPath" in data, backend == "hostPath")
+            self.assertEqual("emptyDir" in data, backend == "emptyDir")
+        self.assertIn("mutually exclusive", render({"engines": [{
+            "name": "conflict", "replicas": 1, "storageType": "emptyDir",
+            "hostPathStorageEnabled": True}]}, expect_error=True))
+
     def test_mixed_service_accounts(self):
         docs = render({"engineSpec": {"serviceAccount": "external"}, "engines": [
             {"name": "first", "replicas": 1, "serviceAccount": ""}, {"name": "second", "replicas": 1}]})

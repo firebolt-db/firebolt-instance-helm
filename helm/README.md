@@ -38,7 +38,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.emptyDir | object | {} | Options for storageType=emptyDir, such as sizeLimit or medium: Memory. Local cache is lost when the pod is removed; metadata and object storage remain authoritative. |
 | engineSpec.extraEnv | list | [] | Extra environment variables for the engine container. Use this to inject AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (for example via `valueFrom.secretKeyRef`) for a custom S3-compatible store (`managed_table_storage: s3` + `aws.endpoint`). |
 | engineSpec.extraEnvFrom | list | [] | Extra `envFrom` sources for the engine container. Use a `secretRef` to load a Secret holding AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for a custom S3-compatible store. |
-| engineSpec.hostPathStorageEnabled | bool | `false` | Legacy alias for storageType=hostPath. Cannot be combined with storageType=emptyDir. |
+| engineSpec.hostPathStorageEnabled | bool | `false` | Legacy alias for storageType=hostPath. An explicit engines[].storageType overrides the inherited alias. Setting both hostPathStorageEnabled=true and storageType=emptyDir on the same Engine is invalid. |
 | engineSpec.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | engineSpec.image.repository | string | `"oci.firebolt.io/firebolt-db/engine"` | Container repository for the Firebolt engine image. |
 | engineSpec.image.tag | string | `""` | Image tag. Defaults to `Chart.appVersion` when empty. |
