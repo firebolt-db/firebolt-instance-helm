@@ -55,18 +55,30 @@ Kubernetes health probes and the gateway's active engine health check keep worki
 
 ### Signing key rotation
 
-`signingKeys` is an ordered list. The **first** entry is the active signer used for new tokens; every entry in the list remains valid for verifying tokens already issued under it. To rotate, prepend a new entry rather than replacing the list, and remove the old entry only once every token it signed has expired:
+`signingKeys` is ordered: the first entry signs new tokens, and all entries verify tokens. Engines load keys at startup, so Secret changes require Engine restarts.
+
+For routine rotation while preserving existing tokens, use separate chart upgrades:
+
+1. Append the new key with a fresh ID and Secret name. Wait for the Secret to exist and every Engine StatefulSet to complete its rollout before proceeding.
+2. Move the new key to the first position and complete every Engine rollout again.
+3. Retain the old key until its tokens have expired, including clock-skew tolerance, measured from when the last node stopped signing with it. Then remove its entry and upgrade.
+
+This gives the sequence `[old]` → `[old, new]` → `[new, old]` → `[new]`. Promoting the new key before all nodes have loaded it can break token validation. Engine restarts can still interrupt queries.
+
+After distributing the new key to every node, configure it as the active signer while retaining the old key for verification:
 
 ```yaml
 auth:
   signingKeys:
-    - id: key-2026-02 # now active
+    - id: key-2026-02 # Active: signs new tokens
       existingSecret:
         secretRef: firebolt-signing-key-2026-02
-    - id: key-2026-01 # still verifies old tokens until they expire
+    - id: key-2026-01 # Retiring: verifies old tokens until they expire
       existingSecret:
         secretRef: firebolt-signing-key-2026-01
 ```
+
+During a maintenance window with authentication and query traffic stopped, you can skip the initial distribution upgrade and switch directly to `[new, old]`. Complete all Engine rollouts before restoring traffic.
 
 ### cert-manager as a signing-key source
 
@@ -84,7 +96,7 @@ auth:
           kind: ClusterIssuer
 ```
 
-The chart pins `privateKey.rotationPolicy: Never` on signing-key Certificates, so cert-manager's renewal timer never silently replaces an active signing key out from under already-issued tokens. Rotate by prepending a new `signingKeys` entry, the same as with an existing Secret.
+The chart pins `privateKey.rotationPolicy: Never`, so certificate renewal preserves the signing key. Rotate signing keys through new `signingKeys` entries using the procedure above. cert-manager provisions the key material; it does not coordinate signer promotion or retirement.
 
 ### OIDC and other auth settings
 
