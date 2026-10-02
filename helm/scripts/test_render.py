@@ -146,19 +146,23 @@ class ConfigurationTests(unittest.TestCase):
 
 
 class CertificateLifecycleTests(unittest.TestCase):
-    def test_restart_tokens_are_component_scoped(self):
+    def test_workload_annotations_are_component_scoped(self):
         baseline = render()
-        def pod(docs, kind, name):
-            return resource(docs, kind, name)["spec"]["template"]
+        custom = {"secret.reloader.stakater.com/auto": "true"}
         cases = [("engineSpec", "StatefulSet", "audit-engine-default-node-0"),
                  ("gateway", "Deployment", "audit-gateway"),
                  ("metadata", "Deployment", "audit-metadata-service")]
         for component, kind, name in cases:
-            docs = render({component: {"restartToken": "rotation-2"}})
-            self.assertNotEqual(pod(baseline, kind, name), pod(docs, kind, name))
+            docs = render({component: {"annotations": custom}})
+            updated = resource(docs, kind, name)
+            original = resource(baseline, kind, name)
+            self.assertEqual(updated["metadata"]["annotations"], custom)
+            self.assertEqual(updated["spec"]["template"], original["spec"]["template"])
+            self.assertNotIn("firebolt.io/restart-token", original["spec"]["template"]["metadata"]["annotations"])
             for other, other_kind, other_name in cases:
                 if other != component:
-                    self.assertEqual(pod(baseline, other_kind, other_name), pod(docs, other_kind, other_name))
+                    self.assertEqual(resource(baseline, other_kind, other_name), resource(docs, other_kind, other_name))
+            render({component: {"annotations": {"invalid": True}}}, expect_error=True)
 
     def test_tls_hook_verifies_hosts_and_projects_only_ca_keys(self):
         values = {"engines": [{"name": "default", "replicas": 2}], "tls": {

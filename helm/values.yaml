@@ -18,8 +18,9 @@ createNamespace: false
 # -- Shared engine pod defaults applied to all engines unless overridden per-engine.
 # @default -- {}
 engineSpec:
-  # -- Change after Secret rotation to restart Engines, including offline/GitOps rendering. Wait for replacement Secret material before upgrading.
-  restartToken: ""
+  # -- Annotations on Engine StatefulSets, for example to opt into an externally installed Secret reload controller. These do not annotate pods.
+  # @default -- {}
+  annotations: {}
   image:
     # -- Container repository for the Firebolt engine image.
     repository: oci.firebolt.io/firebolt-db/engine
@@ -333,8 +334,9 @@ postgresql:
 # the upstream to `{engine}-service:3473` via dynamic forward proxy.
 # @default -- {}
 gateway:
-  # -- Change after certificate or trust-bundle rotation to restart the Gateway, including offline/GitOps rendering.
-  restartToken: ""
+  # -- Annotations on the Gateway Deployment, for example to opt into an externally installed Secret reload controller. These do not annotate pods.
+  # @default -- {}
+  annotations: {}
   # -- Total pod shutdown budget in seconds, including a 5s endpoint-propagation wait and explicit connection draining. Requests still active at the deadline can be interrupted.
   terminationGracePeriodSeconds: 15
   # -- Set to true to deploy the Envoy gateway proxy.

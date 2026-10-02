@@ -63,8 +63,11 @@
             }
           }
         },
-        "restartToken": {
-          "type": "string"
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
@@ -187,8 +190,11 @@
           "type": "integer",
           "minimum": 10
         },
-        "restartToken": {
-          "type": "string"
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },

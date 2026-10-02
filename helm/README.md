@@ -28,6 +28,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | customEngineConfig.instance.id | string | `"01kp98j0000000000000000000"` | Lowercase Crockford ULID for the Firebolt instance. Must match the account reconciled by the metadata service at startup. `values.schema.json` rejects uppercase and any character outside the Crockford alphabet. |
 | engineSpec | object | {} | Shared engine pod defaults applied to all engines unless overridden per-engine. |
 | engineSpec.affinity | object | `{}` | Affinity rules for engine pod scheduling. |
+| engineSpec.annotations | object | {} | Annotations on Engine StatefulSets, for example to opt into an externally installed Secret reload controller. These do not annotate pods. |
 | engineSpec.customInitContainersTemplate | list | `[]` | Custom init containers injected into engine pods (supports templating). |
 | engineSpec.customVolumeMounts | list | `[]` | Custom volume mounts injected into the engine `core` container, paired with `customVolumes` above — a volume declared there is inert until also mounted here. |
 | engineSpec.customVolumes | list | `[]` | Custom volumes injected into engine pods. |
@@ -48,7 +49,6 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | engineSpec.podSecurityContext.fsGroupChangePolicy | string | `"OnRootMismatch"` | When to re-apply `fsGroup` ownership. `OnRootMismatch` skips the chown when already correct — much faster on large PVCs. |
 | engineSpec.podSecurityContext.runAsNonRoot | bool | `true` | Reject the pod if any container runs as UID 0. Also gates the chart's container-level `runAs*` defaults, memlock init, and the entrypoint UID check. |
 | engineSpec.readiness | bool | `true` | When true, a readiness probe is added to the core container. |
-| engineSpec.restartToken | string | `""` | Change after Secret rotation to restart Engines, including offline/GitOps rendering. Wait for replacement Secret material before upgrading. |
 | engineSpec.serviceAccount | string | `""` | ServiceAccount used by engine pods.  Empty (the default): the chart creates `<release>-engine` with `automountServiceAccountToken: false`, so a code-execution exploit in the engine container has no SA token to talk to the apiserver with. Engines do not call the Kubernetes API; the dedicated SA replaces the namespace `default` SA, which automounts a token and inherits any RoleBindings accumulated on `default` from unrelated installs.  Non-empty: the chart references the named SA verbatim and does NOT create one — bring your own (the documented IRSA / Pod Identity flow at docs/usage/object-storage/amazon-s3.mdx works this way). The chart cannot influence `automountServiceAccountToken` on a SA it does not own; set it explicitly in your SA manifest if you want the same hardening. |
 | engineSpec.storageHostPath | object | {} | Host path configuration used when `hostPathStorageEnabled` is true. |
 | engineSpec.storageHostPath.path | string | `"/var/lib/firebolt-core"` | Host path for engine data. |
@@ -75,6 +75,7 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | extraLabels | object | `{"firebolt/product":"core"}` | Extra labels applied to all resources and pods. |
 | gateway | object | {} | Envoy gateway proxy configuration. Routes queries to engine Services based on the `X-Firebolt-Engine` HTTP header. A Lua filter extracts the engine name and rewrites the upstream to `{engine}-service:3473` via dynamic forward proxy. |
 | gateway.adminPort | int | `9901` | Envoy admin interface port (used for health checks). |
+| gateway.annotations | object | {} | Annotations on the Gateway Deployment, for example to opt into an externally installed Secret reload controller. These do not annotate pods. |
 | gateway.containerPort | int | `8080` | Envoy listener port for client traffic. |
 | gateway.enabled | bool | `true` | Set to true to deploy the Envoy gateway proxy. |
 | gateway.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
@@ -105,7 +106,6 @@ Firebolt Instance on Kubernetes — Envoy gateway, metadata, auth, and engines
 | gateway.podTemplate.volumes | list | `[]` | Extra volumes added to the gateway pod, merged with the chart-managed volumes. Mount them on the Envoy container via `volumeMounts` below. |
 | gateway.replicas | int | `2` | Number of gateway replicas. |
 | gateway.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the Envoy container. |
-| gateway.restartToken | string | `""` | Change after certificate or trust-bundle rotation to restart the Gateway, including offline/GitOps rendering. |
 | gateway.service | object | {} | Gateway Service configuration. |
 | gateway.service.port | int | `80` | External service port proxied to `containerPort`. |
 | gateway.service.type | string | `"ClusterIP"` | Service type. One of `ClusterIP`, `LoadBalancer`, or `NodePort`. |
