@@ -55,37 +55,18 @@ Kubernetes health probes and the gateway's active engine health check keep worki
 
 ### Signing key rotation
 
-`signingKeys` is ordered. The first entry signs new tokens, and every entry verifies tokens. Rotate in separate upgrades so every node learns the new key before any node signs with it:
-
-1. Create a new Secret or cert-manager entry with a fresh key ID. **Append** it after the current signer. Upgrade and wait for every Engine StatefulSet to finish rolling out. With cert-manager, wait for the new Secret to be issued as well.
-2. Move the new entry to the first position. Upgrade and wait for every Engine StatefulSet to finish rolling out again.
-3. From the completion of the second rollout, retain the old key for the maximum lifetime of tokens it could have issued, including clock-skew tolerance. If that lifetime is unknown or unbounded, do not remove the key until you have established a safe retention policy.
-4. Remove the old entry, upgrade, and verify authentication across every Engine.
-
-Do not replace key material in an existing Secret or prepend a new signer in a single upgrade. An updated node could issue tokens that an older node cannot verify. These steps preserve token verification compatibility; Engine restarts can still interrupt queries.
-
-During the first upgrade, keep the old signer first:
+`signingKeys` is an ordered list. The **first** entry is the active signer used for new tokens; every entry in the list remains valid for verifying tokens already issued under it. To rotate, prepend a new entry rather than replacing the list, and remove the old entry only once every token it signed has expired:
 
 ```yaml
 auth:
   signingKeys:
-    - id: key-2026-01
-      existingSecret:
-        secretRef: firebolt-signing-key-2026-01
-    - id: key-2026-02
+    - id: key-2026-02 # now active
       existingSecret:
         secretRef: firebolt-signing-key-2026-02
+    - id: key-2026-01 # still verifies old tokens until they expire
+      existingSecret:
+        secretRef: firebolt-signing-key-2026-01
 ```
-
-After each upgrade, wait for all Engine StatefulSets in the release:
-
-```bash
-kubectl rollout status statefulset --namespace firebolt \
-  --selector app.kubernetes.io/instance=firebolt,firebolt/component=engine \
-  --timeout=10m
-```
-
-Check tokens issued by different nodes against every other node before promotion and after removal. A successful login against one node does not establish fleet-wide compatibility.
 
 ### cert-manager as a signing-key source
 
@@ -103,7 +84,7 @@ auth:
           kind: ClusterIssuer
 ```
 
-The chart pins `privateKey.rotationPolicy: Never` on signing-key Certificates, so cert-manager's renewal timer never silently replaces an active signing key out from under already-issued tokens. Use the same staged distribution, promotion, and retirement procedure as with an existing Secret.
+The chart pins `privateKey.rotationPolicy: Never` on signing-key Certificates, so cert-manager's renewal timer never silently replaces an active signing key out from under already-issued tokens. Rotate by prepending a new `signingKeys` entry, the same as with an existing Secret.
 
 ### OIDC and other auth settings
 

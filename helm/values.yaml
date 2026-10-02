@@ -475,11 +475,8 @@ auth:
   # (`instance.auth.local.signing_keys`). An ordered list: the **first**
   # entry is the active signer used for new tokens; every entry remains
   # valid for verifying tokens already issued under it. **To rotate the
-  # signing key, first append the new entry** and finish every Engine
-  # rollout before moving it to the first position. Finish every rollout
-  # again, then retain the old key for the maximum token lifetime plus
-  # clock skew before removing it. Prepending immediately lets updated
-  # nodes mint tokens that older nodes cannot verify.
+  # signing key, prepend a new entry** rather than replacing the list, so
+  # tokens signed by the outgoing key keep validating until it's removed.
   # At least one entry is required when `auth.enabled` is true — an engine
   # with no explicit signing key falls back to a per-pod dev key that
   # differs across nodes and breaks token validation in a multi-node
@@ -495,7 +492,7 @@ auth:
   #     and its CRDs installed in-cluster. The chart pins
   #     `privateKey.rotationPolicy: Never` so cert-manager never silently
   #     rotates a key out from under already-issued tokens — rotate by
-  #     distributing, promoting, and retiring list entries in stages.
+  #     prepending a new list entry instead.
   # @default -- []
   signingKeys: []
   # Example:
