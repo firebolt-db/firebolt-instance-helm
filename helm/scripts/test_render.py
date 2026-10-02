@@ -99,15 +99,12 @@ class ConfigurationTests(unittest.TestCase):
                 self.assertEqual(claim.get("storageClassName"), storage_class)
                 self.assertEqual("storageClassName" in claim, storage_class is not None)
 
-    def test_metadata_rolls_on_identity_and_explicit_secret_restart(self):
+    def test_metadata_rolls_on_identity(self):
         def annotations(values):
             return resource(render(values), "Deployment", "audit-metadata-service")["spec"]["template"]["metadata"]["annotations"]
         baseline = annotations({})
         changed_id = annotations({"customEngineConfig": {"instance": {"id": "01kp98j0000000000000000001"}}})
         self.assertNotEqual(baseline["checksum/config"], changed_id["checksum/config"])
-        restarted = annotations({"metadata": {"restartToken": "rotation-2"}})
-        self.assertNotEqual(baseline, restarted)
-        self.assertEqual(baseline["checksum/config"], restarted["checksum/config"])
 
     def test_mounts_cannot_shadow_owned_paths_or_duplicate_destinations(self):
         for path in ("/secrets/auth/admin", "/var", "/var/lib/firebolt/../firebolt", "/etc/envoy/tls/gateway"):
@@ -122,6 +119,15 @@ class ConfigurationTests(unittest.TestCase):
                                    {"name": "other", "mountPath": "/custom/"}]}}, expect_error=True))
         render({"engineSpec": {"customVolumes": [{"name": "custom", "emptyDir": {}}],
                              "customVolumeMounts": [{"name": "custom", "mountPath": "/custom"}]}})
+
+    def test_metadata_workload_annotations_do_not_change_pod_template(self):
+        baseline = resource(render(), "Deployment", "audit-metadata-service")
+        custom = {"secret.reloader.stakater.com/auto": "true"}
+        updated = resource(render({"metadata": {"annotations": custom}}), "Deployment", "audit-metadata-service")
+        self.assertEqual(updated["metadata"]["annotations"], custom)
+        self.assertEqual(updated["spec"]["template"], baseline["spec"]["template"])
+        self.assertNotIn("firebolt.io/restart-token", baseline["spec"]["template"]["metadata"]["annotations"])
+        render({"metadata": {"annotations": {"invalid": True}}}, expect_error=True)
 
     def test_reject_invalid_combinations(self):
         cases = [
