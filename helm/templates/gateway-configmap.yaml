@@ -133,7 +133,7 @@ data:
                                 cluster: dynamic_forward_proxy
                                 timeout: 0s
                                 # Retry contract:
-                                #   - connect-failure / refused-stream / reset:
+                                #   - connect-failure / refused-stream / reset-before-request:
                                 #     transport-level failures where the engine
                                 #     could not have observed the request, so a
                                 #     retry cannot duplicate side effects.
@@ -148,6 +148,8 @@ data:
                                 #     between SIGTERM and the next health-check
                                 #     ejection would propagate a 503 to the
                                 #     client.
+                                # Never retry a generic reset: the engine may have
+                                # accepted and mutated state before disconnecting.
                                 # We deliberately do NOT match bare 5xx: a
                                 # 5xx returned by the engine after work has
                                 # started may have applied side effects.
@@ -165,7 +167,7 @@ data:
                                 # short exponential back-off lets a DNS refresh or
                                 # health-check ejection take effect between tries.
                                 retry_policy:
-                                  retry_on: connect-failure,refused-stream,reset,retriable-headers
+                                  retry_on: connect-failure,refused-stream,reset-before-request,retriable-headers
                                   retriable_headers:
                                     - name: X-Firebolt-Drained
                                       present_match: true

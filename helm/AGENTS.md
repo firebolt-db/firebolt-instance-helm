@@ -62,7 +62,7 @@ The Helm chart itself, packaged and published as `firebolt-instance` to `oci://g
 - `templates/namespace.yaml` — optional Namespace.
 - `templates/tests/test-*.yaml` — `helm test` Pod manifests. Each is independent; `helm test` runs them in declaration order.
 - `files/memlock-setup.sh` — the sidecar script loaded into the engine pod when `engineSpec.memlockSetup: true`.
-- `scripts/validate-chart.sh` — full validation pipeline used by CI and runnable locally.
+- `scripts/validate-chart.sh` — full validation pipeline used by CI and runnable locally, including `scripts/test_render.py` (Helm + Python/PyYAML). `make test-gateway-runtime` uses Docker to exercise the rendered retry policy against a backend that disconnects after accepting a mutation.
 - `charts/` — populated by `helm dependency build`; contents are not committed.
 
 ## Adding a new value

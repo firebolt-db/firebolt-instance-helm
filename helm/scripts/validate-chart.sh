@@ -153,5 +153,8 @@ done
 echo ""
 
 echo "==================================="
+
+# PyYAML is installed with yamllint in CI. Override PYTHON for a local venv.
+"${PYTHON:-python3}" "$SCRIPT_DIR/test_render.py"
 echo "✓ All validation checks passed!"
 echo "==================================="
