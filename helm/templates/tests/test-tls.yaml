@@ -54,8 +54,9 @@ spec:
           {{- include "fbinstance.testShellHelpers" . | nindent 10 }}
           {{- if .Values.tls.engine.enabled }}
           {{- range $engine := .Values.engines }}
+          {{- $effective := include "fbinstance.effectiveEngine" (dict "root" $ "engine" $engine) | fromYaml }}
           {{- range $i := until (int $engine.replicas) }}
-          HOST="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl.{{ $.Release.Namespace }}.svc{{ $.Values.engineSpec.nodeHostSuffix }}"
+          HOST="{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}-0.{{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-hl.{{ $.Release.Namespace }}.svc{{ $effective.nodeHostSuffix }}"
           log "Verify Engine TLS chain and hostname: $HOST"
           curl --fail --silent --show-error --max-time 30 \
             --cacert /trust/engine/ca.crt "https://$HOST:3473/health/ready"

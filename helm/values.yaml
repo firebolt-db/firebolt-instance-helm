@@ -18,7 +18,28 @@ createNamespace: false
 # -- Shared engine pod defaults applied to all engines unless overridden per-engine.
 # @default -- {}
 engineSpec:
-  # -- Annotations on Engine StatefulSets, for example to opt into an externally installed Secret reload controller. These do not annotate pods.
+  # -- Engine-local cache backend: pvc (retained by default), emptyDir (ephemeral), or hostPath. Changing backend on an existing StatefulSet requires a migration.
+  storageType: pvc
+  # -- Options for storageType=emptyDir, such as sizeLimit or medium: Memory. Local cache is lost when the pod is removed; metadata and object storage remain authoritative.
+  # @default -- {}
+  emptyDir: {}
+  # -- Shared container resource requests and limits, overridden as a whole by engines[].resources.
+  # @default -- {}
+  resources:
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+    limits:
+      memory: "4Gi"
+  # -- Default priority class, overridden per Engine (an empty override clears it).
+  priorityClassName: ""
+  # -- Default custom pod annotations. checksum/ and firebolt.io/ are reserved.
+  # @default -- {}
+  podAnnotations: {}
+  # -- Default extra pod labels. Chart selector labels remain authoritative.
+  # @default -- {}
+  podLabels: {}
+  # -- Default annotations on Engine StatefulSets, replaced as a whole by engines[].annotations (an empty map clears them). These do not annotate pods.
   # @default -- {}
   annotations: {}
   image:
@@ -63,12 +84,11 @@ engineSpec:
   # inherits any RoleBindings accumulated on `default` from unrelated
   # installs.
   #
-  # Non-empty: the chart references the named SA verbatim and does NOT
-  # create one — bring your own (the documented IRSA / Pod Identity
-  # flow at docs/usage/object-storage/amazon-s3.mdx works this way). The chart
-  # cannot influence `automountServiceAccountToken` on a SA it does
-  # not own; set it explicitly in your SA manifest if you want the
-  # same hardening.
+  # Non-empty: this Engine references the named SA verbatim (bring your own).
+  # A managed SA is still created if another Engine needs it. Every Engine
+  # pod sets automountServiceAccountToken: false, including with a supplied SA.
+  # Webhook-injected workload-identity tokens remain supported; see
+  # docs/usage/object-storage/amazon-s3.mdx.
   serviceAccount: ""
   # -- Tolerations for engine pod scheduling.
   tolerations: []
@@ -121,9 +141,9 @@ engineSpec:
   #     mountPath: /etc/custom-config
   #     readOnly: true
 
-  # -- When true, uses hostPath instead of PVC for engine data.
+  # -- Legacy alias for storageType=hostPath. An explicit engines[].storageType overrides the inherited alias. Setting both hostPathStorageEnabled=true and storageType=emptyDir on the same Engine is invalid.
   hostPathStorageEnabled: false
-  # -- Host path configuration used when `hostPathStorageEnabled` is true.
+  # -- Host path configuration used with storageType=hostPath or the legacy hostPathStorageEnabled alias.
   # @default -- {}
   storageHostPath:
     # -- Host path for engine data.
@@ -269,6 +289,15 @@ metadata:
 # for an external database.
 # @default -- {}
 postgresql:
+  # -- TLS to external PostgreSQL. The bundled database does not provide a TLS listener.
+  # @default -- {}
+  tls:
+    # -- Require certificate-chain and hostname verification (verify-full).
+    enabled: false
+    # -- Secret containing the PostgreSQL server CA bundle, mounted read-only into the Metadata Service.
+    caSecret: ""
+    # -- Key containing the PEM CA bundle in caSecret.
+    caKey: ca.crt
   # -- When true, deploys a bundled PostgreSQL StatefulSet. Set to false to use an external database.
   local_enabled: true
   # -- PostgreSQL image used for the bundled StatefulSet. Pinned to an
@@ -605,55 +634,17 @@ tls:
 
 # -- Engine definitions. Each entry produces one StatefulSet per node (`replicas` controls
 # node count), plus a shared headless Service, ClusterIP Service, and ConfigMap.
-# Per-engine values override the shared `engineSpec` defaults.
+# Per-engine values replace shared `engineSpec` defaults, including explicit false and empty maps/lists.
+# Image fields and storage fields inherit individually; use per-engine storage for engineSpec.defaultStorage.
 # @default -- []
 engines:
-  - # -- Engine name. Used to derive resource names across the chart.
+  - # -- Engine name. Generated pod and Service names must fit in 63 characters together with the release prefix and node suffix.
     name: default
-    # -- Number of nodes in this engine group (one StatefulSet replica per node).
+    # -- Number of nodes (one single-replica StatefulSet per node). Upgrades and topology changes can interrupt queries.
     replicas: 1
-    # -- Resource requests and limits for engine containers.
-    # Firebolt Core is memory-bound: more RAM directly improves cache hit rates and query
-    # throughput. CPU governs parallel query execution threads.
-    #
-    # Typical sizing guidance:
-    #   Development / functional testing:  2 vCPU  /  8 Gi  (request)
-    #   Small production workload:         4 vCPU  / 32 Gi
-    #   Medium production workload:        8 vCPU  / 64 Gi
-    #   Large production workload:        16 vCPU  / 128 Gi
-    #
-    # Storage I/O is also significant — use an SSD-backed StorageClass and
-    # size the PVC to hold your working dataset plus ~30 % headroom.
-    resources:
-      requests:
-        cpu: "1"
-        memory: "4Gi"
-      limits:
-        memory: "4Gi"
-    # -- PVC storage configuration for this engine. Falls back to `engineSpec.defaultStorage` if omitted. Set `storageClassName` to select a class, or an empty string to disable dynamic provisioning. Existing claim templates cannot be resized or switched by a normal Helm upgrade.
-    storage:
-      accessModes: [ReadWriteOnce]
-      resources:
-        requests:
-          storage: 100Gi
-    # -- Priority class name for engine pods.
-    priorityClassName: ""
-    # -- Tolerations for engine pod scheduling.
-    tolerations: []
-    # -- Affinity rules for engine pod scheduling.
-    affinity: {}
-    # -- Node selector for engine pod scheduling.
-    nodeSelector: {}
-    # -- Topology spread constraints for engine pod scheduling. Overrides
-    # `engineSpec.topologySpreadConstraints` for this engine when set.
-    topologySpreadConstraints: []
-    # -- Annotations applied to engine pods.
-    podAnnotations: {}
-    # -- Extra labels applied to this engine's pod template. Chart-reserved
-    # keys (`app.kubernetes.io/{name,instance,managed-by}` and
-    # `firebolt/{component,engine,node}`) are silently dropped from user
-    # input so the StatefulSet selector cannot be detached by a typo.
-    podLabels: {}
+    # -- Optional per-Engine config overlay, merged over customEngineConfig. Installation identity and chart-managed topology/auth/TLS fields cannot be overridden.
+    # @default -- {}
+    customEngineConfig: {}
 
 # @section -- Global
 

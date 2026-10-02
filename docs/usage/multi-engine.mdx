@@ -83,3 +83,25 @@ Engine names must match RFC 1123 DNS labels (lowercase alphanumerics and hyphens
 ## Change the engine set
 
 Edit `engines:` and run `helm upgrade`. Removing an engine deletes its StatefulSets but leaves the PVCs (Kubernetes default `Retain`).
+
+## Override shared settings
+
+Each Engine inherits `engineSpec`. Explicit per-Engine fields replace inherited values, including `false`, empty lists, and empty maps. Image objects inherit individual fields. `storage` inherits individual fields from `engineSpec.defaultStorage`. Per-Engine `customEngineConfig` merges over the global configuration, but `instance.id` remains global because all Engines share the Metadata Service. Chart-owned configuration fields remain protected.
+
+For example, set `engines[].extraEnv: []` to clear inherited environment additions or `engines[].uiSidecar: false` to disable the inherited UI sidecar. Each Engine can select its own `serviceAccount`; the chart disables automatic API token mounts even with a supplied ServiceAccount.
+
+## Select an Engine in the URL
+
+Send the routing selector as a query parameter:
+
+```bash
+curl -s 'http://localhost:8080/?engine=analytics' --data 'SELECT 1'
+```
+
+The Gateway accepts either `X-Firebolt-Engine` or `engine=`. If both are present, they must match. Duplicate query selectors, invalid names, and conflicting selectors return HTTP 400. The Gateway removes the routing parameter before forwarding the request and preserves other query parameters.
+
+## Use ephemeral local storage
+
+Set `engineSpec.storageType: emptyDir`, or set `storageType: emptyDir` on one Engine, to use ephemeral local storage. Optional `emptyDir.sizeLimit` and `emptyDir.medium` configure the volume. Memory-backed volumes count against pod memory limits. Pod removal discards local data and caches, so use durable object storage and PostgreSQL for the durable data and metadata. Expect cold-cache recovery after replacement.
+
+The default `storageType: pvc` retains PVCs when an Engine is removed. `storageType: hostPath` and the legacy `hostPathStorageEnabled` setting remain available. An explicit per-Engine `storageType` overrides an inherited `engineSpec.hostPathStorageEnabled: true`, allowing PVC or ephemeral Engines alongside legacy hostPath Engines. Changing storage type on an existing StatefulSet requires a planned migration because its volume claim templates are immutable. Prefer a new Engine name and retire the old Engine after validation.

@@ -30,6 +30,7 @@ whole instance), not per-node, so there's no reason to recompute them inside the
 {{- end -}}
 {{- range .Values.engines }}
 {{- $engine := . }}
+{{- $effective := include "fbinstance.effectiveEngine" (dict "root" $ "engine" $engine) | fromYaml }}
 {{- range $i := until (int $engine.replicas) }}
 ---
 apiVersion: apps/v1
@@ -37,7 +38,7 @@ kind: StatefulSet
 metadata:
   namespace: {{ $.Release.Namespace }}
   name: {{ include "fbinstance.fullname" $ }}-engine-{{ $engine.name }}-node-{{ $i }}
-  {{- with $.Values.engineSpec.annotations }}
+  {{- with $effective.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -83,7 +84,7 @@ spec:
         {{- if $.Values.tls.engine.enabled }}
         checksum/tls-engine: {{ (lookup "v1" "Secret" $.Release.Namespace $engineTlsSecret).data | toYaml | sha256sum }}
         {{- end }}
-        {{- with $engine.podAnnotations }}
+        {{- with $effective.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
@@ -92,7 +93,7 @@ spec:
         firebolt/engine: {{ $engine.name }}
         firebolt/node: {{ $i | quote }}
         {{- $reserved := list "firebolt/component" "firebolt/engine" "firebolt/node" "app.kubernetes.io/name" "app.kubernetes.io/instance" "app.kubernetes.io/managed-by" }}
-        {{- range $k, $v := $engine.podLabels }}
+        {{- range $k, $v := $effective.podLabels }}
         {{- if not (has $k $reserved) }}
         {{ $k }}: {{ $v | quote }}
         {{- end }}
@@ -105,31 +106,32 @@ spec:
       # that also risks colliding with firebolt-core's own config keys
       # (the `FIREBOLT_*` prefix is owned by the engine binary).
       enableServiceLinks: false
-      {{- if $engine.priorityClassName }}
-      priorityClassName: {{ $engine.priorityClassName }}
+      {{- if $effective.priorityClassName }}
+      priorityClassName: {{ $effective.priorityClassName }}
       {{- end }}
-      serviceAccountName: {{ include "fbinstance.engineServiceAccountName" $ }}
-      terminationGracePeriodSeconds: {{ $.Values.engineSpec.terminationGracePeriodSeconds }}
-      {{- with $.Values.engineSpec.podSecurityContext }}
+      serviceAccountName: {{ $effective.serviceAccount | default (printf "%s-engine" (include "fbinstance.fullname" $)) }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ $effective.terminationGracePeriodSeconds }}
+      {{- with $effective.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if and $.Values.engineSpec.memlockSetup $.Values.engineSpec.podSecurityContext.runAsNonRoot }}
+      {{- if and $effective.memlockSetup $effective.podSecurityContext.runAsNonRoot }}
       shareProcessNamespace: true
       {{- end }}
-      {{- with ($engine.tolerations | default $.Values.engineSpec.tolerations) }}
+      {{- with $effective.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with ($engine.affinity | default $.Values.engineSpec.affinity) }}
+      {{- with $effective.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with ($engine.nodeSelector | default $.Values.engineSpec.nodeSelector) }}
+      {{- with $effective.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with ($engine.topologySpreadConstraints | default $.Values.engineSpec.topologySpreadConstraints) }}
+      {{- with $effective.topologySpreadConstraints }}
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -140,8 +142,8 @@ spec:
       {{- end }}
       containers:
         - name: core
-          image: "{{ $.Values.engineSpec.image.repository }}:{{ default $.Chart.AppVersion $.Values.engineSpec.image.tag }}"
-          imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
+          image: "{{ $effective.image.repository }}:{{ default $.Chart.AppVersion $effective.image.tag }}"
+          imagePullPolicy: {{ $effective.image.pullPolicy }}
           env:
             - name: FIREBOLT_CORE_NODE
               value: {{ $i | quote }}
@@ -161,10 +163,10 @@ spec:
             # startup.
             - name: FIREBOLT_CORE_MODE
               value: "1"
-            {{- with $.Values.engineSpec.extraEnv }}
+            {{- with $effective.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- with $.Values.engineSpec.extraEnvFrom }}
+          {{- with $effective.extraEnvFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -196,13 +198,13 @@ spec:
               echo -n "[Setup] Firebolt Core version "
               firebolt --version
 
-              {{- if $.Values.engineSpec.podSecurityContext.runAsNonRoot }}
+              {{- if $effective.podSecurityContext.runAsNonRoot }}
               if [[ $(id -u) -eq 0 ]]; then
                 echo "[Setup] Core container is running as root, however deployment used podSecurityContext.runAsNonRoot=true" 1>&2
                 exit 4
               fi
 
-              {{- if $.Values.engineSpec.memlockSetup }}
+              {{- if $effective.memlockSetup }}
               echo "[Setup] Core entrypoint PID: $BASHPID"
               rm -f /var/lib/firebolt/entrypoint-*.pid
               PID_FILE="/var/lib/firebolt/entrypoint-$POD_UID.pid"
@@ -222,7 +224,7 @@ spec:
                 exit 4
               fi
 
-              {{- if $.Values.engineSpec.memlockSetup }}
+              {{- if $effective.memlockSetup }}
               ## NOTE: no 'ulimit' call happens here because root images support is soon to be deprecated
               echo "WARNING: memlockSetup=true is unnecessary when podSecurityContext.runAsNonRoot is false (or unset)" 1>&2
               {{- end }}
@@ -260,7 +262,7 @@ spec:
             httpGet:
               path: /health/live
               port: 8122
-          {{- if $.Values.engineSpec.readiness }}
+          {{- if $effective.readiness }}
           readinessProbe:
             initialDelaySeconds: 1
             periodSeconds: 3
@@ -278,7 +280,7 @@ spec:
               path: /health/live
               port: 8122
           resources:
-            {{- toYaml $engine.resources | nindent 12 }}
+            {{- toYaml $effective.resources | nindent 12 }}
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
@@ -310,7 +312,7 @@ spec:
               mountPath: /etc/firebolt/tls/engine
               readOnly: true
             {{- end }}
-            {{- with $.Values.engineSpec.customVolumeMounts }}
+            {{- with $effective.customVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
             # Scratch space outside the read-only root filesystem.
@@ -327,7 +329,7 @@ spec:
             # and postgres containers all already enforce this — the
             # engine matching them closes the last writable-root gap.
             readOnlyRootFilesystem: true
-            {{- if $.Values.engineSpec.podSecurityContext.runAsNonRoot }}
+            {{- if $effective.podSecurityContext.runAsNonRoot }}
             runAsNonRoot: true
             runAsUser: 3473
             runAsGroup: 3473
@@ -336,10 +338,10 @@ spec:
             capabilities:
               drop:
                 - ALL
-        {{- if $.Values.engineSpec.uiSidecar }}
+        {{- if $effective.uiSidecar }}
         - name: core-ui
-          image: {{ $.Values.engineSpec.uiSidecarImage.repository }}:{{ $.Values.engineSpec.uiSidecarImage.tag }}
-          imagePullPolicy: {{ $.Values.engineSpec.uiSidecarImage.pullPolicy }}
+          image: {{ $effective.uiSidecarImage.repository }}:{{ $effective.uiSidecarImage.tag }}
+          imagePullPolicy: {{ $effective.uiSidecarImage.pullPolicy }}
           env:
             - name: FIREBOLT_CORE_URL
               # The sidecar's nginx reverse proxy defaults proxy_ssl_verify to off, so
@@ -385,10 +387,10 @@ spec:
             - name: nginx-writable-dir
               mountPath: /var/run/nginx
         {{- end }}
-        {{- if and $.Values.engineSpec.memlockSetup $.Values.engineSpec.podSecurityContext.runAsNonRoot }}
+        {{- if and $effective.memlockSetup $effective.podSecurityContext.runAsNonRoot }}
         - name: memlock-setup
           image: {{ $.Values.utilitiesImage }}
-          imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
+          imagePullPolicy: {{ $effective.image.pullPolicy }}
           resources:
             requests:
               cpu: 50m
@@ -417,11 +419,11 @@ spec:
             - name: data
               mountPath: /var/lib/firebolt
         {{- end }}
-{{- $hpEnabled := $.Values.engineSpec.hostPathStorageEnabled }}
-{{- if or $.Values.engineSpec.customInitContainersTemplate $hpEnabled $.Values.tls.engine.enabled }}
+{{- $hpEnabled := eq $effective.storageType "hostPath" }}
+{{- if or $effective.customInitContainersTemplate $hpEnabled $.Values.tls.engine.enabled }}
       initContainers:
-        {{- if $.Values.engineSpec.customInitContainersTemplate }}
-        {{- tpl (toYaml $.Values.engineSpec.customInitContainersTemplate) $ | nindent 8 }}
+        {{- if $effective.customInitContainersTemplate }}
+        {{- tpl (toYaml $effective.customInitContainersTemplate) $ | nindent 8 }}
         {{- end }}
         {{- if $.Values.tls.engine.enabled }}
         - name: tls-chain-setup
@@ -437,7 +439,7 @@ spec:
           # silently shipping a leaf-only chain that fails self-verification
           # later with a much less obvious curl/SSL error.
           image: {{ $.Values.utilitiesImage }}
-          imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
+          imagePullPolicy: {{ $effective.image.pullPolicy }}
           command: ["/bin/bash", "-c"]
           args:
             - |
@@ -469,7 +471,7 @@ spec:
         {{- if $hpEnabled }}
         - name: host-path-setup
           image: {{ $.Values.utilitiesImage }}
-          imagePullPolicy: {{ $.Values.engineSpec.image.pullPolicy }}
+          imagePullPolicy: {{ $effective.image.pullPolicy }}
           command: ["/bin/bash", "-c"]
           args:
             - |
@@ -494,7 +496,7 @@ spec:
         {{- end }}
 {{- end }}
       volumes:
-        {{- if $.Values.engineSpec.uiSidecar }}
+        {{- if $effective.uiSidecar }}
         - name: nginx-writable-dir
           emptyDir: {}
         {{- end }}
@@ -520,21 +522,25 @@ spec:
         - name: engine-tls-chain
           emptyDir: {}
         {{- end }}
-        {{- with $.Values.engineSpec.customVolumes }}
+        {{- with $effective.customVolumes }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if eq $effective.storageType "emptyDir" }}
+        - name: data
+          emptyDir: {{ toYaml $effective.emptyDir | nindent 12 }}
         {{- end }}
         {{- if $hpEnabled }}
         - name: data
           hostPath:
-            path: {{ $.Values.engineSpec.storageHostPath.path }}
-            type: {{ default "DirectoryOrCreate" $.Values.engineSpec.storageHostPath.type }}
+            path: {{ $effective.storageHostPath.path }}
+            type: {{ default "DirectoryOrCreate" $effective.storageHostPath.type }}
         {{- end }}
-{{- if not $hpEnabled }}
+{{- if eq $effective.storageType "pvc" }}
   volumeClaimTemplates:
     - metadata:
         name: data
       spec:
-        {{- $storage := $engine.storage | default $.Values.engineSpec.defaultStorage }}
+        {{- $storage := $effective.storage }}
         {{- if hasKey $storage "storageClassName" }}
         storageClassName: {{ $storage.storageClassName | quote }}
         {{- end }}

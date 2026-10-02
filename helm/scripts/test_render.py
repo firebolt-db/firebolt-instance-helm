@@ -187,5 +187,122 @@ class CertificateLifecycleTests(unittest.TestCase):
         self.assertNotIn("SERVING=", direct)
 
 
+class EngineOptionsTests(unittest.TestCase):
+    def test_engine_workload_annotations_inherit_replace_and_clear(self):
+        shared = {"secret.reloader.stakater.com/auto": "true", "example.com/owner": "shared"}
+        custom = {"secret.reloader.stakater.com/reload": "engine-tls"}
+        values = {"engineSpec": {"annotations": shared}, "engines": [
+            {"name": "inherited", "replicas": 2},
+            {"name": "overridden", "replicas": 1, "annotations": custom},
+            {"name": "cleared", "replicas": 1, "annotations": {}},
+        ]}
+        docs = render(values)
+        for name, count, expected in [("inherited", 2, shared), ("overridden", 1, custom), ("cleared", 1, {})]:
+            for node in range(count):
+                workload = resource(docs, "StatefulSet", f"audit-engine-{name}-node-{node}")
+                self.assertEqual(workload["metadata"].get("annotations", {}), expected)
+                pod_annotations = workload["spec"]["template"]["metadata"]["annotations"]
+                self.assertFalse(set(shared) & set(pod_annotations))
+                self.assertFalse(set(custom) & set(pod_annotations))
+        render({"engines": [{"name": "invalid", "replicas": 1, "annotations": {"bad": 1}}]}, expect_error=True)
+
+    def test_per_engine_overrides_and_empty_values_do_not_leak(self):
+        docs = render({"engineSpec": {"image": {"tag": "shared"}, "nodeSelector": {"pool": "shared"},
+                                      "extraEnv": [{"name": "CUSTOM", "value": "shared"}], "uiSidecar": True},
+                       "engines": [{"name": "first", "replicas": 1, "image": {"tag": "specific"},
+                                    "nodeSelector": {}, "extraEnv": [], "uiSidecar": False,
+                                    "terminationGracePeriodSeconds": 90,
+                                    "customEngineConfig": {"logging": {"level": "debug"}}},
+                                   {"name": "second", "replicas": 1}]})
+        first = resource(docs, "StatefulSet", "audit-engine-first-node-0")["spec"]["template"]["spec"]
+        second = resource(docs, "StatefulSet", "audit-engine-second-node-0")["spec"]["template"]["spec"]
+        self.assertTrue(first["containers"][0]["image"].endswith(":specific"))
+        self.assertTrue(second["containers"][0]["image"].endswith(":shared"))
+        self.assertNotIn("nodeSelector", first)
+        self.assertEqual(second["nodeSelector"], {"pool": "shared"})
+        self.assertNotIn("CUSTOM", [e["name"] for e in first["containers"][0]["env"]])
+        self.assertIn("CUSTOM", [e["name"] for e in second["containers"][0]["env"]])
+        self.assertEqual(len(first["containers"]), 1)
+        self.assertEqual(len(second["containers"]), 2)
+        self.assertEqual(first["terminationGracePeriodSeconds"], 90)
+        config = yaml.safe_load(resource(docs, "ConfigMap", "audit-engine-first-config")["data"]["config.yaml"])
+        self.assertEqual(config["engine"]["termination_grace_period"], "85s")
+        self.assertEqual(config["logging"]["level"], "debug")
+        other = yaml.safe_load(resource(docs, "ConfigMap", "audit-engine-second-config")["data"]["config.yaml"])
+        self.assertNotIn("level", other["logging"])
+        self.assertNotIn("web-ui", [p["name"] for p in resource(docs, "Service", "audit-engine-first-ready")["spec"]["ports"]])
+
+    def test_node_hooks_use_effective_host_suffix_for_each_engine(self):
+        docs = render({"engineSpec": {"nodeHostSuffix": ".shared.example"}, "engines": [
+            {"name": "first", "replicas": 1, "nodeHostSuffix": ".specific.example"},
+            {"name": "second", "replicas": 1}]})
+        for hook in ("dns", "pods", "ready"):
+            script = resource(docs, "Pod", "audit-test-engine-" + hook)["spec"]["containers"][0]["command"][-1]
+            self.assertIn("audit-engine-first-hl.audit.svc.specific.example", script)
+            self.assertIn("audit-engine-second-hl.audit.svc.shared.example", script)
+            self.assertNotIn(".svc.cluster.local", script)
+
+    def test_default_engine_inherits_shared_scheduling_and_resources(self):
+        docs = render({"engineSpec": {"nodeSelector": {"pool": "shared"}, "resources": {"limits": {"memory": "8Gi"}}}})
+        spec = resource(docs, "StatefulSet", "audit-engine-default-node-0")["spec"]["template"]["spec"]
+        self.assertEqual(spec["nodeSelector"], {"pool": "shared"})
+        self.assertEqual(spec["containers"][0]["resources"]["limits"]["memory"], "8Gi")
+
+    def test_emptydir_is_explicit_and_pvc_retention_is_unchanged(self):
+        docs = render({"engines": [{"name": "cache", "replicas": 1, "storageType": "emptyDir", "emptyDir": {"sizeLimit": "2Gi"}},
+                                   {"name": "persist", "replicas": 1}]})
+        cache = resource(docs, "StatefulSet", "audit-engine-cache-node-0")["spec"]
+        self.assertNotIn("volumeClaimTemplates", cache)
+        self.assertIn({"name": "data", "emptyDir": {"sizeLimit": "2Gi"}}, cache["template"]["spec"]["volumes"])
+        persistent = resource(docs, "StatefulSet", "audit-engine-persist-node-0")["spec"]
+        self.assertIn("volumeClaimTemplates", persistent)
+        self.assertNotIn("persistentVolumeClaimRetentionPolicy", persistent)
+        self.assertIn("mutually exclusive", render({"engineSpec": {"storageType": "emptyDir", "hostPathStorageEnabled": True}}, expect_error=True))
+
+    def test_explicit_storage_type_overrides_inherited_legacy_hostpath(self):
+        docs = render({"engineSpec": {"hostPathStorageEnabled": True}, "engines": [
+            {"name": "legacy", "replicas": 1},
+            {"name": "persistent", "replicas": 1, "storageType": "pvc"},
+            {"name": "ephemeral", "replicas": 1, "storageType": "emptyDir"},
+            {"name": "disabled", "replicas": 1, "hostPathStorageEnabled": False},
+        ]})
+        for name, backend in [("legacy", "hostPath"), ("persistent", "pvc"),
+                              ("ephemeral", "emptyDir"), ("disabled", "pvc")]:
+            spec = resource(docs, "StatefulSet", f"audit-engine-{name}-node-0")["spec"]
+            self.assertEqual("volumeClaimTemplates" in spec, backend == "pvc")
+            volumes = spec["template"]["spec"]["volumes"]
+            data = next((v for v in volumes if v["name"] == "data"), {})
+            self.assertEqual("hostPath" in data, backend == "hostPath")
+            self.assertEqual("emptyDir" in data, backend == "emptyDir")
+        self.assertIn("mutually exclusive", render({"engines": [{
+            "name": "conflict", "replicas": 1, "storageType": "emptyDir",
+            "hostPathStorageEnabled": True}]}, expect_error=True))
+
+    def test_mixed_service_accounts(self):
+        docs = render({"engineSpec": {"serviceAccount": "external"}, "engines": [
+            {"name": "first", "replicas": 1, "serviceAccount": ""}, {"name": "second", "replicas": 1}]})
+        self.assertEqual(resource(docs, "ServiceAccount", "audit-engine")["automountServiceAccountToken"], False)
+        for name, account in [("first", "audit-engine"), ("second", "external")]:
+            spec = resource(docs, "StatefulSet", f"audit-engine-{name}-node-0")["spec"]["template"]["spec"]
+            self.assertEqual(spec["serviceAccountName"], account)
+            self.assertFalse(spec["automountServiceAccountToken"])
+
+    def test_external_postgres_tls_requires_verified_configuration(self):
+        docs = render({"postgresql": {"local_enabled": False, "host": "db.example.com", "tls": {
+            "enabled": True, "caSecret": "database-ca", "caKey": "root.pem"}}})
+        spec = resource(docs, "Deployment", "audit-metadata-service")["spec"]["template"]["spec"]
+        env = {e["name"]: e.get("value") for e in spec["containers"][0]["env"]}
+        self.assertEqual(env["PGSSLMODE"], "verify-full")
+        self.assertEqual(env["PGSSLROOTCERT"], "/secrets/postgres-ca/ca.crt")
+        volume = next(v for v in spec["volumes"] if v["name"] == "postgres-ca")
+        self.assertEqual(volume["secret"]["items"], [{"key": "root.pem", "path": "ca.crt"}])
+        self.assertIn("external database", render({"postgresql": {"tls": {"enabled": True, "caSecret": "ca"}}}, expect_error=True))
+        self.assertIn("caSecret", render({"postgresql": {"local_enabled": False, "host": "db", "tls": {"enabled": True}}}, expect_error=True))
+
+    def test_per_engine_identity_override_is_rejected(self):
+        self.assertIn("installation identity", render({"engines": [{"name": "default", "replicas": 1,
+            "customEngineConfig": {"instance": {"id": "01kp98j0000000000000000001"}}}]}, expect_error=True))
+
+
 if __name__ == "__main__":
     unittest.main()
