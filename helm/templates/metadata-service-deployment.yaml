@@ -4,6 +4,10 @@ kind: Deployment
 metadata:
   name: {{ include "fbinstance.fullname" . }}-metadata-service
   namespace: {{ .Release.Namespace }}
+  {{- with .Values.metadata.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "fbinstance.labels" . | nindent 4 }}
     firebolt/component: metadata-service
@@ -23,7 +27,6 @@ spec:
       annotations:
         checksum/config: {{ (include (print $.Template.BasePath "/metadata-service-configmap.yaml") . | fromYaml).data | toYaml | sha256sum }}
         checksum/secret: {{ toYaml .Values.postgresql | sha256sum }}
-        firebolt.io/restart-token: {{ .Values.metadata.restartToken | quote }}
         {{- if .Values.postgresql.credentials.existingSecret }}
         checksum/credentials-version: {{ (lookup "v1" "Secret" .Release.Namespace $pgSecretName).metadata | default dict | dig "resourceVersion" "" | sha256sum }}
         {{- end }}
