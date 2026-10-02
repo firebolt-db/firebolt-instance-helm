@@ -99,19 +99,48 @@ The issuer behind `tls.engine.certManager` must populate `ca.crt` in the Certifi
 Secret updates do not independently trigger Helm upgrades. Engines load serving certificates at startup, and their full certificate chain is assembled by an init container. Treat certificate replacement and workload restart as separate steps:
 
 1. Renew or replace the certificate Secret, preserving its required keys and SANs. For cert-manager, wait for the replacement Certificate revision to be issued and its Secret to contain the new certificate. Merely observing an old `Ready=True` condition does not establish that renewal finished.
-2. For a same-CA Engine renewal, change `engineSpec.restartToken`. For a Gateway certificate or upstream trust change, change `gateway.restartToken`. Upgrade with the full deployment values and wait for every affected workload to finish rolling out.
-3. Run the verified TLS hooks described below and confirm the served certificate is the renewed certificate before its predecessor expires.
+2. Restart affected workloads after the replacement Secret exists. For a same-CA Engine renewal, restart every Engine StatefulSet. For a Gateway serving-certificate change, restart the Gateway Deployment. If Engine CA trust changes, coordinate restarts of both Engines and the Gateway using a staged trust migration.
+3. Wait for the rollouts, run the verified TLS hooks described below, and confirm the served certificate is the renewed certificate before its predecessor expires.
 
-Use a new arbitrary, non-secret token for each restart:
+For the `firebolt` release in the `firebolt` namespace, restart Engine nodes one StatefulSet at a time during a maintenance window:
 
-```yaml
-engineSpec:
-  restartToken: certificate-renewal-2
-gateway:
-  restartToken: certificate-renewal-2
+```bash
+# Stop if discovery or any rollout fails.
+set -e
+workloads=$(kubectl get statefulsets --namespace firebolt \
+  --selector app.kubernetes.io/instance=firebolt,firebolt/component=engine -o name)
+for workload in $workloads; do
+  kubectl rollout restart "$workload" --namespace firebolt
+  kubectl rollout status "$workload" --namespace firebolt --timeout=10m
+done
 ```
 
-Online Helm rendering hashes the current auth/TLS Secrets as an additional restart trigger. It cannot hash a future Secret that cert-manager has not issued yet. Offline and GitOps rendering cannot read live Secrets at all; use the explicit restart tokens after issuance in either deployment mode. The chart does not install a reload controller.
+Run the loop in Bash. Waiting between nodes avoids initiating all restarts together, but does not guarantee uninterrupted distributed queries. Change the release and namespace in these examples to match your deployment.
+
+After replacing a Gateway certificate, restart its Deployment:
+
+```bash
+kubectl rollout restart deployment/firebolt-gateway --namespace firebolt
+kubectl rollout status deployment/firebolt-gateway --namespace firebolt --timeout=10m
+```
+
+Online Helm rendering hashes current auth/TLS Secrets as an additional rollout trigger. It cannot hash a future Secret that cert-manager has not issued yet. Offline rendering cannot read live Secrets. Neither mechanism watches for changes between Helm operations.
+
+### Optional automatic restarts
+
+If your platform already runs [Stakater Reloader](https://github.com/stakater/Reloader), you can opt workloads into Secret-triggered rollouts. The chart does not install Reloader. Its annotations belong on Deployment or StatefulSet metadata, not on pod metadata.
+
+For example, enable Secret-triggered Gateway restarts through workload annotations:
+
+```yaml
+gateway:
+  annotations:
+    secret.reloader.stakater.com/auto: "true"
+```
+
+The same annotation can be set under `engineSpec.annotations` for Engine StatefulSets or `metadata.annotations` for the Metadata Service. Automatic reload watches referenced Secrets, including those updated by cert-manager. It does not stage CA trust changes, rotate database passwords, or coordinate signing-key promotion.
+
+Each Engine node has its own single-replica StatefulSet. A shared Secret update can trigger concurrent restarts across those StatefulSets. Use manual restarts when you need to control that sequence. Reloader's rolling updates do not provide cross-node coordination or a query-availability guarantee. Configure annotation ownership and rollout strategy according to your Reloader and GitOps controller configuration.
 
 A CA change requires overlapping trust and coordinated restarts. Do not replace the only trusted CA and both leaf certificates in a single upgrade. The chart does not automatically stage trust bundles or gate traffic cutover. Plan a maintenance window, or manage a separately validated staged migration outside the chart.
 

@@ -63,9 +63,6 @@
             }
           }
         },
-        "restartToken": {
-          "type": "string"
-        },
         "storageType": {
           "type": "string",
           "enum": [
@@ -149,6 +146,12 @@
         },
         "topologySpreadConstraints": {
           "type": "array"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
@@ -194,8 +197,11 @@
             }
           }
         },
-        "restartToken": {
-          "type": "string"
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
@@ -283,8 +289,11 @@
           "type": "integer",
           "minimum": 10
         },
-        "restartToken": {
-          "type": "string"
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
@@ -544,9 +553,6 @@
             }
           }
         },
-        "restartToken": {
-          "type": "string"
-        },
         "storageType": {
           "type": "string",
           "enum": [
@@ -627,6 +633,12 @@
         },
         "topologySpreadConstraints": {
           "type": "array"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     }

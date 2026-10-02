@@ -99,15 +99,12 @@ class ConfigurationTests(unittest.TestCase):
                 self.assertEqual(claim.get("storageClassName"), storage_class)
                 self.assertEqual("storageClassName" in claim, storage_class is not None)
 
-    def test_metadata_rolls_on_identity_and_explicit_secret_restart(self):
+    def test_metadata_rolls_on_identity(self):
         def annotations(values):
             return resource(render(values), "Deployment", "audit-metadata-service")["spec"]["template"]["metadata"]["annotations"]
         baseline = annotations({})
         changed_id = annotations({"customEngineConfig": {"instance": {"id": "01kp98j0000000000000000001"}}})
         self.assertNotEqual(baseline["checksum/config"], changed_id["checksum/config"])
-        restarted = annotations({"metadata": {"restartToken": "rotation-2"}})
-        self.assertNotEqual(baseline, restarted)
-        self.assertEqual(baseline["checksum/config"], restarted["checksum/config"])
 
     def test_mounts_cannot_shadow_owned_paths_or_duplicate_destinations(self):
         for path in ("/secrets/auth/admin", "/var", "/var/lib/firebolt/../firebolt", "/etc/envoy/tls/gateway"):
@@ -122,6 +119,15 @@ class ConfigurationTests(unittest.TestCase):
                                    {"name": "other", "mountPath": "/custom/"}]}}, expect_error=True))
         render({"engineSpec": {"customVolumes": [{"name": "custom", "emptyDir": {}}],
                              "customVolumeMounts": [{"name": "custom", "mountPath": "/custom"}]}})
+
+    def test_metadata_workload_annotations_do_not_change_pod_template(self):
+        baseline = resource(render(), "Deployment", "audit-metadata-service")
+        custom = {"secret.reloader.stakater.com/auto": "true"}
+        updated = resource(render({"metadata": {"annotations": custom}}), "Deployment", "audit-metadata-service")
+        self.assertEqual(updated["metadata"]["annotations"], custom)
+        self.assertEqual(updated["spec"]["template"], baseline["spec"]["template"])
+        self.assertNotIn("firebolt.io/restart-token", baseline["spec"]["template"]["metadata"]["annotations"])
+        render({"metadata": {"annotations": {"invalid": True}}}, expect_error=True)
 
     def test_reject_invalid_combinations(self):
         cases = [
@@ -140,19 +146,23 @@ class ConfigurationTests(unittest.TestCase):
 
 
 class CertificateLifecycleTests(unittest.TestCase):
-    def test_restart_tokens_are_component_scoped(self):
+    def test_workload_annotations_are_component_scoped(self):
         baseline = render()
-        def pod(docs, kind, name):
-            return resource(docs, kind, name)["spec"]["template"]
+        custom = {"secret.reloader.stakater.com/auto": "true"}
         cases = [("engineSpec", "StatefulSet", "audit-engine-default-node-0"),
                  ("gateway", "Deployment", "audit-gateway"),
                  ("metadata", "Deployment", "audit-metadata-service")]
         for component, kind, name in cases:
-            docs = render({component: {"restartToken": "rotation-2"}})
-            self.assertNotEqual(pod(baseline, kind, name), pod(docs, kind, name))
+            docs = render({component: {"annotations": custom}})
+            updated = resource(docs, kind, name)
+            original = resource(baseline, kind, name)
+            self.assertEqual(updated["metadata"]["annotations"], custom)
+            self.assertEqual(updated["spec"]["template"], original["spec"]["template"])
+            self.assertNotIn("firebolt.io/restart-token", original["spec"]["template"]["metadata"]["annotations"])
             for other, other_kind, other_name in cases:
                 if other != component:
-                    self.assertEqual(pod(baseline, other_kind, other_name), pod(docs, other_kind, other_name))
+                    self.assertEqual(resource(baseline, other_kind, other_name), resource(docs, other_kind, other_name))
+            render({component: {"annotations": {"invalid": True}}}, expect_error=True)
 
     def test_tls_hook_verifies_hosts_and_projects_only_ca_keys(self):
         values = {"engines": [{"name": "default", "replicas": 2}], "tls": {
@@ -178,6 +188,24 @@ class CertificateLifecycleTests(unittest.TestCase):
 
 
 class EngineOptionsTests(unittest.TestCase):
+    def test_engine_workload_annotations_inherit_replace_and_clear(self):
+        shared = {"secret.reloader.stakater.com/auto": "true", "example.com/owner": "shared"}
+        custom = {"secret.reloader.stakater.com/reload": "engine-tls"}
+        values = {"engineSpec": {"annotations": shared}, "engines": [
+            {"name": "inherited", "replicas": 2},
+            {"name": "overridden", "replicas": 1, "annotations": custom},
+            {"name": "cleared", "replicas": 1, "annotations": {}},
+        ]}
+        docs = render(values)
+        for name, count, expected in [("inherited", 2, shared), ("overridden", 1, custom), ("cleared", 1, {})]:
+            for node in range(count):
+                workload = resource(docs, "StatefulSet", f"audit-engine-{name}-node-{node}")
+                self.assertEqual(workload["metadata"].get("annotations", {}), expected)
+                pod_annotations = workload["spec"]["template"]["metadata"]["annotations"]
+                self.assertFalse(set(shared) & set(pod_annotations))
+                self.assertFalse(set(custom) & set(pod_annotations))
+        render({"engines": [{"name": "invalid", "replicas": 1, "annotations": {"bad": 1}}]}, expect_error=True)
+
     def test_per_engine_overrides_and_empty_values_do_not_leak(self):
         docs = render({"engineSpec": {"image": {"tag": "shared"}, "nodeSelector": {"pool": "shared"},
                                       "extraEnv": [{"name": "CUSTOM", "value": "shared"}], "uiSidecar": True},
