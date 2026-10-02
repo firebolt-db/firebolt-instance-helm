@@ -12,6 +12,14 @@ chore(deps): bump amazon/aws-cli from 2.35.2 to 2.35.3 (#1)
 
 # Changelog
 
+## [0.4.1](https://github.com/firebolt-db/firebolt-instance-helm/compare/0.4.0...0.4.1) (2026-10-02)
+
+
+### Dependencies
+
+* **deps:** bump packdb appVersion to release-5.0.0-pre.0.20260831081410.a005be0f9030 ([#90](https://github.com/firebolt-db/firebolt-instance-helm/issues/90)) ([5e25329](https://github.com/firebolt-db/firebolt-instance-helm/commit/5e253297df6a649ed11960aa09930e1402158ab8))
+* **deps:** bump packdb appVersion to release-5.0.0-pre.0.20260927210425.e91cd5bd17f8 ([#97](https://github.com/firebolt-db/firebolt-instance-helm/issues/97)) ([ce13250](https://github.com/firebolt-db/firebolt-instance-helm/commit/ce132500e8fc5e0c0cc99c5d252a6d45dca47e19))
+
 ## [0.4.0](https://github.com/firebolt-db/firebolt-instance-helm/compare/0.3.2...0.4.0) (2026-08-29)
 
 
