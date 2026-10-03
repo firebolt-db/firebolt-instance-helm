@@ -118,6 +118,9 @@ canonical document has shape:
         metadata_endpoint: <pensieve gRPC endpoint>
     logging:
       format: json
+    storage:
+      gcp:
+        allow_engine_identity: true
 
 .Values.customEngineConfig is deep-merged on top of the canonical
 document at the root: keys at the top become siblings of `engine`
@@ -136,6 +139,13 @@ before the merge: `schema_version`, `engine.id`, `engine.nodes`,
 `instance.auth.{enabled,admin,local.signing_keys}` and
 `endpoints.http.listeners`. The same customEngineConfig therefore
 stays portable across chart versions.
+
+`storage.gcp.allow_engine_identity` is a default rather than a
+chart-authoritative path: the chart renders `true`, and
+`customEngineConfig.storage.gcp.allow_engine_identity: false` takes it
+back. It is read out of the user document before the merge rather than
+overridden by it, because a boolean false is an empty value to
+mergeOverwrite.
 
 When `auth.enabled` is true, `instance.auth.{enabled,admin,
 local.signing_keys}` are built from `auth.admin` / `auth.signingKeys`
@@ -250,11 +260,32 @@ Usage: {{ include "fbinstance.engineConfig" (dict "root" $ "engine" $engine) }}
       ) -}}
 {{- end -}}
 
+{{/*
+  A credential-less external gs:// location authenticates as the engine pod's own
+  Google identity. The engine refuses that unless a deployment permits it, because
+  it cannot tell whose identity it runs as. An engine this chart installs runs under
+  a ServiceAccount belonging to whoever installed it, so the identity is theirs to
+  use, and they should not have to name the setting to reach their own buckets.
+
+  Resolved from the user document here rather than left to the merge below: a
+  boolean false is an empty value to mergeOverwrite, so relying on the merge to let
+  a user turn this off would put a security answer at the mercy of merge semantics.
+*/}}
+{{- $allowEngineIdentity := true -}}
+{{- if and (hasKey $user "storage") (kindIs "map" $user.storage) -}}
+{{-   if and (hasKey $user.storage "gcp") (kindIs "map" $user.storage.gcp) -}}
+{{-     if hasKey $user.storage.gcp "allow_engine_identity" -}}
+{{-       $allowEngineIdentity = $user.storage.gcp.allow_engine_identity -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+
 {{- $canonical := dict
       "schema_version" "1.0"
       "engine" (dict "id" $engine.name "nodes" $nodes "termination_grace_period" (printf "%ds" $shutdownWait))
       "instance" $instanceCanonical
       "logging" (dict "format" "json")
+      "storage" (dict "gcp" (dict "allow_engine_identity" $allowEngineIdentity))
 -}}
 {{- if $root.Values.tls.engine.enabled -}}
 {{-   $_ := set $canonical "endpoints" (dict "http" (dict "listeners" (list (dict

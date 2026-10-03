@@ -184,6 +184,12 @@ By default, external access also uses the engine pod's own Azure identity. That 
 
 An intermediary service principal gives external access a stable identity instead. When you set one, the engine uses the intermediary service principal for external access rather than its own pod identity. Because the service principal is stable and known ahead of time, you can share it with third parties and reference it in container role assignments, including on Azure subscriptions outside your own organization. Access to the object storage container always uses the engine pod's own identity, so the intermediary service principal applies only to external locations.
 
+An `azure://` location carries no secret, because its `CREDENTIALS` clause supplies only a tenant ID. A query that reads or writes such a location therefore signs with an identity that this deployment owns: the engine pod's identity, or the intermediary service principal if you set one. What those identities can reach in Azure Blob Storage is the security boundary.
+
+The engine refuses an external location that points to the managed blob container itself, which is the container that `managed_table_bucket_name` names inside the storage account that `azure.storage_account_name` names. Managed tablet data is not readable or writable that way.
+
+Every other container those identities can reach stays reachable by URL. An inline `azure://` URL carries no location privileges, so any user who can run a query can read, overwrite, or delete the objects in such a container. Give the engine pod's identity blob access to the managed container only, and set an intermediary service principal for the external data. The pod identity then needs no access to that data itself.
+
 Create the intermediary service principal and grant it the permissions it needs to reach the external data.
 
 Set its application client ID under `customEngineConfig.storage.azure.intermediary_service_principal_client_id`:
