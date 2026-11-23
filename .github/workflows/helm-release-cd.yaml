@@ -43,7 +43,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         with:
           client-id: ${{ secrets.GH_APP_FB_DB_CI_WRITER_CLIENT_ID }}
@@ -74,7 +74,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         with:
           client-id: ${{ secrets.GH_APP_FB_DB_CI_WRITER_CLIENT_ID }}
@@ -135,7 +135,7 @@ jobs:
           fi
 
       - name: Set up Helm
-        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
         with:
           # Keep release packaging on the same vetted Helm v3 patch as validation
           # until we've explicitly audited and adopted Helm v4 behavior.
